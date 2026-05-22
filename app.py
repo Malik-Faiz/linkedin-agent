@@ -13,8 +13,8 @@ warnings.filterwarnings('ignore', category=DeprecationWarning)
 # ─── API KEYS ────────────────────────────────────────────────────────────────
 
 GROQ_API_KEY = "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"
-BUFFER_API_KEY = "hVsIuiztTgSXmo7JvTzEAeSrU39vfQhOXl-LytmDW6M"
-BUFFER_CHANNEL_ID = "6a10a6cd090476fb994c09f6"
+BUFFER_API_KEY = "OEF_iqPQxmZ4zJzwJ-PddYHlfaARGRriXnzamvWdFx8"
+BUFFER_CHANNEL_ID = "67fe17592799bb0a23ef270d"
 SERPAPI_API_KEY = "7aa81bd2ac8b9e77e2522ec091bd44ffd1eaf0083184bf300980c7d5abf7b447"
 
 
