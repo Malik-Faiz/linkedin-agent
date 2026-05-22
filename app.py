@@ -13,7 +13,7 @@ warnings.filterwarnings('ignore', category=DeprecationWarning)
 # ─── API KEYS ────────────────────────────────────────────────────────────────
 
 GROQ_API_KEY = "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"
-BUFFER_API_KEY = "wasX1sAMeSlmistvcYkWSGx6XuqIOCqN43JlSBoNBkf"
+BUFFER_API_KEY = "OEF_iqPQxmZ4zJzwJ-PddYHlfaARGRriXnzamvWdFx8"
 BUFFER_CHANNEL_ID = "67fe17592799bb0a23ef270d"
 SERPAPI_API_KEY = "7aa81bd2ac8b9e77e2522ec091bd44ffd1eaf0083184bf300980c7d5abf7b447"
 
@@ -272,60 +272,87 @@ def get_subjects():
     return jsonify({"subjects": subjects})
 
 @app.route("/api/subjects", methods=["POST"])
+
 def add_subjects():
+
     data         = request.get_json()
+
     new_subjects = data.get("subjects", [])
+
     image_b64    = data.get("image_base64")
+
     filename     = data.get("filename", "upload.jpg")
 
+
+
     if not new_subjects:
+
         return jsonify({"ok": False, "message": "No subjects provided"}), 400
+
+
 
     uploaded_url = None
 
+
+
     # Automatically upload physical file to a free link host
+
     if image_b64:
+
         try:
+
             if "," in image_b64:
+
                 image_b64 = image_b64.split(",")[1]
+
             
+
             img_data = base64.b64decode(image_b64)
+
+            add_log(f"Uploading '{filename}' to image host...", "info")
+
             
-            # 1. Clean the filename (Catbox hates spaces and special characters)
-            safe_filename = filename.replace(" ", "_").replace(",", "")
-            if not safe_filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-                safe_filename += ".png"
-                
-            add_log(f"Uploading '{safe_filename}' to image host...", "info")
+
+            files = {'fileToUpload': (filename, img_data)}
+
+            data_payload = {'reqtype': 'fileupload'}
+
+            res = requests.post("https://catbox.moe/user/api.php", data=data_payload, files=files, timeout=30)
+
             
-            # 2. Force the correct MIME type so Catbox knows it's an image
-            mime_type = 'image/jpeg' if 'jpg' in safe_filename.lower() or 'jpeg' in safe_filename.lower() else 'image/png'
-            files = {'fileToUpload': (safe_filename, img_data, mime_type)}
-            
-            # 3. Add an empty userhash (sometimes required by Catbox API)
-            data_payload = {'reqtype': 'fileupload', 'userhash': ''}
-            
-            # 4. Spoof a normal Web Browser to bypass bot-blockers
-            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
-            
-            res = requests.post("https://catbox.moe/user/api.php", data=data_payload, files=files, headers=headers, timeout=30)
-            
+
             if res.status_code == 200 and "catbox.moe" in res.text:
+
                 uploaded_url = res.text.strip()
+
                 add_log(f"Upload success! Public link: {uploaded_url}", "ok")
+
             else:
-                add_log(f"Upload failed (HTTP {res.status_code}): {res.text}", "error")
+
+                add_log(f"Upload failed: {res.text}", "error")
+
         except Exception as e:
+
             add_log(f"Error processing image file: {e}", "error")
 
+
+
     with open(SUBJECTS_FILE, "a", encoding="utf-8") as f:
+
         for s in new_subjects:
+
             line = s.strip()
+
             if uploaded_url:
+
                 line = f"{line} | IMG: {uploaded_url}"
+
             f.write(line + "\n")
 
+
+
     add_log(f"Added {len(new_subjects)} subject(s) from dashboard.", "ok")
+
     return jsonify({"ok": True, "added": len(new_subjects)})
 
 # ─── STARTUP ─────────────────────────────────────────────────────────────────
