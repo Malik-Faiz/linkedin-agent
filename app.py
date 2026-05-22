@@ -23,14 +23,14 @@ SERPAPI_API_KEY = "7aa81bd2ac8b9e77e2522ec091bd44ffd1eaf0083184bf300980c7d5abf7b
 SUBJECTS_FILE = "subjects.txt"
 BATCH_SIZE    = 2
 TARGET_HOUR   = 8
- 
+
 SYSTEM_PROMPT_POST = """You are an expert LinkedIn ghostwriter.
 Write a highly engaging, professional LinkedIn post based on the user's subject.
 1. Hook on the first line wrapped in **asterisks**.
 2. Short, punchy sentences.
 3. Call-To-Action (CTA) question at the end.
 4. 3 to 5 relevant hashtags."""
- 
+
 # ─── STATE ───────────────────────────────────────────────────────────────────
 agent_state = {
     "status":      "waiting",
@@ -40,33 +40,33 @@ agent_state = {
     "last_run":    None,
     "running":     False
 }
- 
+
 app = Flask(__name__)
 CORS(app)
- 
+
 # ─── HELPERS ─────────────────────────────────────────────────────────────────
 def to_unicode_bold(text):
     normal = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
     b_chars = "𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭𝗮𝗯𝗰𝗱𝗲𝗳𝗴𝗵𝗶𝗷𝗸𝗹𝗺𝗻𝗼𝗽𝗾𝗿𝘀𝘁𝘂𝘃𝘄𝘅𝘆𝘇𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵"
     return text.translate(str.maketrans(normal, b_chars))
- 
+
 def format_linkedin_bold(text):
     return re.sub(r'\*\*(.*?)\*\*', lambda m: to_unicode_bold(m.group(1)), text)
- 
+
 def add_log(msg, level="info"):
     entry = {"time": datetime.now().strftime("%H:%M:%S"), "msg": msg, "level": level}
     agent_state["logs"].append(entry)
     if len(agent_state["logs"]) > 100:
         agent_state["logs"] = agent_state["logs"][-100:]
     print(f"[{entry['time']}] [{level.upper()}] {msg}")
- 
+
 def get_next_run_time():
     now = datetime.now()
     target = now.replace(hour=TARGET_HOUR, minute=0, second=0, microsecond=0)
     if now >= target:
         target += timedelta(days=1)
     return target
- 
+
 # ─── CORE FUNCTIONS ──────────────────────────────────────────────────────────
 def generate_post(subject):
     clean = subject.replace("(create image)", "").strip()
@@ -86,7 +86,7 @@ def generate_post(subject):
     except Exception as e:
         add_log(f"Groq failure: {e}", "error")
         return None
- 
+
 def get_image_url(subject):
     clean = subject.replace("(create image)", "").strip()
     try:
@@ -98,7 +98,7 @@ def get_image_url(subject):
     except Exception as e:
         add_log(f"SerpAPI Error: {e}", "error")
     return None
- 
+
 def send_to_buffer(post_text, image_url=None):
     input_data = {
         "text": post_text,
@@ -122,7 +122,7 @@ def send_to_buffer(post_text, image_url=None):
         return response.status_code, response.json()
     except Exception as e:
         return 500, {"error": str(e)}
- 
+
 # ─── BATCH ENGINE ─────────────────────────────────────────────────────────────
 def run_batch(triggered_by="scheduler"):
     if agent_state["running"]:
@@ -132,28 +132,28 @@ def run_batch(triggered_by="scheduler"):
     agent_state["status"]      = "running"
     agent_state["today_count"] = 0
     add_log(f"Batch started (trigger: {triggered_by})", "info")
- 
+
     if not os.path.exists(SUBJECTS_FILE):
         add_log("subjects.txt not found! Add subjects from dashboard.", "error")
         agent_state["running"] = False
         agent_state["status"]  = "waiting"
         return
- 
+
     with open(SUBJECTS_FILE, "r", encoding="utf-8") as f:
         all_subjects = [l.strip() for l in f if l.strip()]
- 
+
     if not all_subjects:
         add_log("Queue is empty! Add subjects from dashboard.", "warn")
         agent_state["running"] = False
         agent_state["status"]  = "waiting"
         return
- 
+
     batch = all_subjects[:BATCH_SIZE]
     with open(SUBJECTS_FILE, "w", encoding="utf-8") as f:
         f.write("\n".join(all_subjects[BATCH_SIZE:]))
- 
+
     add_log(f"Processing {len(batch)} subjects. {len(all_subjects)-len(batch)} remaining.", "info")
- 
+
     for j, subject in enumerate(batch):
         add_log(f"[{j+1}/{len(batch)}] {subject[:50]}", "info")
         post_text = generate_post(subject)
@@ -172,12 +172,12 @@ def run_batch(triggered_by="scheduler"):
         else:
             add_log(f"[{j+1}/{len(batch)}] Buffer failed: {result}", "error")
         time.sleep(10)
- 
+
     agent_state["last_run"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     agent_state["running"]  = False
     agent_state["status"]   = "waiting"
     add_log(f"Batch complete! {agent_state['today_count']} posts sent.", "ok")
- 
+
 # ─── THREADS ─────────────────────────────────────────────────────────────────
 def scheduler_loop():
     add_log("Scheduler started — waiting for 08:00 AM.", "info")
@@ -188,7 +188,7 @@ def scheduler_loop():
             threading.Thread(target=run_batch, args=("scheduler",), daemon=True).start()
             time.sleep(60)
         time.sleep(1)
- 
+
 def keep_alive_loop():
     time.sleep(30)
     while True:
@@ -202,12 +202,16 @@ def keep_alive_loop():
         except Exception as e:
             add_log(f"Ping failed: {e}", "warn")
         time.sleep(600)
- 
+
 # ─── ROUTES ──────────────────────────────────────────────────────────────────
+@app.route("/")
+def home():
+    return jsonify({"message": "LinkedIn Agent is running!", "status": agent_state["status"]})
+
 @app.route("/ping")
 def ping():
     return jsonify({"status": "alive", "time": datetime.now().strftime("%H:%M:%S")})
- 
+
 @app.route("/api/status")
 def get_status():
     next_run = get_next_run_time()
@@ -226,14 +230,14 @@ def get_status():
         "subjects":     subjects,
         "logs":         agent_state["logs"][-30:]
     })
- 
+
 @app.route("/api/run", methods=["POST"])
 def manual_run():
     if agent_state["running"]:
         return jsonify({"ok": False, "message": "Already running"}), 409
     threading.Thread(target=run_batch, args=("manual",), daemon=True).start()
     return jsonify({"ok": True, "message": "Batch triggered!"})
- 
+
 @app.route("/api/subjects", methods=["GET"])
 def get_subjects():
     subjects = []
@@ -241,7 +245,7 @@ def get_subjects():
         with open(SUBJECTS_FILE, "r", encoding="utf-8") as f:
             subjects = [l.strip() for l in f if l.strip()]
     return jsonify({"subjects": subjects})
- 
+
 @app.route("/api/subjects", methods=["POST"])
 def add_subjects():
     data         = request.get_json()
@@ -253,7 +257,7 @@ def add_subjects():
             f.write(s.strip() + "\n")
     add_log(f"Added {len(new_subjects)} subject(s) from dashboard.", "ok")
     return jsonify({"ok": True, "added": len(new_subjects)})
- 
+
 # ─── STARTUP ─────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     threading.Thread(target=scheduler_loop, daemon=True).start()
@@ -263,6 +267,3 @@ if __name__ == "__main__":
     add_log("Scheduler active — auto-run at 08:00 AM daily", "ok")
     add_log("Keep-alive ping active every 10 minutes", "ok")
     app.run(host="0.0.0.0", port=port, debug=False)
- 
-
-
