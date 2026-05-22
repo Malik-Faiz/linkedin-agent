@@ -290,17 +290,31 @@ def add_subjects():
                 image_b64 = image_b64.split(",")[1]
             
             img_data = base64.b64decode(image_b64)
-            add_log(f"Uploading '{filename}' to image host...", "info")
             
-            files = {'fileToUpload': (filename, img_data)}
-            data_payload = {'reqtype': 'fileupload'}
-            res = requests.post("https://catbox.moe/user/api.php", data=data_payload, files=files, timeout=30)
+            # 1. Clean the filename (Catbox hates spaces and special characters)
+            safe_filename = filename.replace(" ", "_").replace(",", "")
+            if not safe_filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                safe_filename += ".png"
+                
+            add_log(f"Uploading '{safe_filename}' to image host...", "info")
+            
+            # 2. Force the correct MIME type so Catbox knows it's an image
+            mime_type = 'image/jpeg' if 'jpg' in safe_filename.lower() or 'jpeg' in safe_filename.lower() else 'image/png'
+            files = {'fileToUpload': (safe_filename, img_data, mime_type)}
+            
+            # 3. Add an empty userhash (sometimes required by Catbox API)
+            data_payload = {'reqtype': 'fileupload', 'userhash': ''}
+            
+            # 4. Spoof a normal Web Browser to bypass bot-blockers
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
+            
+            res = requests.post("https://catbox.moe/user/api.php", data=data_payload, files=files, headers=headers, timeout=30)
             
             if res.status_code == 200 and "catbox.moe" in res.text:
                 uploaded_url = res.text.strip()
                 add_log(f"Upload success! Public link: {uploaded_url}", "ok")
             else:
-                add_log(f"Upload failed: {res.text}", "error")
+                add_log(f"Upload failed (HTTP {res.status_code}): {res.text}", "error")
         except Exception as e:
             add_log(f"Error processing image file: {e}", "error")
 
