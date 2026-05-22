@@ -291,19 +291,32 @@ body::after{
       <div id="subjectList"></div>
     </div>
 
-    <!-- ADD SUBJECTS -->
+    <!-- ADD SUBJECTS WITH FILE UPLOAD -->
     <div class="card" style="margin-bottom:0">
       <div class="card-head">
         <h2>Add Subjects</h2>
         <span class="chip">one per line</span>
       </div>
       <textarea class="add-area" id="newSubjects" placeholder="AI tools for marketers&#10;Remote leadership tips (create image)&#10;Personal branding in 2025"></textarea>
-      <button class="add-btn" onclick="addSubjects()">
+      
+      <!-- FILE INPUT + BUTTON CONTROLS -->
+      <div style="display: flex; gap: 12px; align-items: center; margin-top: 8px;">
+        <input type="file" id="imageFile" accept="image/*" style="display:none" onchange="document.getElementById('fileName').textContent = this.files[0] ? 'Attached: ' + this.files[0].name : ''">
+        
+        <button class="add-btn" style="margin-top:0;" onclick="document.getElementById('imageFile').click()">
+          <i class="ti ti-photo" style="font-size:14px"></i> Select Image
+        </button>
+        
+        <span id="fileName" style="font-size: 11px; color: var(--accent); font-family: var(--mono);"></span>
+      </div>
+      
+      <button class="add-btn" onclick="addSubjects()" style="width: 100%; justify-content: center; background: var(--surface2); color: var(--text); border-color: var(--accent); margin-top: 12px;">
         <i class="ti ti-plus" style="font-size:14px"></i>
         Add to Queue
       </button>
+      
       <div style="margin-top:12px;font-size:11px;color:var(--muted);font-family:var(--mono);line-height:1.7">
-        Tip: add <code style="color:var(--accent)">(create image)</code> to fetch a relevant image via SerpAPI.
+        Tip: Attach an image manually, or add <code style="color:var(--accent)">(create image)</code> to fetch one automatically.
       </div>
     </div>
   </div>
@@ -373,13 +386,29 @@ function renderSubjects(subjects){
     list.innerHTML='<div class="empty-state"><i class="ti ti-inbox" style="font-size:24px;display:block;margin-bottom:6px"></i>Queue empty — add subjects above</div>';
     return;
   }
+  
   list.innerHTML = subjects.slice(0,8).map((s,i)=>{
-    const hasImg = s.toLowerCase().includes('(create image)');
     const isNext = i < 2;
+    // Updated to check for the | IMG: delimiter
+    const hasManualImg = s.includes('| IMG:');
+    const hasAutoImg = s.toLowerCase().includes('(create image)');
+    
+    // Hide the backend delimiter from the UI
+    let cleanText = s.split('| IMG:')[0].replace('(create image)','').trim();
+    
+    let tagHtml = '';
+    if (hasManualImg) {
+        tagHtml = `<span class="si-tag tag-img">+ manual img</span>`;
+    } else if (hasAutoImg) {
+        tagHtml = `<span class="si-tag tag-img">+ auto img</span>`;
+    } else {
+        tagHtml = `<span class="si-tag tag-txt">text</span>`;
+    }
+
     return `<div class="subj-item${isNext?' next':''}">
       <span class="si-num">${pad(i+1)}</span>
-      <span class="si-text" style="color:${isNext?'var(--text)':'var(--muted)'}">${s.replace('(create image)','').trim()}</span>
-      <span class="si-tag ${hasImg?'tag-img':'tag-txt'}">${hasImg?'+ img':'text'}</span>
+      <span class="si-text" style="color:${isNext?'var(--text)':'var(--muted)'}">${cleanText}</span>
+      ${tagHtml}
     </div>`;
   }).join('') + (subjects.length>8?`<div style="text-align:center;padding:8px;font-size:12px;color:var(--muted)">+${subjects.length-8} more</div>`:'');
 }
@@ -450,20 +479,51 @@ async function triggerManual(){
   }
 }
 
+// UPDATE: Image conversion logic added here
 async function addSubjects(){
   const ta = document.getElementById('newSubjects');
+  const fileInput = document.getElementById('imageFile');
+  
   const lines = ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
   if(!lines.length) return;
+
+  // Change Add Button to loading state
+  const btn = document.querySelector('.add-btn:last-of-type');
+  const originalText = btn.innerHTML;
+  btn.innerHTML = `<i class="ti ti-loader-2 spin" style="font-size:14px"></i> Processing...`;
+  btn.disabled = true;
+
+  let payload = { subjects: lines };
+
+  // Convert physical file to base64 string
+  if (fileInput.files.length > 0) {
+      const file = fileInput.files[0];
+      payload.filename = file.name;
+      payload.image_base64 = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.readAsDataURL(file);
+      });
+  }
+
   try {
     const res = await fetch(`${API}/subjects`, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({subjects: lines})
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
-    if(data.ok){ ta.value=''; fetchStatus(); }
+    if(data.ok){ 
+      ta.value = ''; 
+      fileInput.value = '';
+      document.getElementById('fileName').textContent = '';
+      fetchStatus(); 
+    }
   } catch(e){
     alert('Cannot reach Flask server.');
+  } finally {
+    btn.innerHTML = originalText;
+    btn.disabled = false;
   }
 }
 
