@@ -44,6 +44,9 @@ agent_state = {
 app = Flask(__name__)
 CORS(app)
 
+# ─── DASHBOARD HTML ──────────────────────────────────────────────────────────
+DASHBOARD = open("dashboard.html", encoding="utf-8").read() if os.path.exists("dashboard.html") else "<h1>dashboard.html not found</h1>"
+
 # ─── HELPERS ─────────────────────────────────────────────────────────────────
 def to_unicode_bold(text):
     normal = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
@@ -134,7 +137,7 @@ def run_batch(triggered_by="scheduler"):
     add_log(f"Batch started (trigger: {triggered_by})", "info")
 
     if not os.path.exists(SUBJECTS_FILE):
-        add_log("subjects.txt not found! Add subjects from dashboard.", "error")
+        add_log("Queue is empty! Add subjects from dashboard.", "warn")
         agent_state["running"] = False
         agent_state["status"]  = "waiting"
         return
@@ -206,7 +209,7 @@ def keep_alive_loop():
 # ─── ROUTES ──────────────────────────────────────────────────────────────────
 @app.route("/")
 def home():
-    return jsonify({"message": "LinkedIn Agent is running!", "status": agent_state["status"]})
+    return DASHBOARD
 
 @app.route("/ping")
 def ping():
