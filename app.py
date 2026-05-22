@@ -4,6 +4,7 @@ import re
 import warnings
 import os
 import threading
+import base64
 from datetime import datetime, timedelta
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -13,10 +14,7 @@ warnings.filterwarnings('ignore', category=DeprecationWarning)
 GROQ_API_KEY = "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"
 BUFFER_API_KEY = "d6uQ82pUexcxVpA6CTgcIaOnAnFkQ_o4XRj9ux-NYx3"
 BUFFER_CHANNEL_ID = "6a0ed242090476fb99433477"
-
-# NEW: Paste your free SerpApi key here
 SERPAPI_API_KEY = "7aa81bd2ac8b9e77e2522ec091bd44ffd1eaf0083184bf300980c7d5abf7b447"
-
 
 # ─── CONFIG ──────────────────────────────────────────────────────────────────
 SUBJECTS_FILE = "subjects.txt"
@@ -157,14 +155,32 @@ def run_batch(triggered_by="scheduler"):
     add_log(f"Processing {len(batch)} subjects. {len(all_subjects)-len(batch)} remaining.", "info")
 
     for j, subject in enumerate(batch):
-        add_log(f"[{j+1}/{len(batch)}] {subject[:50]}", "info")
-        post_text = generate_post(subject)
+        manual_image_url = None
+        base_subject = subject
+
+        # Parse manual image if it exists
+        if "| IMG:" in subject:
+            parts = subject.split("| IMG:")
+            base_subject = parts[0].strip()
+            manual_image_url = parts[1].strip()
+
+        add_log(f"[{j+1}/{len(batch)}] {base_subject[:50]}", "info")
+        
+        post_text = generate_post(base_subject)
         if not post_text:
             continue
+        
         add_log(f"[{j+1}/{len(batch)}] Post generated ✓", "ok")
-        image_url = get_image_url(subject) if "(create image)" in subject.lower() else None
-        if image_url:
-            add_log(f"[{j+1}/{len(batch)}] Image fetched ✓", "ok")
+        
+        image_url = None
+        if manual_image_url:
+            image_url = manual_image_url
+            add_log(f"[{j+1}/{len(batch)}] Attached uploaded image ✓", "ok")
+        elif "(create image)" in base_subject.lower():
+            image_url = get_image_url(base_subject)
+            if image_url:
+                add_log(f"[{j+1}/{len(batch)}] Image fetched via SerpAPI ✓", "ok")
+
         status, result = send_to_buffer(post_text, image_url)
         if status == 200 and "errors" not in result:
             pid = result.get("data",{}).get("createPost",{}).get("post",{}).get("id","?")
@@ -257,11 +273,42 @@ def get_subjects():
 def add_subjects():
     data         = request.get_json()
     new_subjects = data.get("subjects", [])
+    image_b64    = data.get("image_base64")
+    filename     = data.get("filename", "upload.jpg")
+
     if not new_subjects:
         return jsonify({"ok": False, "message": "No subjects provided"}), 400
+
+    uploaded_url = None
+
+    # Automatically upload physical file to a free link host
+    if image_b64:
+        try:
+            if "," in image_b64:
+                image_b64 = image_b64.split(",")[1]
+            
+            img_data = base64.b64decode(image_b64)
+            add_log(f"Uploading '{filename}' to image host...", "info")
+            
+            files = {'fileToUpload': (filename, img_data)}
+            data_payload = {'reqtype': 'fileupload'}
+            res = requests.post("https://catbox.moe/user/api.php", data=data_payload, files=files, timeout=30)
+            
+            if res.status_code == 200 and "catbox.moe" in res.text:
+                uploaded_url = res.text.strip()
+                add_log(f"Upload success! Public link: {uploaded_url}", "ok")
+            else:
+                add_log(f"Upload failed: {res.text}", "error")
+        except Exception as e:
+            add_log(f"Error processing image file: {e}", "error")
+
     with open(SUBJECTS_FILE, "a", encoding="utf-8") as f:
         for s in new_subjects:
-            f.write(s.strip() + "\n")
+            line = s.strip()
+            if uploaded_url:
+                line = f"{line} | IMG: {uploaded_url}"
+            f.write(line + "\n")
+
     add_log(f"Added {len(new_subjects)} subject(s) from dashboard.", "ok")
     return jsonify({"ok": True, "added": len(new_subjects)})
 
