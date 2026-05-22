@@ -9,7 +9,6 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 warnings.filterwarnings('ignore', category=DeprecationWarning)
-
 # ─── API KEYS ────────────────────────────────────────────────────────────────
 GROQ_API_KEY = "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"
 BUFFER_API_KEY = "d6uQ82pUexcxVpA6CTgcIaOnAnFkQ_o4XRj9ux-NYx3"
@@ -196,10 +195,15 @@ def keep_alive_loop():
     time.sleep(30)
     while True:
         try:
-            port = os.environ.get("PORT", 5000)
-            url  = os.environ.get("RENDER_EXTERNAL_URL") or \
-                   os.environ.get("RAILWAY_STATIC_URL") or \
-                   f"http://localhost:{port}"
+            railway_url = os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+            render_url  = os.environ.get("RENDER_EXTERNAL_URL")
+            port        = os.environ.get("PORT", 5000)
+            if railway_url:
+                url = f"https://{railway_url}"
+            elif render_url:
+                url = render_url
+            else:
+                url = f"http://localhost:{port}"
             requests.get(f"{url}/ping", timeout=10)
             add_log("Keep-alive ping ✓", "info")
         except Exception as e:
