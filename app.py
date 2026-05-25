@@ -116,7 +116,10 @@ def get_state(username):
 
 def add_log(username, msg, level="info"):
     state = get_state(username)
-    entry = {"time": datetime.now().strftime("%H:%M:%S"), "msg": msg, "level": level}
+    cfg    = load_config(username)
+    offset = cfg.get("utc_offset_hours", 0)
+    user_now = datetime.utcnow() + timedelta(hours=offset)
+    entry = {"time": user_now.strftime("%H:%M:%S"), "msg": msg, "level": level}
     state["logs"].append(entry)
     if len(state["logs"]) > 100:
         state["logs"] = state["logs"][-100:]
