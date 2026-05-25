@@ -499,6 +499,11 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
           SerpAPI will auto-fetch a relevant image for each subject.<br>
           No extra text needed — just write your subjects normally.
         </div>
+        <div id="serpWarn" style="display:none;margin-top:10px;background:rgba(255,179,71,.08);border:1px solid rgba(255,179,71,.3);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--amber);font-family:var(--mono);line-height:1.6">
+          <i class="ti ti-alert-triangle" style="font-size:13px;vertical-align:-2px"></i>
+          <strong>SerpAPI key not set.</strong> Posts will be created but sent <u>without an image</u>.<br>
+          Go to <span style="cursor:pointer;text-decoration:underline" onclick="showSetup()">API Settings</span> to add your SerpAPI key.
+        </div>
       </div>
 
       <!-- MANUAL IMAGE PANEL -->
@@ -734,6 +739,18 @@ function setMode(mode) {
     manual_image: 'Add to Queue — With Image'
   };
   document.getElementById('addBtnLabel').textContent = labels[mode];
+  // Show SerpAPI warning if auto image selected and key missing
+  if (mode === 'auto_image') checkSerpKey();
+  else { const w = document.getElementById('serpWarn'); if(w) w.style.display='none'; }
+}
+
+function checkSerpKey() {
+  const warn = document.getElementById('serpWarn');
+  if (!warn) return;
+  // Check badge dot — dot-warn means key not set
+  const dot = document.querySelector('#badgeSerp .api-dot');
+  const missing = dot && dot.classList.contains('dot-warn');
+  warn.style.display = missing ? 'block' : 'none';
 }
 
 function onFileChange() {
