@@ -15,10 +15,12 @@ from flask_cors import CORS
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 # ─── PATHS ───────────────────────────────────────────────────────────────────
-USERS_FILE    = "users.json"          # { username: { password_hash, salt } }
-USER_DATA_DIR = "user_data"           # user_data/{username}/config.json
-                                      # user_data/{username}/subjects.txt
-                                      # user_data/{username}/state.json
+# On Railway, /data is a persistent volume that survives redeploys.
+# Locally it falls back to the project directory.
+import os as _os
+_DATA_ROOT    = "/data" if _os.path.isdir("/data") else "."
+USERS_FILE    = _os.path.join(_DATA_ROOT, "users.json")
+USER_DATA_DIR = _os.path.join(_DATA_ROOT, "user_data")
 
 BATCH_SIZE  = 2
 TARGET_HOUR = 8
