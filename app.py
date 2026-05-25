@@ -31,7 +31,7 @@ Write a highly engaging, professional LinkedIn post based on the user's subject.
 4. 3 to 5 relevant hashtags."""
 
 app = Flask(__name__)
-app.secret_key = secrets.token_hex(32)   # session signing key
+app.secret_key = secrets.token_hex(32)
 CORS(app, supports_credentials=True)
 
 os.makedirs(USER_DATA_DIR, exist_ok=True)
@@ -97,16 +97,14 @@ def load_state(username):
         return default
     with open(p, "r", encoding="utf-8") as f:
         s = json.load(f)
-    # running flag should never persist across restarts
     s["running"] = False
     return s
 
 def save_state(username, state):
     with open(user_state_path(username), "w", encoding="utf-8") as f:
-        # Don't persist the full logs to disk every tick — only on batch events
         json.dump(state, f, indent=2)
 
-# In-memory state per user (loaded on first access)
+# In-memory state per user
 _states = {}
 _state_lock = threading.Lock()
 
@@ -144,12 +142,18 @@ def to_unicode_bold(text):
 def format_linkedin_bold(text):
     return re.sub(r'\*\*(.*?)\*\*', lambda m: to_unicode_bold(m.group(1)), text)
 
-def get_next_run_time():
-    now = datetime.now()
-    target = now.replace(hour=TARGET_HOUR, minute=0, second=0, microsecond=0)
-    if now >= target:
-        target += timedelta(days=1)
-    return target
+def get_next_run_time_for_user(username):
+    """Return the next 08:00 in user's local timezone as a UTC datetime."""
+    cfg = load_config(username)
+    offset = cfg.get("utc_offset_hours", 0)
+    now_utc = datetime.utcnow()
+    user_now = now_utc + timedelta(hours=offset)
+    target_local = user_now.replace(hour=TARGET_HOUR, minute=0, second=0, microsecond=0)
+    if user_now >= target_local:
+        target_local += timedelta(days=1)
+    # Convert back to UTC for the frontend
+    target_utc = target_local - timedelta(hours=offset)
+    return target_utc
 
 # ─── CORE AI / POST FUNCTIONS ─────────────────────────────────────────────────
 def generate_post(username, subject):
@@ -189,7 +193,7 @@ def get_image_url(username, subject):
 
 def send_to_buffer(username, post_text, image_url=None):
     cfg = load_config(username)
-    buffer_key    = cfg.get("buffer_api_key", "")
+    buffer_key     = cfg.get("buffer_api_key", "")
     buffer_channel = cfg.get("buffer_channel_id", "")
     input_data = {
         "text": post_text,
@@ -267,7 +271,7 @@ def run_batch(username, triggered_by="scheduler"):
         if manual_image_url:
             image_url = manual_image_url
             add_log(username, f"[{j+1}/{len(batch)}] Using uploaded image ✓", "ok")
-        elif "(create image)" in base_subject.lower() or state.get("_auto_img_" + str(j)):
+        elif "(create image)" in base_subject.lower():
             image_url = get_image_url(username, base_subject)
             if image_url:
                 add_log(username, f"[{j+1}/{len(batch)}] Image fetched via SerpAPI ✓", "ok")
@@ -288,18 +292,39 @@ def run_batch(username, triggered_by="scheduler"):
     add_log(username, f"Batch complete! {state['today_count']} posts sent.", "ok")
     save_state(username, state)
 
-# ─── SCHEDULER ────────────────────────────────────────────────────────────────
+# ─── TIMEZONE-AWARE SCHEDULER ─────────────────────────────────────────────────
 def scheduler_loop():
-    print("[SCHEDULER] Started — waiting for 08:00 AM")
+    print("[SCHEDULER] Started — timezone-aware, fires at 08:00 local time per user")
+    fired_today = set()   # (username, date_in_user_tz)
+
     while True:
-        now = datetime.now()
-        if now.hour == TARGET_HOUR and now.minute == 0 and now.second < 5:
-            users = load_users()
-            for uname in users:
-                threading.Thread(target=run_batch, args=(uname, "scheduler"), daemon=True).start()
-            time.sleep(60)
+        now_utc = datetime.utcnow()
+
+        users = load_users()
+        for uname in users:
+            cfg    = load_config(uname)
+            offset = cfg.get("utc_offset_hours", 0)
+            user_now = now_utc + timedelta(hours=offset)
+
+            fire_key = (uname, user_now.date())
+
+            if (user_now.hour == TARGET_HOUR
+                    and user_now.minute == 0
+                    and user_now.second < 5
+                    and fire_key not in fired_today):
+                fired_today.add(fire_key)
+                add_log(uname, f"Scheduler fired at local 08:00 (UTC offset {offset:+.1f}h)", "info")
+                threading.Thread(
+                    target=run_batch, args=(uname, "scheduler"), daemon=True
+                ).start()
+
+        # Prune old dates to prevent memory growth
+        today_utc = now_utc.date()
+        fired_today = {k for k in fired_today if k[1] >= today_utc}
+
         time.sleep(1)
 
+# ─── KEEP ALIVE ───────────────────────────────────────────────────────────────
 def keep_alive_loop():
     time.sleep(30)
     while True:
@@ -355,6 +380,13 @@ def register():
     save_users(users)
     os.makedirs(user_dir(username), exist_ok=True)
 
+    # Save timezone offset if provided
+    utc_offset = data.get("utc_offset_hours")
+    if utc_offset is not None:
+        cfg = load_config(username)
+        cfg["utc_offset_hours"] = float(utc_offset)
+        save_config(username, cfg)
+
     session["username"] = username
     session.permanent = True
     return jsonify({"ok": True, "username": username, "message": "Account created!"})
@@ -373,10 +405,17 @@ def login():
     if not verify_password(password, u["password_hash"], u["salt"]):
         return jsonify({"ok": False, "message": "Invalid username or password."}), 401
 
+    # Save/update timezone offset on every login
+    utc_offset = data.get("utc_offset_hours")
+    if utc_offset is not None:
+        cfg = load_config(username)
+        cfg["utc_offset_hours"] = float(utc_offset)
+        save_config(username, cfg)
+        print(f"[{username}] UTC offset updated to {float(utc_offset):+.1f}h")
+
     session["username"] = username
     session.permanent = True
 
-    # Tell frontend whether APIs are already configured
     cfg = load_config(username)
     has_config = bool(cfg.get("groq_api_key") and cfg.get("buffer_api_key"))
     return jsonify({"ok": True, "username": username, "has_config": has_config})
@@ -400,10 +439,9 @@ def me():
 @require_auth
 def get_config(username):
     cfg = load_config(username)
-    # Mask keys — only show last 4 chars
     masked = {}
     for k, v in cfg.items():
-        if v and len(v) > 8:
+        if isinstance(v, str) and v and len(v) > 8:
             masked[k] = "*" * (len(v) - 4) + v[-4:]
         else:
             masked[k] = v
@@ -413,11 +451,11 @@ def get_config(username):
 @require_auth
 def save_config_route(username):
     data = request.get_json()
-    cfg  = load_config(username)  # preserve existing values
+    cfg  = load_config(username)
     fields = ["groq_api_key", "buffer_api_key", "buffer_channel_id", "serpapi_key"]
     for field in fields:
         val = (data.get(field) or "").strip()
-        if val and not val.startswith("*"):  # don't overwrite with masked value
+        if val and not val.startswith("*"):
             cfg[field] = val
     save_config(username, cfg)
     add_log(username, "API configuration updated ✓", "ok")
@@ -427,23 +465,29 @@ def save_config_route(username):
 @app.route("/api/status")
 @require_auth
 def get_status(username):
-    state         = get_state(username)
-    next_run      = get_next_run_time()
+    state    = get_state(username)
+    next_run = get_next_run_time_for_user(username)
+
     subjects_file = user_subjects_path(username)
     subjects = []
     if os.path.exists(subjects_file):
         with open(subjects_file, "r", encoding="utf-8") as f:
             subjects = [l.strip() for l in f if l.strip()]
+
+    cfg = load_config(username)
+    offset = cfg.get("utc_offset_hours", None)
+
     return jsonify({
-        "status":       state["status"],
-        "running":      state["running"],
-        "today_count":  state["today_count"],
-        "total_run":    state["total_run"],
-        "last_run":     state["last_run"],
-        "next_run_iso": next_run.isoformat(),
-        "seconds_left": max(0, int((next_run - datetime.now()).total_seconds())),
-        "subjects":     subjects,
-        "logs":         state["logs"][-30:]
+        "status":          state["status"],
+        "running":         state["running"],
+        "today_count":     state["today_count"],
+        "total_run":       state["total_run"],
+        "last_run":        state["last_run"],
+        "next_run_iso":    next_run.isoformat() + "Z",
+        "seconds_left":    max(0, int((next_run - datetime.utcnow()).total_seconds())),
+        "subjects":        subjects,
+        "logs":            state["logs"][-30:],
+        "utc_offset":      offset,
     })
 
 # ── MANUAL RUN ────────────────────────────────────────────────────────────────
@@ -474,7 +518,7 @@ def add_subjects(username):
     new_subjects = data.get("subjects", [])
     image_b64    = data.get("image_base64")
     filename     = data.get("filename", "upload.jpg")
-    mode         = data.get("mode", "no_image")   # "no_image" | "auto_image" | "manual_image"
+    mode         = data.get("mode", "no_image")
 
     if not new_subjects:
         return jsonify({"ok": False, "message": "No subjects provided"}), 400
@@ -542,4 +586,5 @@ if __name__ == "__main__":
     print(f"[STARTUP] LinkedIn Agent on port {port}")
     print(f"[STARTUP] Users file: {USERS_FILE}")
     print(f"[STARTUP] User data dir: {USER_DATA_DIR}/")
+    print(f"[STARTUP] Scheduler fires at {TARGET_HOUR:02d}:00 in each user's local timezone")
     app.run(host="0.0.0.0", port=port, debug=False)
