@@ -37,6 +37,39 @@ body::after{
 
 .page{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:32px 24px 60px}
 
+/* ── AUTH PAGE & VIEWS ── */
+#loginView, #dashboardView { display: none; }
+.auth-wrapper {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 80vh; max-width: 400px; margin: 0 auto;
+}
+.auth-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px; padding: 40px 32px; width: 100%;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  position: relative; overflow: hidden;
+}
+.auth-card::before {
+  content:'';position:absolute;top:-80px;right:-80px;width:200px;height:200px;
+  background:radial-gradient(circle,rgba(124,106,255,.12) 0%,transparent 65%);pointer-events:none
+}
+.auth-header { text-align: center; margin-bottom: 32px; }
+.auth-input-group { margin-bottom: 20px; }
+.auth-input-group label {
+  display: block; font-size: 11px; font-family: var(--mono);
+  color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;
+}
+.auth-input {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 14px 16px; color: var(--text); font-family: var(--mono);
+  font-size: 14px; outline: none; transition: border .2s;
+}
+.auth-input:focus { border-color: var(--accent); }
+#loginError {
+  color: var(--red); font-size: 12px; font-family: var(--mono);
+  text-align: center; margin-top: 16px; display: none;
+}
+
 /* ── HEADER ── */
 .header{display:flex;align-items:center;gap:16px;margin-bottom:36px}
 .logo-wrap{position:relative}
@@ -53,6 +86,12 @@ body::after{
   box-shadow:0 0 0 3px rgba(0,229,160,.2);animation:livepulse 2s infinite}
 @keyframes livepulse{0%,100%{box-shadow:0 0 0 3px rgba(0,229,160,.2)}50%{box-shadow:0 0 0 6px rgba(0,229,160,.05)}}
 .status-chip.running .live-dot{background:var(--amber);box-shadow:0 0 0 3px rgba(255,179,71,.2)}
+.logout-btn {
+  background: transparent; border: 1px solid var(--border2); color: var(--muted);
+  border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all .2s; margin-left: 8px;
+}
+.logout-btn:hover { background: var(--surface2); color: var(--red); border-color: var(--red); }
 
 /* ── TIMER CARD ── */
 .timer-card{
@@ -211,9 +250,43 @@ body::after{
 </style>
 </head>
 <body>
-<div class="page">
 
-  <!-- HEADER -->
+<div id="loginView" class="page">
+  <div class="auth-wrapper">
+    <div class="logo-wrap" style="margin-bottom: 24px;">
+      <div class="logo" style="width: 64px; height: 64px; font-size: 28px;">Li</div>
+      <div class="logo-glow"></div>
+    </div>
+    
+    <div class="auth-card">
+      <div class="auth-header">
+        <h1 style="font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Dashboard Login</h1>
+        <p style="font-size: 12px; color: var(--muted); font-family: var(--mono); margin-top: 6px;">Secure access required</p>
+      </div>
+
+      <form onsubmit="handleLogin(event)">
+        <div class="auth-input-group">
+          <label>Username</label>
+          <input type="text" id="username" class="auth-input" placeholder="admin" required autocomplete="off">
+        </div>
+        <div class="auth-input-group">
+          <label>Password</label>
+          <input type="password" id="password" class="auth-input" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="run-btn" style="margin-top: 10px;">
+          <div class="bi">
+            <i class="ti ti-login" style="font-size:18px"></i>
+            <span>Secure Login</span>
+          </div>
+        </button>
+        <div id="loginError">Invalid username or password.</div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="dashboardView" class="page">
+  
   <header class="header">
     <div class="logo-wrap">
       <div class="logo">Li</div>
@@ -227,15 +300,16 @@ body::after{
       <div class="live-dot"></div>
       <span id="statusLabel">Connecting...</span>
     </div>
+    <button class="logout-btn" onclick="logout()" title="Logout">
+      <i class="ti ti-power" style="font-size: 16px;"></i>
+    </button>
   </header>
 
-  <!-- CONN ERROR -->
   <div class="conn-banner" id="connBanner">
     <i class="ti ti-wifi-off" style="font-size:18px"></i>
     Cannot reach Flask server at localhost:5000 — make sure <code>python app.py</code> is running.
   </div>
 
-  <!-- TIMER -->
   <div class="timer-card">
     <div class="tc-label"><i class="ti ti-clock" style="font-size:14px"></i> next auto-run countdown</div>
     <div class="timer-row">
@@ -257,7 +331,6 @@ body::after{
     </div>
   </div>
 
-  <!-- STATS -->
   <div class="stats-row">
     <div class="stat-card">
       <div class="sc-label">Posts Today</div>
@@ -276,9 +349,7 @@ body::after{
     </div>
   </div>
 
-  <!-- MAIN COLS -->
   <div class="two-col">
-    <!-- SUBJECTS -->
     <div class="card" style="margin-bottom:0">
       <div class="card-head">
         <h2>Subject Queue</h2>
@@ -291,7 +362,6 @@ body::after{
       <div id="subjectList"></div>
     </div>
 
-    <!-- ADD SUBJECTS WITH FILE UPLOAD -->
     <div class="card" style="margin-bottom:0">
       <div class="card-head">
         <h2>Add Subjects</h2>
@@ -299,7 +369,6 @@ body::after{
       </div>
       <textarea class="add-area" id="newSubjects" placeholder="AI tools for marketers&#10;Remote leadership tips (create image)&#10;Personal branding in 2025"></textarea>
       
-      <!-- FILE INPUT + BUTTON CONTROLS -->
       <div style="display: flex; gap: 12px; align-items: center; margin-top: 8px;">
         <input type="file" id="imageFile" accept="image/*" style="display:none" onchange="document.getElementById('fileName').textContent = this.files[0] ? 'Attached: ' + this.files[0].name : ''">
         
@@ -323,7 +392,6 @@ body::after{
 
   <br>
 
-  <!-- RUN BUTTON -->
   <button class="run-btn" id="runBtn" onclick="triggerManual()">
     <div class="bi">
       <i class="ti ti-player-play" id="runIcon" style="font-size:18px"></i>
@@ -331,7 +399,6 @@ body::after{
     </div>
   </button>
 
-  <!-- LOG -->
   <div class="log-wrap">
     <div class="log-head"><i class="ti ti-terminal-2" style="font-size:13px;vertical-align:-2px"></i>&nbsp; Activity Log</div>
     <div class="log-lines" id="logBox">
@@ -342,10 +409,85 @@ body::after{
 </div>
 
 <script>
+// ==========================================
+// AUTHENTICATION LOGIC
+// ==========================================
+const AUTH_CREDENTIALS = { username: 'admin', password: 'password123' };
+const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+let autoLogoutTimer = null;
+
+function initAuth() {
+  const sessionString = localStorage.getItem('li_agent_session');
+  if (sessionString) {
+    const sessionData = JSON.parse(sessionString);
+    if (sessionData.expiry > Date.now()) {
+      // Session is valid
+      showDashboard();
+      
+      // Setup auto logout if they stay on page
+      const timeLeft = sessionData.expiry - Date.now();
+      clearTimeout(autoLogoutTimer);
+      autoLogoutTimer = setTimeout(() => {
+        logout();
+      }, timeLeft);
+      
+      return;
+    }
+  }
+  // No valid session, show login
+  showLogin();
+}
+
+function handleLogin(e) {
+  e.preventDefault();
+  const u = document.getElementById('username').value;
+  const p = document.getElementById('password').value;
+  
+  if (u === AUTH_CREDENTIALS.username && p === AUTH_CREDENTIALS.password) {
+    // Set 24 hour session
+    localStorage.setItem('li_agent_session', JSON.stringify({
+      expiry: Date.now() + SESSION_EXPIRY_MS
+    }));
+    document.getElementById('loginError').style.display = 'none';
+    initAuth();
+  } else {
+    document.getElementById('loginError').style.display = 'block';
+  }
+}
+
+function logout() {
+  localStorage.removeItem('li_agent_session');
+  clearTimeout(autoLogoutTimer);
+  stopDashboardIntervals();
+  showLogin();
+  // Clear inputs
+  document.getElementById('username').value = '';
+  document.getElementById('password').value = '';
+}
+
+function showLogin() {
+  document.getElementById('dashboardView').style.display = 'none';
+  document.getElementById('loginView').style.display = 'block';
+}
+
+function showDashboard() {
+  document.getElementById('loginView').style.display = 'none';
+  document.getElementById('dashboardView').style.display = 'block';
+  startDashboardIntervals(); // start fetching data only when logged in
+}
+
+// Initialize Authentication on load
+initAuth();
+
+
+// ==========================================
+// DASHBOARD LOGIC
+// ==========================================
 const API = window.location.origin + '/api';
 let nextRunTarget = null;
 let connected = false;
 let prevLogLen = 0;
+let countdownInterval, statusInterval;
 
 function pad(n){return String(n).padStart(2,'0')}
 
@@ -389,11 +531,9 @@ function renderSubjects(subjects){
   
   list.innerHTML = subjects.slice(0,8).map((s,i)=>{
     const isNext = i < 2;
-    // Updated to check for the | IMG: delimiter
     const hasManualImg = s.includes('| IMG:');
     const hasAutoImg = s.toLowerCase().includes('(create image)');
     
-    // Hide the backend delimiter from the UI
     let cleanText = s.split('| IMG:')[0].replace('(create image)','').trim();
     
     let tagHtml = '';
@@ -479,7 +619,6 @@ async function triggerManual(){
   }
 }
 
-// UPDATE: Image conversion logic added here
 async function addSubjects(){
   const ta = document.getElementById('newSubjects');
   const fileInput = document.getElementById('imageFile');
@@ -487,7 +626,6 @@ async function addSubjects(){
   const lines = ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
   if(!lines.length) return;
 
-  // Change Add Button to loading state
   const btn = document.querySelector('.add-btn:last-of-type');
   const originalText = btn.innerHTML;
   btn.innerHTML = `<i class="ti ti-loader-2 spin" style="font-size:14px"></i> Processing...`;
@@ -495,7 +633,6 @@ async function addSubjects(){
 
   let payload = { subjects: lines };
 
-  // Convert physical file to base64 string
   if (fileInput.files.length > 0) {
       const file = fileInput.files[0];
       payload.filename = file.name;
@@ -527,9 +664,20 @@ async function addSubjects(){
   }
 }
 
-setInterval(updateCountdown, 1000);
-setInterval(fetchStatus, 2000);
-fetchStatus();
+// Function to start Dashboard polling
+function startDashboardIntervals() {
+  if (!countdownInterval) countdownInterval = setInterval(updateCountdown, 1000);
+  if (!statusInterval) statusInterval = setInterval(fetchStatus, 2000);
+  fetchStatus();
+}
+
+// Function to stop Dashboard polling
+function stopDashboardIntervals() {
+  clearInterval(countdownInterval);
+  clearInterval(statusInterval);
+  countdownInterval = null;
+  statusInterval = null;
+}
 </script>
 </body>
 </html>
