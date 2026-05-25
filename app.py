@@ -182,7 +182,10 @@ def generate_post(username, subject):
 
 def get_image_url(username, subject):
     cfg = load_config(username)
-    serp_key = cfg.get("serpapi_key", "")
+    serp_key = cfg.get("serpapi_key", "").strip()
+    if not serp_key:
+        add_log(username, "SerpAPI key not set — post sent without image. Add key in API settings.", "warn")
+        return None
     clean = subject.replace("(create image)", "").strip()
     try:
         response = requests.get("https://serpapi.com/search.json", params={
@@ -190,6 +193,7 @@ def get_image_url(username, subject):
         }, timeout=20).json()
         if "images_results" in response and response["images_results"]:
             return response["images_results"][0]["original"]
+        add_log(username, "SerpAPI returned no images for this subject.", "warn")
     except Exception as e:
         add_log(username, f"SerpAPI Error: {e}", "error")
     return None
