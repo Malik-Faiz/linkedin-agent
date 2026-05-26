@@ -355,21 +355,21 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
                 <div class="field" style="margin-bottom:0">
-                  <label>Channel 2 Name</label>
+                  <label>Channel 2 Name <span style="color:var(--muted2);font-size:9px">(optional)</span></label>
                   <div class="field-wrap"><i class="ti ti-tag field-icon"></i><input type="text" id="cfgChName2" placeholder="e.g. Company"></div>
                 </div>
                 <div class="field" style="margin-bottom:0">
-                  <label>Channel 2 ID</label>
+                  <label>Channel 2 ID <span style="color:var(--muted2);font-size:9px">(optional)</span></label>
                   <div class="field-wrap"><i class="ti ti-hash field-icon"></i><input type="text" id="cfgCh2" placeholder="670d••••••••"></div>
                 </div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
                 <div class="field" style="margin-bottom:0">
-                  <label>Channel 3 Name</label>
+                  <label>Channel 3 Name <span style="color:var(--muted2);font-size:9px">(optional)</span></label>
                   <div class="field-wrap"><i class="ti ti-tag field-icon"></i><input type="text" id="cfgChName3" placeholder="e.g. Agency"></div>
                 </div>
                 <div class="field" style="margin-bottom:0">
-                  <label>Channel 3 ID</label>
+                  <label>Channel 3 ID <span style="color:var(--muted2);font-size:9px">(optional)</span></label>
                   <div class="field-wrap"><i class="ti ti-hash field-icon"></i><input type="text" id="cfgCh3" placeholder="670d••••••••"></div>
                 </div>
               </div>
@@ -721,37 +721,45 @@ async function saveConfig() {
   const okEl  = document.getElementById('setupOk');
   errEl.classList.remove('show'); okEl.classList.remove('show');
 
+  // Read all values first
   const groq    = document.getElementById('cfgGroq').value.trim();
   const buffer  = document.getElementById('cfgBuffer').value.trim();
   const serp    = document.getElementById('cfgSerp').value.trim();
+  const ch1     = document.getElementById('cfgCh1').value.trim();
+  const ch2     = document.getElementById('cfgCh2').value.trim();       // optional
+  const ch3     = document.getElementById('cfgCh3').value.trim();       // optional
+  const chName1 = document.getElementById('cfgChName1').value.trim();
+  const chName2 = document.getElementById('cfgChName2').value.trim();   // optional
+  const chName3 = document.getElementById('cfgChName3').value.trim();   // optional
 
+  // Validate — only Groq, Buffer key, and Channel 1 are required
   if (!groq || !buffer) {
     document.getElementById('setupErrMsg').textContent = 'Groq and Buffer API key are required.';
     errEl.classList.add('show'); return;
   }
-  if (!ch1 && !ch2 && !ch3) {
-    document.getElementById('setupErrMsg').textContent = 'Add at least one Buffer Channel ID.';
+  if (!ch1) {
+    document.getElementById('setupErrMsg').textContent = 'Channel 1 ID is required. Channels 2 and 3 are optional.';
     errEl.classList.add('show'); return;
   }
 
   btn.disabled = true; btn.textContent = 'Saving...';
 
-  const ch1     = document.getElementById('cfgCh1').value.trim();
-  const ch2     = document.getElementById('cfgCh2').value.trim();
-  const ch3     = document.getElementById('cfgCh3').value.trim();
-  const chName1 = document.getElementById('cfgChName1').value.trim();
-  const chName2 = document.getElementById('cfgChName2').value.trim();
-  const chName3 = document.getElementById('cfgChName3').value.trim();
-
   try {
+    const payload = {
+      groq_api_key: groq,
+      buffer_api_key: buffer,
+      serpapi_key: serp,
+      buffer_channel_1: ch1,
+      buffer_channel_1_name: chName1 || 'Channel 1',
+    };
+    // Only include ch2/ch3 if provided (optional)
+    if (ch2) { payload.buffer_channel_2 = ch2; payload.buffer_channel_2_name = chName2 || 'Channel 2'; }
+    if (ch3) { payload.buffer_channel_3 = ch3; payload.buffer_channel_3_name = chName3 || 'Channel 3'; }
+
     const res  = await fetch(`${API}/config`, {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        groq_api_key: groq, buffer_api_key: buffer, serpapi_key: serp,
-        buffer_channel_1: ch1, buffer_channel_2: ch2, buffer_channel_3: ch3,
-        buffer_channel_1_name: chName1, buffer_channel_2_name: chName2, buffer_channel_3_name: chName3
-      })
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
     if (data.ok) {
