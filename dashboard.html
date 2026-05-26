@@ -1251,14 +1251,14 @@ async function fetchConfig() {
       _chConfig = data.config;
       updateApiBadges(data.config);
       // Pre-fill setup page channel fields when opened
-      const f = (id, val) => { const el = document.getElementById(id); if(el && val) el.value = val; };
+      const f = (id, val) => { const el = document.getElementById(id); if(el && val && !val.includes('*')) el.value = val; };
       f('cfgCh1',     data.config.buffer_channel_1);
       f('cfgCh2',     data.config.buffer_channel_2);
       f('cfgCh3',     data.config.buffer_channel_3);
+      f('cfgCh4',     data.config.buffer_channel_4);
       f('cfgChName1', data.config.buffer_channel_1_name);
       f('cfgChName2', data.config.buffer_channel_2_name);
       f('cfgChName3', data.config.buffer_channel_3_name);
-      f('cfgCh4',     data.config.buffer_channel_4);
       f('cfgChName4', data.config.buffer_channel_4_name);
     }
   } catch(e) {}
