@@ -251,6 +251,8 @@ def send_to_buffer(username, post_text, image_url=None):
         status, result = send_to_one_channel(buf_key, cid, post_text, image_url)
         if status == 200 and "errors" not in result:
             pid = result.get("data",{}).get("createPost",{}).get("post",{}).get("id","?")
+            status, result = ...
+                print(f"[BUFFER RAW RESPONSE] {result}")
             add_log(username, f"  → [{name}] Queued ✓ ID: {pid}", "ok")
             success += 1
         else:
