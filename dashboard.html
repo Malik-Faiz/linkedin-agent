@@ -210,23 +210,34 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
 
 /* ── CHANNEL TOGGLE ── */
 .ch-toggle{
-  border:1.5px solid var(--border2);border-radius:12px;padding:14px 14px;
+  border:1.5px solid var(--border2);border-radius:12px;padding:12px 12px 10px;
   cursor:pointer;transition:all .2s;background:var(--surface2);position:relative;
   display:flex;flex-direction:column;gap:6px
 }
-.ch-toggle:hover{border-color:var(--accent);background:var(--surface3)}
-.ch-toggle.active{border-color:var(--accent);background:rgba(124,106,255,.1)}
+.ch-toggle:hover:not(.no-id){border-color:var(--accent);background:var(--surface3)}
+.ch-toggle.active{border-color:var(--green);background:rgba(0,229,160,.06)}
 .ch-toggle.active .ch-indicator{background:var(--green);box-shadow:0 0 0 3px rgba(0,229,160,.2)}
-.ch-toggle.no-id{opacity:.45;cursor:not-allowed;pointer-events:none}
-.ch-indicator{width:10px;height:10px;border-radius:50%;background:var(--muted2);transition:all .3s;flex-shrink:0}
-.ch-name{font-size:13px;font-weight:700;line-height:1}
+.ch-toggle.no-id{opacity:.4;cursor:not-allowed}
+.ch-indicator{width:8px;height:8px;border-radius:50%;background:var(--muted2);transition:all .3s;flex-shrink:0}
+.ch-name{font-size:12px;font-weight:700;line-height:1;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ch-slot{font-size:10px;color:var(--muted);font-family:var(--mono)}
-.ch-toggle-row{display:flex;align-items:center;justify-content:space-between}
+.ch-toggle-row{display:flex;align-items:center;gap:6px}
 /* pill switch */
-.pill-switch{width:36px;height:20px;border-radius:10px;background:var(--surface3);border:1px solid var(--border2);position:relative;transition:background .2s;flex-shrink:0}
-.pill-switch .knob{position:absolute;top:3px;left:3px;width:12px;height:12px;border-radius:50%;background:var(--muted2);transition:all .2s}
-.ch-toggle.active .pill-switch{background:var(--accent)}
-.ch-toggle.active .pill-switch .knob{left:19px;background:#fff}
+.pill-switch{width:32px;height:18px;border-radius:9px;background:var(--surface3);border:1px solid var(--border2);position:relative;transition:background .2s;flex-shrink:0}
+.pill-switch .knob{position:absolute;top:3px;left:3px;width:10px;height:10px;border-radius:50%;background:var(--muted2);transition:all .2s}
+.ch-toggle.active .pill-switch{background:var(--green);border-color:var(--green)}
+.ch-toggle.active .pill-switch .knob{left:17px;background:#fff}
+/* delete btn */
+.ch-del-btn{
+  display:none;position:absolute;top:6px;right:6px;
+  width:20px;height:20px;border-radius:5px;border:none;
+  background:rgba(255,95,95,.12);color:var(--red);cursor:pointer;
+  font-size:11px;align-items:center;justify-content:center;
+  transition:background .15s;line-height:1
+}
+.ch-del-btn:hover{background:rgba(255,95,95,.25)}
+.ch-toggle:hover .ch-del-btn{display:flex}
+.ch-toggle.no-id .ch-del-btn{display:none!important}
 
 @media(max-width:600px){
   .stats-row{grid-template-columns:1fr 1fr}
@@ -502,9 +513,12 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
 
   <!-- CHANNEL SWITCHER -->
   <div class="card" style="margin-bottom:20px;padding:18px 20px">
-    <div class="card-head" style="margin-bottom:12px">
-      <h2><i class="ti ti-toggle-right" style="font-size:15px;vertical-align:-2px;margin-right:6px"></i>Active Buffer Channel</h2>
+    <div class="card-head" style="margin-bottom:6px">
+      <h2><i class="ti ti-toggle-right" style="font-size:15px;vertical-align:-2px;margin-right:6px"></i>Buffer Channels</h2>
       <span class="chip" id="activeChipLabel">Loading...</span>
+    </div>
+    <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:14px">
+      Toggle ON any channels you want — post goes to <strong style="color:var(--text)">all active channels</strong> at once
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px" id="channelToggles">
       <!-- rendered by JS -->
@@ -1003,7 +1017,7 @@ async function fetchStatus() {
     renderSubjects(data.subjects || []);
     renderLogs(data.logs || []);
     if (data.config) updateApiBadges(data.config);
-    renderChannels(data);
+    if (data.channels_info) renderChannels(data);
 
     // Update TZ banner with server-stored offset
     updateTzBanner(data.utc_offset);
@@ -1044,39 +1058,56 @@ function watchSession() {
 let _chConfig = {};
 
 function renderChannels(statusData) {
-  const cfg        = _chConfig;
-  const active     = statusData.active_channel || 1;
-  const container  = document.getElementById('channelToggles');
-  const chip       = document.getElementById('activeChipLabel');
+  const channels  = statusData.channels_info || [];
+  const container = document.getElementById('channelToggles');
+  const chip      = document.getElementById('activeChipLabel');
   if (!container) return;
 
   let html = '';
-  for (let i = 1; i <= 3; i++) {
-    const name  = cfg[`buffer_channel_${i}_name`] || `Channel ${i}`;
-    const hasId = !!(cfg[`buffer_channel_${i}`]);
-    const isOn  = (i === active) && hasId;
-    html += `<div class="ch-toggle${isOn ? ' active' : ''}${!hasId ? ' no-id' : ''}"
-                  onclick="switchChannel(${i})" title="${hasId ? 'Click to activate' : 'No channel ID set'}">
+  channels.forEach(ch => {
+    const isOn   = ch.active && ch.exists;
+    const canDel = ch.slot > 1 && ch.exists;   // only ch2 & ch3 deletable
+    html += `<div class="ch-toggle${isOn ? ' active' : ''}${!ch.exists ? ' no-id' : ''}"
+                  onclick="toggleChannel(${ch.slot})"
+                  title="${ch.exists ? (isOn ? 'Click to turn OFF' : 'Click to turn ON') : 'Not configured — go to API Settings'}">
+      ${canDel ? `<button class="ch-del-btn" onclick="event.stopPropagation();deleteChannel(${ch.slot})" title="Delete channel ${ch.slot}">✕</button>` : ''}
       <div class="ch-toggle-row">
-        <span class="ch-name">${name}</span>
+        <div class="ch-indicator"></div>
+        <span class="ch-name">${ch.name}</span>
         <div class="pill-switch"><div class="knob"></div></div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
-        <div class="ch-indicator"></div>
-        <span class="ch-slot">${hasId ? (isOn ? 'ACTIVE' : 'slot ' + i) : 'not configured'}</span>
+      <div style="margin-top:4px">
+        <span class="ch-slot">${ch.exists ? (isOn ? '● ACTIVE' : '○ off') : 'not configured'}</span>
       </div>
     </div>`;
-  }
+  });
   container.innerHTML = html;
 
-  const activeName = cfg[`buffer_channel_${active}_name`] || `Channel ${active}`;
-  chip.textContent  = statusData.active_ch_set ? activeName : 'No channel set';
-  chip.style.color  = statusData.active_ch_set ? 'var(--green)' : 'var(--red)';
+  // Chip shows count of active channels
+  const activeCount = channels.filter(c => c.active && c.exists).length;
+  const activeNames = channels.filter(c => c.active && c.exists).map(c => c.name).join(', ');
+  chip.textContent = activeCount > 0 ? `${activeCount} active` : 'None active';
+  chip.style.color = activeCount > 0 ? 'var(--green)' : 'var(--red)';
+  chip.title       = activeNames || 'No channels active';
 }
 
-async function switchChannel(num) {
+async function toggleChannel(num) {
   try {
-    const res  = await fetch(`${API}/channel/switch`, {
+    const res  = await fetch(`${API}/channel/toggle`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel: num })
+    });
+    const data = await res.json();
+    if (data.ok) fetchStatus();
+    else { alert(data.message); }
+  } catch(e) { alert('Cannot reach server.'); }
+}
+
+async function deleteChannel(num) {
+  if (!confirm(`Delete Channel ${num}? This removes it from your config permanently.`)) return;
+  try {
+    const res  = await fetch(`${API}/channel/delete`, {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channel: num })
