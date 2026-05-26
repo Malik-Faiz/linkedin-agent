@@ -232,7 +232,6 @@ def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None):
                     }
                     ... on MutationError {
                         message
-                        code
                     }
                 }
             }""", "variables": {"input": input_data}}, timeout=20
@@ -271,8 +270,7 @@ def send_to_buffer(username, post_text, image_url=None):
 
         # MutationError — Buffer rejected the post (duplicate, invalid channel, etc.)
         if "message" in create_post:
-            code = create_post.get("code", "")
-            add_log(username, f"  → [{name}] Buffer error: {create_post['message']} (code: {code})", "error")
+            add_log(username, f"  → [{name}] Buffer error: {create_post['message']}", "error")
             continue
 
         # PostActionSuccess — extract id from post object
