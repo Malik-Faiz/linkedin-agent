@@ -795,6 +795,8 @@ async function saveConfig() {
   const ch1     = document.getElementById('cfgCh1').value.trim();
   const ch2     = document.getElementById('cfgCh2').value.trim();       // optional
   const ch3     = document.getElementById('cfgCh3').value.trim();       // optional
+  const ch4     = document.getElementById('cfgCh4').value.trim();
+  const chName4 = document.getElementById('cfgChName4').value.trim();
   const chName1 = document.getElementById('cfgChName1').value.trim();
   const chName2 = document.getElementById('cfgChName2').value.trim();   // optional
   const chName3 = document.getElementById('cfgChName3').value.trim();   // optional
@@ -822,9 +824,6 @@ async function saveConfig() {
     // Only include ch2/ch3 if provided (optional)
     if (ch2) { payload.buffer_channel_2 = ch2; payload.buffer_channel_2_name = chName2 || 'Channel 2'; }
     if (ch3) { payload.buffer_channel_3 = ch3; payload.buffer_channel_3_name = chName3 || 'Channel 3'; }
-
-    const ch4     = document.getElementById('cfgCh4').value.trim();
-    const chName4 = document.getElementById('cfgChName4').value.trim();
     if (ch4) { payload.buffer_channel_4 = ch4; payload.buffer_channel_4_name = chName4 || 'Facebook Page'; }
     
     const res  = await fetch(`${API}/config`, {
