@@ -354,36 +354,68 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
             <!-- 3 Channel Slots -->
             <div style="font-size:10px;font-family:var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Channel Slots</div>
             <div style="display:grid;gap:10px">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                <div class="field" style="margin-bottom:0">
-                  <label>Channel 1 Name</label>
-                  <div class="field-wrap"><i class="ti ti-tag field-icon"></i><input type="text" id="cfgChName1" placeholder="e.g. Personal"></div>
+
+              <!-- Channel 1 — mandatory, no delete -->
+              <div style="background:var(--surface3);border-radius:10px;padding:10px 12px">
+                <div style="font-size:10px;font-family:var(--mono);color:var(--accent);margin-bottom:8px;letter-spacing:1px">
+                  CHANNEL 1 <span style="color:var(--muted2)">(required)</span>
                 </div>
-                <div class="field" style="margin-bottom:0">
-                  <label>Channel 1 ID</label>
-                  <div class="field-wrap"><i class="ti ti-hash field-icon"></i><input type="text" id="cfgCh1" placeholder="670d••••••••"></div>
-                </div>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                <div class="field" style="margin-bottom:0">
-                  <label>Channel 2 Name <span style="color:var(--muted2);font-size:9px">(optional)</span></label>
-                  <div class="field-wrap"><i class="ti ti-tag field-icon"></i><input type="text" id="cfgChName2" placeholder="e.g. Company"></div>
-                </div>
-                <div class="field" style="margin-bottom:0">
-                  <label>Channel 2 ID <span style="color:var(--muted2);font-size:9px">(optional)</span></label>
-                  <div class="field-wrap"><i class="ti ti-hash field-icon"></i><input type="text" id="cfgCh2" placeholder="670d••••••••"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <div class="field" style="margin-bottom:0">
+                    <label>Name</label>
+                    <div class="field-wrap"><i class="ti ti-tag field-icon"></i><input type="text" id="cfgChName1" placeholder="e.g. Personal"></div>
+                  </div>
+                  <div class="field" style="margin-bottom:0">
+                    <label>Channel ID</label>
+                    <div class="field-wrap"><i class="ti ti-hash field-icon"></i><input type="text" id="cfgCh1" placeholder="670d••••••••"></div>
+                  </div>
                 </div>
               </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                <div class="field" style="margin-bottom:0">
-                  <label>Channel 3 Name <span style="color:var(--muted2);font-size:9px">(optional)</span></label>
-                  <div class="field-wrap"><i class="ti ti-tag field-icon"></i><input type="text" id="cfgChName3" placeholder="e.g. Agency"></div>
+
+              <!-- Channel 2 — optional, has delete -->
+              <div style="background:var(--surface3);border-radius:10px;padding:10px 12px;position:relative" id="chRow2">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                  <span style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:1px">CHANNEL 2 <span style="color:var(--muted2)">(optional)</span></span>
+                  <button type="button" onclick="clearChannelRow(2)" title="Delete channel 2"
+                    style="background:rgba(255,95,95,.1);border:1px solid rgba(255,95,95,.2);border-radius:6px;color:var(--red);font-size:11px;font-family:var(--mono);padding:3px 8px;cursor:pointer;display:flex;align-items:center;gap:4px;transition:background .15s"
+                    onmouseover="this.style.background='rgba(255,95,95,.22)'" onmouseout="this.style.background='rgba(255,95,95,.1)'">
+                    <i class="ti ti-trash" style="font-size:12px"></i> Delete
+                  </button>
                 </div>
-                <div class="field" style="margin-bottom:0">
-                  <label>Channel 3 ID <span style="color:var(--muted2);font-size:9px">(optional)</span></label>
-                  <div class="field-wrap"><i class="ti ti-hash field-icon"></i><input type="text" id="cfgCh3" placeholder="670d••••••••"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <div class="field" style="margin-bottom:0">
+                    <label>Name</label>
+                    <div class="field-wrap"><i class="ti ti-tag field-icon"></i><input type="text" id="cfgChName2" placeholder="e.g. Company"></div>
+                  </div>
+                  <div class="field" style="margin-bottom:0">
+                    <label>Channel ID</label>
+                    <div class="field-wrap"><i class="ti ti-hash field-icon"></i><input type="text" id="cfgCh2" placeholder="670d••••••••"></div>
+                  </div>
                 </div>
               </div>
+
+              <!-- Channel 3 — optional, has delete -->
+              <div style="background:var(--surface3);border-radius:10px;padding:10px 12px;position:relative" id="chRow3">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                  <span style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:1px">CHANNEL 3 <span style="color:var(--muted2)">(optional)</span></span>
+                  <button type="button" onclick="clearChannelRow(3)" title="Delete channel 3"
+                    style="background:rgba(255,95,95,.1);border:1px solid rgba(255,95,95,.2);border-radius:6px;color:var(--red);font-size:11px;font-family:var(--mono);padding:3px 8px;cursor:pointer;display:flex;align-items:center;gap:4px;transition:background .15s"
+                    onmouseover="this.style.background='rgba(255,95,95,.22)'" onmouseout="this.style.background='rgba(255,95,95,.1)'">
+                    <i class="ti ti-trash" style="font-size:12px"></i> Delete
+                  </button>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <div class="field" style="margin-bottom:0">
+                    <label>Name</label>
+                    <div class="field-wrap"><i class="ti ti-tag field-icon"></i><input type="text" id="cfgChName3" placeholder="e.g. Agency"></div>
+                  </div>
+                  <div class="field" style="margin-bottom:0">
+                    <label>Channel ID</label>
+                    <div class="field-wrap"><i class="ti ti-hash field-icon"></i><input type="text" id="cfgCh3" placeholder="670d••••••••"></div>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
 
@@ -1135,6 +1167,41 @@ async function deleteChannel(num) {
     if (data.ok) { fetchStatus(); fetchConfig(); }
     else alert(data.message);
   } catch(e) { alert('Cannot reach server.'); }
+}
+
+/* ── CLEAR CHANNEL ROW (setup page delete button) ── */
+async function clearChannelRow(slot) {
+  if (!confirm(`Delete Channel ${slot}? This clears both the name and ID from your config.`)) return;
+
+  // Clear the input fields immediately in the UI
+  document.getElementById(`cfgCh${slot}`).value     = '';
+  document.getElementById(`cfgChName${slot}`).value = '';
+
+  // Call backend to wipe from config.json
+  try {
+    const res  = await fetch(`${API}/channel/delete`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel: slot })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      // Show green confirmation briefly
+      const row = document.getElementById(`chRow${slot}`);
+      if (row) {
+        row.style.border = '1px solid rgba(0,229,160,.3)';
+        row.style.background = 'rgba(0,229,160,.04)';
+        setTimeout(() => {
+          row.style.border = '';
+          row.style.background = 'var(--surface3)';
+        }, 1500);
+      }
+    } else {
+      alert(data.message || 'Delete failed.');
+    }
+  } catch(e) {
+    alert('Cannot reach server.');
+  }
 }
 
 function startDashboard() {
