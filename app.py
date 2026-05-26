@@ -200,21 +200,22 @@ def get_image_url(username, subject):
         add_log(username, f"SerpAPI Error: {e}", "error")
     return None
 
-def get_active_channel(cfg):
-    """Return the channel_id of whichever channel slot is toggled on."""
-    active = cfg.get("active_channel", 1)   # 1, 2, or 3
-    return cfg.get(f"buffer_channel_{active}", "")
+def get_active_channels(cfg):
+    """Return list of (slot_num, channel_id, channel_name) for all toggled-ON channels."""
+    active_list = cfg.get("active_channels", [1])   # list e.g. [1] or [1,2] or [1,2,3]
+    result = []
+    for slot in active_list:
+        cid = cfg.get(f"buffer_channel_{slot}", "").strip()
+        if cid:
+            name = cfg.get(f"buffer_channel_{slot}_name", f"Channel {slot}")
+            result.append((slot, cid, name))
+    return result
 
-def send_to_buffer(username, post_text, image_url=None):
-    cfg = load_config(username)
-    buffer_key     = cfg.get("buffer_api_key", "")
-    buffer_channel = get_active_channel(cfg)
-    if not buffer_channel:
-        add_log(username, "No active Buffer channel set — check API settings.", "error")
-        return 400, {"error": "No active channel"}
+def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None):
+    """Send one post to one Buffer channel. Returns (status_code, response_json)."""
     input_data = {
         "text": post_text,
-        "channelId": buffer_channel,
+        "channelId": channel_id,
         "schedulingType": "automatic",
         "mode": "addToQueue"
     }
@@ -234,6 +235,27 @@ def send_to_buffer(username, post_text, image_url=None):
         return response.status_code, response.json()
     except Exception as e:
         return 500, {"error": str(e)}
+
+def send_to_buffer(username, post_text, image_url=None):
+    """Send post to ALL active channels. Returns total success count."""
+    cfg      = load_config(username)
+    buf_key  = cfg.get("buffer_api_key", "")
+    channels = get_active_channels(cfg)
+
+    if not channels:
+        add_log(username, "No active Buffer channels — turn on at least one channel.", "error")
+        return 0
+
+    success = 0
+    for slot, cid, name in channels:
+        status, result = send_to_one_channel(buf_key, cid, post_text, image_url)
+        if status == 200 and "errors" not in result:
+            pid = result.get("data",{}).get("createPost",{}).get("post",{}).get("id","?")
+            add_log(username, f"  → [{name}] Queued ✓ ID: {pid}", "ok")
+            success += 1
+        else:
+            add_log(username, f"  → [{name}] Failed: {result}", "error")
+    return success
 
 # ─── BATCH ENGINE ─────────────────────────────────────────────────────────────
 def run_batch(username, triggered_by="scheduler"):
@@ -293,14 +315,13 @@ def run_batch(username, triggered_by="scheduler"):
             if image_url:
                 add_log(username, f"[{j+1}/{len(batch)}] Image fetched via SerpAPI ✓", "ok")
 
-        status, result = send_to_buffer(username, post_text, image_url)
-        if status == 200 and "errors" not in result:
-            pid = result.get("data",{}).get("createPost",{}).get("post",{}).get("id","?")
-            add_log(username, f"[{j+1}/{len(batch)}] Queued to Buffer ✓ ID: {pid}", "ok")
+        sent = send_to_buffer(username, post_text, image_url)
+        if sent > 0:
+            add_log(username, f"[{j+1}/{len(batch)}] Sent to {sent} channel(s) ✓", "ok")
             state["today_count"] += 1
-            state["total_run"]   += 1
+            state["total_run"]   += sent
         else:
-            add_log(username, f"[{j+1}/{len(batch)}] Buffer failed: {result}", "error")
+            add_log(username, f"[{j+1}/{len(batch)}] All channels failed — check logs above.", "error")
         time.sleep(10)
 
     state["last_run"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -491,34 +512,77 @@ def save_config_route(username):
         if name:
             cfg[f"buffer_channel_{i}_name"] = name
 
-    # Active channel toggle (1, 2, or 3)
-    ac = data.get("active_channel")
-    if ac is not None and int(ac) in [1, 2, 3]:
-        cfg["active_channel"] = int(ac)
+    # Ensure active_channels is initialised (default to [1])
+    if "active_channels" not in cfg:
+        cfg["active_channels"] = [1]
 
     save_config(username, cfg)
-    active = cfg.get("active_channel", 1)
-    active_name = cfg.get(f"buffer_channel_{active}_name", f"Channel {active}")
-    add_log(username, f"API config updated ✓ — Active channel: {active_name}", "ok")
-    return jsonify({"ok": True, "message": "Configuration saved!", "active_channel": active})
+    active_list = cfg.get("active_channels", [1])
+    names = [cfg.get(f"buffer_channel_{i}_name", f"Channel {i}") for i in active_list]
+    add_log(username, f"API config updated ✓ — Active: {', '.join(names)}", "ok")
+    return jsonify({"ok": True, "message": "Configuration saved!", "active_channels": active_list})
 
-# ── CHANNEL SWITCH ───────────────────────────────────────────────────────────
-@app.route("/api/channel/switch", methods=["POST"])
+# ── CHANNEL TOGGLE (multi-select) ────────────────────────────────────────────
+@app.route("/api/channel/toggle", methods=["POST"])
 @require_auth
-def switch_channel(username):
+def toggle_channel(username):
     data = request.get_json()
     ch   = data.get("channel")
     if ch not in [1, 2, 3]:
         return jsonify({"ok": False, "message": "Channel must be 1, 2, or 3"}), 400
     cfg = load_config(username)
-    # Must have a channel ID saved for this slot
     if not cfg.get(f"buffer_channel_{ch}", "").strip():
         return jsonify({"ok": False, "message": f"Channel {ch} has no ID configured yet"}), 400
-    cfg["active_channel"] = ch
+
+    active = cfg.get("active_channels", [1])
+    if not isinstance(active, list):
+        active = [active]   # migrate old single-value format
+
+    if ch in active:
+        # At least one channel must stay on
+        if len(active) <= 1:
+            return jsonify({"ok": False, "message": "At least one channel must be active"}), 400
+        active.remove(ch)
+        state = "OFF"
+    else:
+        active.append(ch)
+        active.sort()
+        state = "ON"
+
+    cfg["active_channels"] = active
     save_config(username, cfg)
     name = cfg.get(f"buffer_channel_{ch}_name", f"Channel {ch}")
-    add_log(username, f"Switched active channel to: {name} (slot {ch})", "ok")
-    return jsonify({"ok": True, "active_channel": ch, "name": name})
+    add_log(username, f"Channel [{name}] toggled {state} — Active: {active}", "ok")
+    return jsonify({"ok": True, "active_channels": active, "channel": ch, "state": state})
+
+# ── CHANNEL DELETE ────────────────────────────────────────────────────────────
+@app.route("/api/channel/delete", methods=["POST"])
+@require_auth
+def delete_channel(username):
+    data = request.get_json()
+    ch   = data.get("channel")
+    if ch not in [2, 3]:   # channel 1 is permanent
+        return jsonify({"ok": False, "message": "Only channels 2 and 3 can be deleted"}), 400
+    cfg = load_config(username)
+    name = cfg.get(f"buffer_channel_{ch}_name", f"Channel {ch}")
+
+    # Remove from config
+    for key in [f"buffer_channel_{ch}", f"buffer_channel_{ch}_name"]:
+        cfg.pop(key, None)
+
+    # Remove from active list
+    active = cfg.get("active_channels", [1])
+    if not isinstance(active, list):
+        active = [active]
+    if ch in active:
+        active.remove(ch)
+    if not active:
+        active = [1]   # fallback to channel 1
+    cfg["active_channels"] = active
+
+    save_config(username, cfg)
+    add_log(username, f"Channel [{name}] deleted from slot {ch}", "warn")
+    return jsonify({"ok": True, "message": f"Channel {ch} deleted"})
 
 # ── STATUS ────────────────────────────────────────────────────────────────────
 @app.route("/api/status")
@@ -536,9 +600,23 @@ def get_status(username):
     cfg = load_config(username)
     offset = cfg.get("utc_offset_hours", None)
 
-    active_ch   = cfg.get("active_channel", 1)
-    active_name = cfg.get(f"buffer_channel_{active_ch}_name", f"Channel {active_ch}")
-    active_id   = cfg.get(f"buffer_channel_{active_ch}", "")
+    active_chs  = cfg.get("active_channels", [1])
+    if not isinstance(active_chs, list):
+        active_chs = [active_chs]
+    any_ch_set  = any(cfg.get(f"buffer_channel_{i}", "").strip() for i in [1,2,3])
+
+    # Build channel info for frontend
+    channels_info = []
+    for i in [1, 2, 3]:
+        cid  = cfg.get(f"buffer_channel_{i}", "").strip()
+        name = cfg.get(f"buffer_channel_{i}_name", f"Channel {i}")
+        channels_info.append({
+            "slot":   i,
+            "id":     cid,
+            "name":   name,
+            "active": (i in active_chs) and bool(cid),
+            "exists": bool(cid),
+        })
 
     return jsonify({
         "status":          state["status"],
@@ -551,9 +629,9 @@ def get_status(username):
         "subjects":        subjects,
         "logs":            state["logs"][-30:],
         "utc_offset":      offset,
-        "active_channel":  active_ch,
-        "active_ch_name":  active_name,
-        "active_ch_set":   bool(active_id),
+        "active_channels": active_chs,
+        "channels_info":   channels_info,
+        "any_ch_set":      any_ch_set,
     })
 
 # ── MANUAL RUN ────────────────────────────────────────────────────────────────
