@@ -208,15 +208,17 @@ def get_active_channels(cfg):
             result.append((slot, cid, name))
     return result
 
-def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None):
+def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None, is_facebook=False):
     """Send one post to one Buffer channel. Returns (status_code, response_json)."""
     input_data = {
         "text": post_text,
         "channelId": channel_id,
         "schedulingType": "automatic",
-        "mode": "addToQueue",
-        "type": "post"
+        "mode": "addToQueue"
     }
+    # Facebook requires post type specified via extra field
+    if is_facebook:
+        input_data["extra"] = {"facebook": {"type": "post"}}
     if image_url:
         input_data["assets"] = [{"image": {"url": image_url}}]
     try:
@@ -253,7 +255,9 @@ def send_to_buffer(username, post_text, image_url=None):
 
     success = 0
     for slot, cid, name in channels:
-        status, result = send_to_one_channel(buf_key, cid, post_text, image_url)
+        # Detect Facebook channels by slot number (slot 4) or name containing 'facebook'
+        is_facebook = (slot == 4 or 'facebook' in name.lower())
+        status, result = send_to_one_channel(buf_key, cid, post_text, image_url, is_facebook=is_facebook)
 
         # Network / HTTP error
         if status != 200:
