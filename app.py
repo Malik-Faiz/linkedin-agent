@@ -15,8 +15,6 @@ from flask_cors import CORS
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 # ─── PATHS ───────────────────────────────────────────────────────────────────
-# On Railway, /data is a persistent volume that survives redeploys.
-# Locally it falls back to the project directory.
 import os as _os
 _DATA_ROOT    = "/data" if _os.path.isdir("/data") else "."
 USERS_FILE    = _os.path.join(_DATA_ROOT, "users.json")
@@ -156,7 +154,6 @@ def get_next_run_time_for_user(username):
     target_local = user_now.replace(hour=TARGET_HOUR, minute=0, second=0, microsecond=0)
     if user_now >= target_local:
         target_local += timedelta(days=1)
-    # Convert back to UTC for the frontend
     target_utc = target_local - timedelta(hours=offset)
     return target_utc
 
@@ -202,7 +199,7 @@ def get_image_url(username, subject):
 
 def get_active_channels(cfg):
     """Return list of (slot_num, channel_id, channel_name) for all toggled-ON channels."""
-    active_list = cfg.get("active_channels", [1])   # list e.g. [1] or [1,2] or [1,2,3]
+    active_list = cfg.get("active_channels", [1])
     result = []
     for slot in active_list:
         cid = cfg.get(f"buffer_channel_{slot}", "").strip()
@@ -227,8 +224,16 @@ def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None):
             headers={"Authorization": f"Bearer {buffer_key}", "Content-Type": "application/json"},
             json={"query": """mutation CreatePost($input: CreatePostInput!) {
                 createPost(input: $input) {
-                    ... on PostActionSuccess { post { id } }
-                    ... on MutationError { message }
+                    ... on PostActionSuccess {
+                        post {
+                            id
+                            status
+                        }
+                    }
+                    ... on MutationError {
+                        message
+                        code
+                    }
                 }
             }""", "variables": {"input": input_data}}, timeout=20
         )
@@ -249,12 +254,39 @@ def send_to_buffer(username, post_text, image_url=None):
     success = 0
     for slot, cid, name in channels:
         status, result = send_to_one_channel(buf_key, cid, post_text, image_url)
-        if status == 200 and "errors" not in result:
-            pid = result.get("data",{}).get("createPost",{}).get("post",{}).get("id","?")
+
+        # Network / HTTP error
+        if status != 200:
+            add_log(username, f"  → [{name}] HTTP {status} error: {result}", "error")
+            continue
+
+        # GraphQL-level errors (e.g. auth failure, malformed query)
+        if "errors" in result:
+            errs = "; ".join(e.get("message", str(e)) for e in result["errors"])
+            add_log(username, f"  → [{name}] GraphQL error: {errs}", "error")
+            continue
+
+        create_post = result.get("data", {}) or {}
+        create_post = create_post.get("createPost", {}) or {}
+
+        # MutationError — Buffer rejected the post (duplicate, invalid channel, etc.)
+        if "message" in create_post:
+            code = create_post.get("code", "")
+            add_log(username, f"  → [{name}] Buffer error: {create_post['message']} (code: {code})", "error")
+            continue
+
+        # PostActionSuccess — extract id from post object
+        post_obj = create_post.get("post") or {}
+        pid = post_obj.get("id")
+
+        if pid:
             add_log(username, f"  → [{name}] Queued ✓ ID: {pid}", "ok")
-            success += 1
         else:
-            add_log(username, f"  → [{name}] Failed: {result}", "error")
+            # Post accepted but no ID returned — common with Facebook pages
+            add_log(username, f"  → [{name}] Queued ✓ (no ID in response)", "ok")
+
+        success += 1
+
     return success
 
 # ─── BATCH ENGINE ─────────────────────────────────────────────────────────────
@@ -333,7 +365,7 @@ def run_batch(username, triggered_by="scheduler"):
 # ─── TIMEZONE-AWARE SCHEDULER ─────────────────────────────────────────────────
 def scheduler_loop():
     print("[SCHEDULER] Started — timezone-aware, fires at 08:00 local time per user")
-    fired_today = set()   # (username, date_in_user_tz)
+    fired_today = set()
 
     while True:
         now_utc = datetime.utcnow()
@@ -356,7 +388,6 @@ def scheduler_loop():
                     target=run_batch, args=(uname, "scheduler"), daemon=True
                 ).start()
 
-        # Prune old dates to prevent memory growth
         today_utc = now_utc.date()
         fired_today = {k for k in fired_today if k[1] >= today_utc}
 
@@ -418,7 +449,6 @@ def register():
     save_users(users)
     os.makedirs(user_dir(username), exist_ok=True)
 
-    # Save timezone offset if provided
     utc_offset = data.get("utc_offset_hours")
     if utc_offset is not None:
         cfg = load_config(username)
@@ -443,7 +473,6 @@ def login():
     if not verify_password(password, u["password_hash"], u["salt"]):
         return jsonify({"ok": False, "message": "Invalid username or password."}), 401
 
-    # Save/update timezone offset on every login
     utc_offset = data.get("utc_offset_hours")
     if utc_offset is not None:
         cfg = load_config(username)
@@ -478,7 +507,6 @@ def me():
 def get_config(username):
     cfg = load_config(username)
     masked = {}
-    # Fields that should NOT be masked (shown in full)
     no_mask = {"active_channel", "utc_offset_hours",
                "buffer_channel_1", "buffer_channel_2", "buffer_channel_3", "buffer_channel_4",
                "buffer_channel_1_name", "buffer_channel_2_name", "buffer_channel_3_name", "buffer_channel_4_name",
@@ -534,10 +562,9 @@ def toggle_channel(username):
 
     active = cfg.get("active_channels", [1])
     if not isinstance(active, list):
-        active = [active]   # migrate old single-value format
+        active = [active]
 
     if ch in active:
-        # At least one channel must stay on
         if len(active) <= 1:
             return jsonify({"ok": False, "message": "At least one channel must be active"}), 400
         active.remove(ch)
@@ -559,23 +586,21 @@ def toggle_channel(username):
 def delete_channel(username):
     data = request.get_json()
     ch   = data.get("channel")
-    if ch not in [2, 3, 4]:   # channel 1 is permanent
+    if ch not in [2, 3, 4]:
         return jsonify({"ok": False, "message": "Only channels 2, 3 and 4 can be deleted"}), 400
     cfg = load_config(username)
     name = cfg.get(f"buffer_channel_{ch}_name", f"Channel {ch}")
 
-    # Remove from config
     for key in [f"buffer_channel_{ch}", f"buffer_channel_{ch}_name"]:
         cfg.pop(key, None)
 
-    # Remove from active list
     active = cfg.get("active_channels", [1])
     if not isinstance(active, list):
         active = [active]
     if ch in active:
         active.remove(ch)
     if not active:
-        active = [1]   # fallback to channel 1
+        active = [1]
     cfg["active_channels"] = active
 
     save_config(username, cfg)
@@ -601,9 +626,8 @@ def get_status(username):
     active_chs  = cfg.get("active_channels", [1])
     if not isinstance(active_chs, list):
         active_chs = [active_chs]
-    any_ch_set  = any(cfg.get(f"buffer_channel_{i}", "").strip() for i in [1,2,3,4])
+    any_ch_set  = any(cfg.get(f"buffer_channel_{i}", "").strip() for i in [1, 2, 3, 4])
 
-    # Build channel info for frontend
     channels_info = []
     for i in [1, 2, 3, 4]:
         cid  = cfg.get(f"buffer_channel_{i}", "").strip()
