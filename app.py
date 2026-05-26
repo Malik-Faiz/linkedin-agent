@@ -480,8 +480,9 @@ def get_config(username):
     masked = {}
     # Fields that should NOT be masked (shown in full)
     no_mask = {"active_channel", "utc_offset_hours",
-               "buffer_channel_1", "buffer_channel_2", "buffer_channel_3",
-               "buffer_channel_1_name", "buffer_channel_2_name", "buffer_channel_3_name"}
+               "buffer_channel_1", "buffer_channel_2", "buffer_channel_3", "buffer_channel_4",
+               "buffer_channel_1_name", "buffer_channel_2_name", "buffer_channel_3_name", "buffer_channel_4_name",
+               "active_channels"}
     for k, v in cfg.items():
         if k in no_mask:
             masked[k] = v
