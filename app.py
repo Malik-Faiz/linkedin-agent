@@ -200,10 +200,18 @@ def get_image_url(username, subject):
         add_log(username, f"SerpAPI Error: {e}", "error")
     return None
 
+def get_active_channel(cfg):
+    """Return the channel_id of whichever channel slot is toggled on."""
+    active = cfg.get("active_channel", 1)   # 1, 2, or 3
+    return cfg.get(f"buffer_channel_{active}", "")
+
 def send_to_buffer(username, post_text, image_url=None):
     cfg = load_config(username)
     buffer_key     = cfg.get("buffer_api_key", "")
-    buffer_channel = cfg.get("buffer_channel_id", "")
+    buffer_channel = get_active_channel(cfg)
+    if not buffer_channel:
+        add_log(username, "No active Buffer channel set — check API settings.", "error")
+        return 400, {"error": "No active channel"}
     input_data = {
         "text": post_text,
         "channelId": buffer_channel,
@@ -449,8 +457,14 @@ def me():
 def get_config(username):
     cfg = load_config(username)
     masked = {}
+    # Fields that should NOT be masked (shown in full)
+    no_mask = {"active_channel", "utc_offset_hours",
+               "buffer_channel_1", "buffer_channel_2", "buffer_channel_3",
+               "buffer_channel_1_name", "buffer_channel_2_name", "buffer_channel_3_name"}
     for k, v in cfg.items():
-        if isinstance(v, str) and v and len(v) > 8:
+        if k in no_mask:
+            masked[k] = v
+        elif isinstance(v, str) and v and len(v) > 8:
             masked[k] = "*" * (len(v) - 4) + v[-4:]
         else:
             masked[k] = v
@@ -461,14 +475,50 @@ def get_config(username):
 def save_config_route(username):
     data = request.get_json()
     cfg  = load_config(username)
-    fields = ["groq_api_key", "buffer_api_key", "buffer_channel_id", "serpapi_key"]
-    for field in fields:
+
+    # Standard key fields (mask-safe save)
+    for field in ["groq_api_key", "buffer_api_key", "serpapi_key"]:
         val = (data.get(field) or "").strip()
         if val and not val.startswith("*"):
             cfg[field] = val
+
+    # 3 channel IDs and their display names (store as-is, no masking)
+    for i in [1, 2, 3]:
+        cid  = (data.get(f"buffer_channel_{i}") or "").strip()
+        name = (data.get(f"buffer_channel_{i}_name") or "").strip()
+        if cid:
+            cfg[f"buffer_channel_{i}"] = cid
+        if name:
+            cfg[f"buffer_channel_{i}_name"] = name
+
+    # Active channel toggle (1, 2, or 3)
+    ac = data.get("active_channel")
+    if ac is not None and int(ac) in [1, 2, 3]:
+        cfg["active_channel"] = int(ac)
+
     save_config(username, cfg)
-    add_log(username, "API configuration updated ✓", "ok")
-    return jsonify({"ok": True, "message": "Configuration saved!"})
+    active = cfg.get("active_channel", 1)
+    active_name = cfg.get(f"buffer_channel_{active}_name", f"Channel {active}")
+    add_log(username, f"API config updated ✓ — Active channel: {active_name}", "ok")
+    return jsonify({"ok": True, "message": "Configuration saved!", "active_channel": active})
+
+# ── CHANNEL SWITCH ───────────────────────────────────────────────────────────
+@app.route("/api/channel/switch", methods=["POST"])
+@require_auth
+def switch_channel(username):
+    data = request.get_json()
+    ch   = data.get("channel")
+    if ch not in [1, 2, 3]:
+        return jsonify({"ok": False, "message": "Channel must be 1, 2, or 3"}), 400
+    cfg = load_config(username)
+    # Must have a channel ID saved for this slot
+    if not cfg.get(f"buffer_channel_{ch}", "").strip():
+        return jsonify({"ok": False, "message": f"Channel {ch} has no ID configured yet"}), 400
+    cfg["active_channel"] = ch
+    save_config(username, cfg)
+    name = cfg.get(f"buffer_channel_{ch}_name", f"Channel {ch}")
+    add_log(username, f"Switched active channel to: {name} (slot {ch})", "ok")
+    return jsonify({"ok": True, "active_channel": ch, "name": name})
 
 # ── STATUS ────────────────────────────────────────────────────────────────────
 @app.route("/api/status")
@@ -486,6 +536,10 @@ def get_status(username):
     cfg = load_config(username)
     offset = cfg.get("utc_offset_hours", None)
 
+    active_ch   = cfg.get("active_channel", 1)
+    active_name = cfg.get(f"buffer_channel_{active_ch}_name", f"Channel {active_ch}")
+    active_id   = cfg.get(f"buffer_channel_{active_ch}", "")
+
     return jsonify({
         "status":          state["status"],
         "running":         state["running"],
@@ -497,6 +551,9 @@ def get_status(username):
         "subjects":        subjects,
         "logs":            state["logs"][-30:],
         "utc_offset":      offset,
+        "active_channel":  active_ch,
+        "active_ch_name":  active_name,
+        "active_ch_set":   bool(active_id),
     })
 
 # ── MANUAL RUN ────────────────────────────────────────────────────────────────
