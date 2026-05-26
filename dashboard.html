@@ -1063,13 +1063,21 @@ function renderChannels(statusData) {
   const chip      = document.getElementById('activeChipLabel');
   if (!container) return;
 
+  // Only show channel 1 always + ch2/ch3 only if they have an ID configured
+  const visible = channels.filter(ch => ch.slot === 1 || ch.exists);
+
+  // Adjust grid columns based on how many visible
+  container.style.gridTemplateColumns = visible.length === 1
+    ? '1fr' : visible.length === 2 ? '1fr 1fr' : '1fr 1fr 1fr';
+
   let html = '';
-  channels.forEach(ch => {
+  visible.forEach(ch => {
     const isOn   = ch.active && ch.exists;
-    const canDel = ch.slot > 1 && ch.exists;   // only ch2 & ch3 deletable
+    const canDel = ch.slot > 1;   // ch2 & ch3 always deletable when visible
+
     html += `<div class="ch-toggle${isOn ? ' active' : ''}${!ch.exists ? ' no-id' : ''}"
                   onclick="toggleChannel(${ch.slot})"
-                  title="${ch.exists ? (isOn ? 'Click to turn OFF' : 'Click to turn ON') : 'Not configured — go to API Settings'}">
+                  title="${ch.exists ? (isOn ? 'Click to turn OFF' : 'Click to turn ON') : 'Not configured'}">
       ${canDel ? `<button class="ch-del-btn" onclick="event.stopPropagation();deleteChannel(${ch.slot})" title="Delete channel ${ch.slot}">✕</button>` : ''}
       <div class="ch-toggle-row">
         <div class="ch-indicator"></div>
@@ -1081,6 +1089,17 @@ function renderChannels(statusData) {
       </div>
     </div>`;
   });
+
+  // If ch2 or ch3 slots are missing, show an "+ Add Channel" hint card
+  const missingSlots = [2, 3].filter(s => !channels.find(c => c.slot === s && c.exists));
+  if (missingSlots.length > 0) {
+    html += `<div class="ch-toggle no-id" onclick="showSetup()" title="Add channels in API Settings"
+                  style="border-style:dashed;justify-content:center;align-items:center;flex-direction:row;gap:8px;opacity:.5;cursor:pointer;pointer-events:all">
+      <i class="ti ti-plus" style="font-size:16px;color:var(--muted)"></i>
+      <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">Add Channel</span>
+    </div>`;
+  }
+
   container.innerHTML = html;
 
   // Chip shows count of active channels
