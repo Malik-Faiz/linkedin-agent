@@ -214,7 +214,8 @@ def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None):
         "text": post_text,
         "channelId": channel_id,
         "schedulingType": "automatic",
-        "mode": "addToQueue"
+        "mode": "addToQueue",
+        "type": "post"
     }
     if image_url:
         input_data["assets"] = [{"image": {"url": image_url}}]
