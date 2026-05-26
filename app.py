@@ -504,7 +504,7 @@ def save_config_route(username):
             cfg[field] = val
 
     # 3 channel IDs and their display names (store as-is, no masking)
-    for i in [1, 2, 3]:
+    for i in [1, 2, 3, 4]:
         cid  = (data.get(f"buffer_channel_{i}") or "").strip()
         name = (data.get(f"buffer_channel_{i}_name") or "").strip()
         if cid:
@@ -528,8 +528,8 @@ def save_config_route(username):
 def toggle_channel(username):
     data = request.get_json()
     ch   = data.get("channel")
-    if ch not in [1, 2, 3]:
-        return jsonify({"ok": False, "message": "Channel must be 1, 2, or 3"}), 400
+    if ch not in [1, 2, 3, 4]:
+        return jsonify({"ok": False, "message": "Channel must be 1, 2, 3, or 4"}), 400
     cfg = load_config(username)
     if not cfg.get(f"buffer_channel_{ch}", "").strip():
         return jsonify({"ok": False, "message": f"Channel {ch} has no ID configured yet"}), 400
@@ -561,8 +561,8 @@ def toggle_channel(username):
 def delete_channel(username):
     data = request.get_json()
     ch   = data.get("channel")
-    if ch not in [2, 3]:   # channel 1 is permanent
-        return jsonify({"ok": False, "message": "Only channels 2 and 3 can be deleted"}), 400
+    if ch not in [2, 3, 4]:   # channel 1 is permanent
+        return jsonify({"ok": False, "message": "Only channels 2, 3 and 4 can be deleted"}), 400
     cfg = load_config(username)
     name = cfg.get(f"buffer_channel_{ch}_name", f"Channel {ch}")
 
@@ -603,11 +603,11 @@ def get_status(username):
     active_chs  = cfg.get("active_channels", [1])
     if not isinstance(active_chs, list):
         active_chs = [active_chs]
-    any_ch_set  = any(cfg.get(f"buffer_channel_{i}", "").strip() for i in [1,2,3])
+    any_ch_set  = any(cfg.get(f"buffer_channel_{i}", "").strip() for i in [1,2,3,4])
 
     # Build channel info for frontend
     channels_info = []
-    for i in [1, 2, 3]:
+    for i in [1, 2, 3, 4]:
         cid  = cfg.get(f"buffer_channel_{i}", "").strip()
         name = cfg.get(f"buffer_channel_{i}_name", f"Channel {i}")
         channels_info.append({
