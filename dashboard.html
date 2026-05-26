@@ -416,6 +416,27 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
                 </div>
               </div>
 
+              <!-- Channel 4 — Facebook, optional, has delete -->
+          <div style="background:var(--surface3);border-radius:10px;padding:10px 12px;position:relative" id="chRow4">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <span style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:1px">CHANNEL 4 — FACEBOOK <span style="color:var(--muted2)">(optional)</span></span>
+              <button type="button" onclick="clearChannelRow(4)" title="Delete channel 4"
+                style="background:rgba(255,95,95,.1);border:1px solid rgba(255,95,95,.2);border-radius:6px;color:var(--red);font-size:11px;font-family:var(--mono);padding:3px 8px;cursor:pointer;display:flex;align-items:center;gap:4px;transition:background .15s"
+                onmouseover="this.style.background='rgba(255,95,95,.22)'" onmouseout="this.style.background='rgba(255,95,95,.1)'">
+                <i class="ti ti-trash" style="font-size:12px"></i> Delete
+              </button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div class="field" style="margin-bottom:0">
+                <label>Name</label>
+                <div class="field-wrap"><i class="ti ti-tag field-icon"></i><input type="text" id="cfgChName4" placeholder="e.g. Facebook Page"></div>
+              </div>
+              <div class="field" style="margin-bottom:0">
+                <label>Channel ID</label>
+                <div class="field-wrap"><i class="ti ti-hash field-icon"></i><input type="text" id="cfgCh4" placeholder="670d••••••••"></div>
+              </div>
+            </div>
+          </div>
             </div>
           </div>
 
@@ -802,6 +823,10 @@ async function saveConfig() {
     if (ch2) { payload.buffer_channel_2 = ch2; payload.buffer_channel_2_name = chName2 || 'Channel 2'; }
     if (ch3) { payload.buffer_channel_3 = ch3; payload.buffer_channel_3_name = chName3 || 'Channel 3'; }
 
+    const ch4     = document.getElementById('cfgCh4').value.trim();
+    const chName4 = document.getElementById('cfgChName4').value.trim();
+    if (ch4) { payload.buffer_channel_4 = ch4; payload.buffer_channel_4_name = chName4 || 'Facebook Page'; }
+    
     const res  = await fetch(`${API}/config`, {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -1100,8 +1125,8 @@ function renderChannels(statusData) {
 
   // Adjust grid columns based on how many visible
   container.style.gridTemplateColumns = visible.length === 1
-    ? '1fr' : visible.length === 2 ? '1fr 1fr' : '1fr 1fr 1fr';
-
+    ? '1fr' : visible.length === 2 ? '1fr 1fr' : visible.length === 3 ? '1fr 1fr 1fr' : '1fr 1fr';
+  
   let html = '';
   visible.forEach(ch => {
     const isOn   = ch.active && ch.exists;
@@ -1123,7 +1148,7 @@ function renderChannels(statusData) {
   });
 
   // If ch2 or ch3 slots are missing, show an "+ Add Channel" hint card
-  const missingSlots = [2, 3].filter(s => !channels.find(c => c.slot === s && c.exists));
+  const missingSlots = [2, 3, 4].filter(s => !channels.find(c => c.slot === s && c.exists));
   if (missingSlots.length > 0) {
     html += `<div class="ch-toggle no-id" onclick="showSetup()" title="Add channels in API Settings"
                   style="border-style:dashed;justify-content:center;align-items:center;flex-direction:row;gap:8px;opacity:.5;cursor:pointer;pointer-events:all">
@@ -1234,6 +1259,8 @@ async function fetchConfig() {
       f('cfgChName1', data.config.buffer_channel_1_name);
       f('cfgChName2', data.config.buffer_channel_2_name);
       f('cfgChName3', data.config.buffer_channel_3_name);
+      f('cfgCh4',     data.config.buffer_channel_4);
+      f('cfgChName4', data.config.buffer_channel_4_name);
     }
   } catch(e) {}
 }
