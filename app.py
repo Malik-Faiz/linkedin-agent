@@ -498,22 +498,19 @@ def save_config_route(username):
     data = request.get_json()
     cfg  = load_config(username)
 
-    # Standard key fields (mask-safe save)
     for field in ["groq_api_key", "buffer_api_key", "serpapi_key"]:
         val = (data.get(field) or "").strip()
-        if val and not val.startswith("*"):
+        if val and not val.startswith("*") and "*" not in val:
             cfg[field] = val
 
-    # 3 channel IDs and their display names (store as-is, no masking)
     for i in [1, 2, 3, 4]:
         cid  = (data.get(f"buffer_channel_{i}") or "").strip()
         name = (data.get(f"buffer_channel_{i}_name") or "").strip()
-        if cid:
+        if cid and "*" not in cid:
             cfg[f"buffer_channel_{i}"] = cid
-        if name:
+        if name and "*" not in name:
             cfg[f"buffer_channel_{i}_name"] = name
 
-    # Ensure active_channels is initialised (default to [1])
     if "active_channels" not in cfg:
         cfg["active_channels"] = [1]
 
