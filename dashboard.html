@@ -208,6 +208,26 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
 .spin{animation:spin .8s linear infinite}
 @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 
+/* ── CHANNEL TOGGLE ── */
+.ch-toggle{
+  border:1.5px solid var(--border2);border-radius:12px;padding:14px 14px;
+  cursor:pointer;transition:all .2s;background:var(--surface2);position:relative;
+  display:flex;flex-direction:column;gap:6px
+}
+.ch-toggle:hover{border-color:var(--accent);background:var(--surface3)}
+.ch-toggle.active{border-color:var(--accent);background:rgba(124,106,255,.1)}
+.ch-toggle.active .ch-indicator{background:var(--green);box-shadow:0 0 0 3px rgba(0,229,160,.2)}
+.ch-toggle.no-id{opacity:.45;cursor:not-allowed;pointer-events:none}
+.ch-indicator{width:10px;height:10px;border-radius:50%;background:var(--muted2);transition:all .3s;flex-shrink:0}
+.ch-name{font-size:13px;font-weight:700;line-height:1}
+.ch-slot{font-size:10px;color:var(--muted);font-family:var(--mono)}
+.ch-toggle-row{display:flex;align-items:center;justify-content:space-between}
+/* pill switch */
+.pill-switch{width:36px;height:20px;border-radius:10px;background:var(--surface3);border:1px solid var(--border2);position:relative;transition:background .2s;flex-shrink:0}
+.pill-switch .knob{position:absolute;top:3px;left:3px;width:12px;height:12px;border-radius:50%;background:var(--muted2);transition:all .2s}
+.ch-toggle.active .pill-switch{background:var(--accent)}
+.ch-toggle.active .pill-switch .knob{left:19px;background:#fff}
+
 @media(max-width:600px){
   .stats-row{grid-template-columns:1fr 1fr}
   .two-col{grid-template-columns:1fr}
@@ -314,17 +334,44 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
                 <p>Publish posts · buffer.com</p>
               </div>
             </div>
-            <div class="field" style="margin-bottom:12px">
+            <div class="field" style="margin-bottom:14px">
               <div class="field-wrap">
                 <i class="ti ti-key field-icon"></i>
                 <input type="password" id="cfgBuffer" placeholder="OEF_••••••••••••••••••">
               </div>
             </div>
-            <div class="field">
-              <label>Buffer Channel ID</label>
-              <div class="field-wrap">
-                <i class="ti ti-hash field-icon"></i>
-                <input type="text" id="cfgChannel" placeholder="670d••••••••••••••••••••">
+            <!-- 3 Channel Slots -->
+            <div style="font-size:10px;font-family:var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Channel Slots</div>
+            <div style="display:grid;gap:10px">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div class="field" style="margin-bottom:0">
+                  <label>Channel 1 Name</label>
+                  <div class="field-wrap"><i class="ti ti-tag field-icon"></i><input type="text" id="cfgChName1" placeholder="e.g. Personal"></div>
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label>Channel 1 ID</label>
+                  <div class="field-wrap"><i class="ti ti-hash field-icon"></i><input type="text" id="cfgCh1" placeholder="670d••••••••"></div>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div class="field" style="margin-bottom:0">
+                  <label>Channel 2 Name</label>
+                  <div class="field-wrap"><i class="ti ti-tag field-icon"></i><input type="text" id="cfgChName2" placeholder="e.g. Company"></div>
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label>Channel 2 ID</label>
+                  <div class="field-wrap"><i class="ti ti-hash field-icon"></i><input type="text" id="cfgCh2" placeholder="670d••••••••"></div>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div class="field" style="margin-bottom:0">
+                  <label>Channel 3 Name</label>
+                  <div class="field-wrap"><i class="ti ti-tag field-icon"></i><input type="text" id="cfgChName3" placeholder="e.g. Agency"></div>
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label>Channel 3 ID</label>
+                  <div class="field-wrap"><i class="ti ti-hash field-icon"></i><input type="text" id="cfgCh3" placeholder="670d••••••••"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -450,6 +497,17 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
       <div class="sc-label">All-Time Posts</div>
       <div class="sc-val c-blue" id="totalRun">0</div>
       <div class="sc-sub">sent to Buffer</div>
+    </div>
+  </div>
+
+  <!-- CHANNEL SWITCHER -->
+  <div class="card" style="margin-bottom:20px;padding:18px 20px">
+    <div class="card-head" style="margin-bottom:12px">
+      <h2><i class="ti ti-toggle-right" style="font-size:15px;vertical-align:-2px;margin-right:6px"></i>Active Buffer Channel</h2>
+      <span class="chip" id="activeChipLabel">Loading...</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px" id="channelToggles">
+      <!-- rendered by JS -->
     </div>
   </div>
 
@@ -665,21 +723,35 @@ async function saveConfig() {
 
   const groq    = document.getElementById('cfgGroq').value.trim();
   const buffer  = document.getElementById('cfgBuffer').value.trim();
-  const channel = document.getElementById('cfgChannel').value.trim();
   const serp    = document.getElementById('cfgSerp').value.trim();
 
-  if (!groq || !buffer || !channel) {
-    document.getElementById('setupErrMsg').textContent = 'Groq, Buffer key, and Channel ID are required.';
+  if (!groq || !buffer) {
+    document.getElementById('setupErrMsg').textContent = 'Groq and Buffer API key are required.';
+    errEl.classList.add('show'); return;
+  }
+  if (!ch1 && !ch2 && !ch3) {
+    document.getElementById('setupErrMsg').textContent = 'Add at least one Buffer Channel ID.';
     errEl.classList.add('show'); return;
   }
 
   btn.disabled = true; btn.textContent = 'Saving...';
 
+  const ch1     = document.getElementById('cfgCh1').value.trim();
+  const ch2     = document.getElementById('cfgCh2').value.trim();
+  const ch3     = document.getElementById('cfgCh3').value.trim();
+  const chName1 = document.getElementById('cfgChName1').value.trim();
+  const chName2 = document.getElementById('cfgChName2').value.trim();
+  const chName3 = document.getElementById('cfgChName3').value.trim();
+
   try {
     const res  = await fetch(`${API}/config`, {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ groq_api_key: groq, buffer_api_key: buffer, buffer_channel_id: channel, serpapi_key: serp })
+      body: JSON.stringify({
+        groq_api_key: groq, buffer_api_key: buffer, serpapi_key: serp,
+        buffer_channel_1: ch1, buffer_channel_2: ch2, buffer_channel_3: ch3,
+        buffer_channel_1_name: chName1, buffer_channel_2_name: chName2, buffer_channel_3_name: chName3
+      })
     });
     const data = await res.json();
     if (data.ok) {
@@ -923,6 +995,7 @@ async function fetchStatus() {
     renderSubjects(data.subjects || []);
     renderLogs(data.logs || []);
     if (data.config) updateApiBadges(data.config);
+    renderChannels(data);
 
     // Update TZ banner with server-stored offset
     updateTzBanner(data.utc_offset);
@@ -959,6 +1032,53 @@ function watchSession() {
   if (left < WARN_BEFORE) document.getElementById('expiryCountdown').textContent = fmtLeft(left);
 }
 
+/* ── CHANNEL TOGGLE RENDER ── */
+let _chConfig = {};
+
+function renderChannels(statusData) {
+  const cfg        = _chConfig;
+  const active     = statusData.active_channel || 1;
+  const container  = document.getElementById('channelToggles');
+  const chip       = document.getElementById('activeChipLabel');
+  if (!container) return;
+
+  let html = '';
+  for (let i = 1; i <= 3; i++) {
+    const name  = cfg[`buffer_channel_${i}_name`] || `Channel ${i}`;
+    const hasId = !!(cfg[`buffer_channel_${i}`]);
+    const isOn  = (i === active) && hasId;
+    html += `<div class="ch-toggle${isOn ? ' active' : ''}${!hasId ? ' no-id' : ''}"
+                  onclick="switchChannel(${i})" title="${hasId ? 'Click to activate' : 'No channel ID set'}">
+      <div class="ch-toggle-row">
+        <span class="ch-name">${name}</span>
+        <div class="pill-switch"><div class="knob"></div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
+        <div class="ch-indicator"></div>
+        <span class="ch-slot">${hasId ? (isOn ? 'ACTIVE' : 'slot ' + i) : 'not configured'}</span>
+      </div>
+    </div>`;
+  }
+  container.innerHTML = html;
+
+  const activeName = cfg[`buffer_channel_${active}_name`] || `Channel ${active}`;
+  chip.textContent  = statusData.active_ch_set ? activeName : 'No channel set';
+  chip.style.color  = statusData.active_ch_set ? 'var(--green)' : 'var(--red)';
+}
+
+async function switchChannel(num) {
+  try {
+    const res  = await fetch(`${API}/channel/switch`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel: num })
+    });
+    const data = await res.json();
+    if (data.ok) { fetchStatus(); fetchConfig(); }
+    else alert(data.message);
+  } catch(e) { alert('Cannot reach server.'); }
+}
+
 function startDashboard() {
   connected = false; prevLogLen = 0;
   fetchStatus();
@@ -978,7 +1098,18 @@ async function fetchConfig() {
   try {
     const res  = await fetch(`${API}/config`, { credentials: 'include' });
     const data = await res.json();
-    if (data.ok) updateApiBadges(data.config);
+    if (data.ok) {
+      _chConfig = data.config;
+      updateApiBadges(data.config);
+      // Pre-fill setup page channel fields when opened
+      const f = (id, val) => { const el = document.getElementById(id); if(el && val) el.value = val; };
+      f('cfgCh1',     data.config.buffer_channel_1);
+      f('cfgCh2',     data.config.buffer_channel_2);
+      f('cfgCh3',     data.config.buffer_channel_3);
+      f('cfgChName1', data.config.buffer_channel_1_name);
+      f('cfgChName2', data.config.buffer_channel_2_name);
+      f('cfgChName3', data.config.buffer_channel_3_name);
+    }
   } catch(e) {}
 }
 
