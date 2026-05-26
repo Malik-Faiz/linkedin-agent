@@ -216,9 +216,9 @@ def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None, is_fa
         "schedulingType": "automatic",
         "mode": "addToQueue"
     }
-    # Facebook requires post type specified via extra field
+    # Facebook requires post type via metadata.facebook.type (PostTypeFacebook enum)
     if is_facebook:
-        input_data["extra"] = {"facebook": {"type": "post"}}
+        input_data["metadata"] = {"facebook": {"type": "post"}}
     if image_url:
         input_data["assets"] = [{"image": {"url": image_url}}]
     try:
@@ -230,7 +230,6 @@ def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None, is_fa
                     ... on PostActionSuccess {
                         post {
                             id
-                            status
                         }
                     }
                     ... on MutationError {
