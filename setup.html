@@ -297,10 +297,14 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 <script>
 const API=window.location.origin+'/api';
 
+// Track which keys are already saved on the server
+let savedKeys={groq:false,buffer:false,ch1:false};
+
 async function saveConfig(){
   const btn=document.getElementById('saveBtn'),lbl=document.getElementById('saveBtnLabel');
   document.getElementById('errBox').classList.remove('show');
   document.getElementById('okBox').classList.remove('show');
+
   const groq=document.getElementById('cfgGroq').value.trim();
   const buffer=document.getElementById('cfgBuffer').value.trim();
   const serp=document.getElementById('cfgSerp').value.trim();
@@ -312,33 +316,84 @@ async function saveConfig(){
   const n2=document.getElementById('cfgChName2').value.trim();
   const n3=document.getElementById('cfgChName3').value.trim();
   const n4=document.getElementById('cfgChName4').value.trim();
-  if(!groq||!buffer){document.getElementById('errMsg').textContent='Groq and Buffer API keys are required.';document.getElementById('errBox').classList.add('show');return;}
-  if(!ch1){document.getElementById('errMsg').textContent='Channel 1 ID is required.';document.getElementById('errBox').classList.add('show');return;}
+
+  // Only require groq/buffer if NOT already saved on server
+  const groqOk = groq || savedKeys.groq;
+  const bufferOk = buffer || savedKeys.buffer;
+  const ch1Ok = ch1 || savedKeys.ch1;
+
+  if(!groqOk||!bufferOk){
+    document.getElementById('errMsg').textContent='Groq and Buffer API keys are required. '+(savedKeys.groq?'':'Enter your Groq key. ')+(savedKeys.buffer?'':'Enter your Buffer key.');
+    document.getElementById('errBox').classList.add('show');return;
+  }
+  if(!ch1Ok){
+    document.getElementById('errMsg').textContent='Channel 1 ID is required.';
+    document.getElementById('errBox').classList.add('show');return;
+  }
+
   btn.disabled=true;lbl.innerHTML='<span class="spin">⟳</span> Saving...';
   try{
-    const payload={groq_api_key:groq,buffer_api_key:buffer,serpapi_key:serp,buffer_channel_1:ch1,buffer_channel_1_name:n1||'Channel 1'};
+    // Only send fields that have new values — backend merges with existing
+    const payload={};
+    if(groq) payload.groq_api_key=groq;
+    if(buffer) payload.buffer_api_key=buffer;
+    if(serp) payload.serpapi_key=serp;
+    // Always send channel fields so names update
+    if(ch1){payload.buffer_channel_1=ch1;payload.buffer_channel_1_name=n1||'Channel 1';}
+    else if(n1&&savedKeys.ch1){payload.buffer_channel_1_name=n1;}
     if(ch2){payload.buffer_channel_2=ch2;payload.buffer_channel_2_name=n2||'Channel 2';}
     if(ch3){payload.buffer_channel_3=ch3;payload.buffer_channel_3_name=n3||'Channel 3';}
     if(ch4){payload.buffer_channel_4=ch4;payload.buffer_channel_4_name=n4||'Facebook Page';}
+
     const res=await fetch(`${API}/config`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     const data=await res.json();
-    if(data.ok){document.getElementById('okMsg').textContent='Saved! Redirecting to dashboard...';document.getElementById('okBox').classList.add('show');setTimeout(goToDash,900);}
-    else{document.getElementById('errMsg').textContent=data.message||'Save failed.';document.getElementById('errBox').classList.add('show');btn.disabled=false;lbl.textContent='Save Configuration & Continue →';}
-  }catch(e){document.getElementById('errMsg').textContent='Cannot reach server.';document.getElementById('errBox').classList.add('show');btn.disabled=false;lbl.textContent='Save Configuration & Continue →';}
+    if(data.ok){
+      document.getElementById('okMsg').textContent='Saved! Redirecting to dashboard...';
+      document.getElementById('okBox').classList.add('show');
+      setTimeout(goToDash,900);
+    }else{
+      document.getElementById('errMsg').textContent=data.message||'Save failed.';
+      document.getElementById('errBox').classList.add('show');
+      btn.disabled=false;lbl.textContent='Save Configuration & Continue →';
+    }
+  }catch(e){
+    document.getElementById('errMsg').textContent='Cannot reach server.';
+    document.getElementById('errBox').classList.add('show');
+    btn.disabled=false;lbl.textContent='Save Configuration & Continue →';
+  }
 }
 
 async function clearChannel(slot){
   if(!confirm(`Delete Channel ${slot}?`))return;
   document.getElementById(`cfgCh${slot}`).value='';
   document.getElementById(`cfgChName${slot}`).value='';
+  // Remove saved badge if present
+  const badge=document.getElementById(`savedBadge${slot}`);
+  if(badge)badge.remove();
   try{
     const res=await fetch(`${API}/channel/delete`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({channel:slot})});
     const data=await res.json();
-    if(data.ok){const row=document.getElementById(`chRow${slot}`);if(row){row.style.borderColor='rgba(61,255,192,0.3)';setTimeout(()=>row.style.borderColor='',1500);}}
+    if(data.ok){
+      const row=document.getElementById(`chRow${slot}`);
+      if(row){row.style.borderColor='rgba(61,255,192,0.3)';setTimeout(()=>row.style.borderColor='',1500);}
+    }
   }catch(e){}
 }
 
 function goToDash(){window.location.href='/dashboard';}
+
+// Show a "saved ✓" badge next to a field label
+function showSavedBadge(inputId,label){
+  const inp=document.getElementById(inputId);
+  if(!inp)return;
+  const existing=document.getElementById('savedBadge'+inputId);
+  if(existing)return;
+  const badge=document.createElement('span');
+  badge.id='savedBadge'+inputId;
+  badge.style.cssText='margin-left:8px;font-family:var(--mono);font-size:10px;color:var(--green);background:rgba(61,255,192,0.1);border:1px solid rgba(61,255,192,0.25);border-radius:6px;padding:2px 8px;';
+  badge.textContent='✓ saved';
+  inp.closest('.field').querySelector('label').appendChild(badge);
+}
 
 (async function prefill(){
   try{
@@ -346,11 +401,43 @@ function goToDash(){window.location.href='/dashboard';}
     const data=await res.json();
     if(!data.ok)return;
     const c=data.config;
-    const set=(id,val)=>{const el=document.getElementById(id);if(el&&val&&!val.includes('*'))el.value=val;};
-    set('cfgCh1',c.buffer_channel_1);set('cfgChName1',c.buffer_channel_1_name);
-    set('cfgCh2',c.buffer_channel_2);set('cfgChName2',c.buffer_channel_2_name);
-    set('cfgCh3',c.buffer_channel_3);set('cfgChName3',c.buffer_channel_3_name);
-    set('cfgCh4',c.buffer_channel_4);set('cfgChName4',c.buffer_channel_4_name);
+
+    // Check which sensitive keys exist (they come back masked with ***)
+    const hasMask=(v)=>v&&v.includes('*');
+
+    if(hasMask(c.groq_api_key)||c.groq_api_key){
+      savedKeys.groq=true;
+      // Show placeholder indicating key is saved, don't fill actual value
+      const el=document.getElementById('cfgGroq');
+      if(el){el.placeholder='already saved — leave blank to keep';}
+      showSavedBadge('cfgGroq');
+    }
+    if(hasMask(c.buffer_api_key)||c.buffer_api_key){
+      savedKeys.buffer=true;
+      const el=document.getElementById('cfgBuffer');
+      if(el){el.placeholder='already saved — leave blank to keep';}
+      showSavedBadge('cfgBuffer');
+    }
+    if(hasMask(c.serpapi_key)||c.serpapi_key){
+      const el=document.getElementById('cfgSerp');
+      if(el){el.placeholder='already saved — leave blank to keep';}
+      showSavedBadge('cfgSerp');
+    }
+
+    // Channel IDs & names — fill non-masked values directly
+    const setVal=(id,val)=>{const el=document.getElementById(id);if(el&&val){if(!val.includes('*'))el.value=val;else{el.placeholder='already saved — leave blank to keep';}}};
+    setVal('cfgCh1',c.buffer_channel_1);
+    if(c.buffer_channel_1){savedKeys.ch1=true;showSavedBadge('cfgCh1');}
+    const setName=(id,val)=>{const el=document.getElementById(id);if(el&&val&&!val.includes('*'))el.value=val;};
+    setName('cfgChName1',c.buffer_channel_1_name);
+    setVal('cfgCh2',c.buffer_channel_2);setName('cfgChName2',c.buffer_channel_2_name);
+    setVal('cfgCh3',c.buffer_channel_3);setName('cfgChName3',c.buffer_channel_3_name);
+    setVal('cfgCh4',c.buffer_channel_4);setName('cfgChName4',c.buffer_channel_4_name);
+
+    // Update button text if already configured
+    if(savedKeys.groq&&savedKeys.buffer){
+      document.getElementById('saveBtnLabel').textContent='Update Configuration →';
+    }
   }catch(e){}
 })();
 
