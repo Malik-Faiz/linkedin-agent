@@ -328,11 +328,50 @@ function isSessionValid(){ try{const s=JSON.parse(localStorage.getItem(SESSION_K
     const r=await fetch(`${API}/config`,{credentials:'include'});
     const d=await r.json();
     if(d.ok){
-      const f=(id,val)=>{ const el=document.getElementById(id); if(el&&val&&!val.includes('*')) el.value=val; };
-      f('cfgCh1',d.config.buffer_channel_1); f('cfgChName1',d.config.buffer_channel_1_name);
-      f('cfgCh2',d.config.buffer_channel_2); f('cfgChName2',d.config.buffer_channel_2_name);
-      f('cfgCh3',d.config.buffer_channel_3); f('cfgChName3',d.config.buffer_channel_3_name);
-      f('cfgCh4',d.config.buffer_channel_4); f('cfgChName4',d.config.buffer_channel_4_name);
+      const cfg=d.config;
+
+      /* For API key fields (masked): show masked value as placeholder so user
+         knows the key is saved. If they leave it blank we won't overwrite it.
+         If they type a new one we will. */
+      const fillKey=(id,val)=>{
+        const el=document.getElementById(id); if(!el||!val) return;
+        if(val.includes('*')){
+          /* key is saved — show masked value as placeholder, leave input empty
+             so a blank submission doesn't overwrite the stored key */
+          el.placeholder=val;
+          el.closest('.api-row')?.querySelector('.section-head-text h3') &&
+            el.parentElement.parentElement.querySelector('label') &&
+            (el.parentElement.parentElement.querySelector('label').style.color='var(--green)');
+          /* add a small "saved" indicator */
+          const wrap=el.parentElement;
+          if(!wrap.querySelector('.saved-tag')){
+            const tag=document.createElement('span');
+            tag.className='saved-tag';
+            tag.textContent='✓ saved';
+            tag.style.cssText='position:absolute;right:38px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--green);font-family:var(--mono);pointer-events:none';
+            wrap.style.position='relative';
+            wrap.appendChild(tag);
+          }
+        } else {
+          el.value=val;
+        }
+      };
+
+      /* For plain text fields (channel IDs, names): always fill */
+      const fillText=(id,val)=>{ const el=document.getElementById(id); if(el&&val) el.value=val; };
+
+      fillKey('cfgGroq',   cfg.groq_api_key);
+      fillKey('cfgBuffer', cfg.buffer_api_key);
+      fillKey('cfgSerp',   cfg.serpapi_key);
+
+      fillText('cfgCh1',     cfg.buffer_channel_1);
+      fillText('cfgChName1', cfg.buffer_channel_1_name);
+      fillText('cfgCh2',     cfg.buffer_channel_2);
+      fillText('cfgChName2', cfg.buffer_channel_2_name);
+      fillText('cfgCh3',     cfg.buffer_channel_3);
+      fillText('cfgChName3', cfg.buffer_channel_3_name);
+      fillText('cfgCh4',     cfg.buffer_channel_4);
+      fillText('cfgChName4', cfg.buffer_channel_4_name);
     }
   } catch(e){}
 })();
@@ -377,13 +416,25 @@ async function saveConfig(){
   const ch4    =document.getElementById('cfgCh4').value.trim();
   const chName4=document.getElementById('cfgChName4').value.trim();
 
-  if(!groq||!buffer){ showErr('Groq and Buffer API key are required.'); return; }
-  if(!ch1){ showErr('Channel 1 ID is required.'); return; }
+  /* A key field is "present" if typed now OR already saved (placeholder shows masked value) */
+  const groqSaved   = document.getElementById('cfgGroq').placeholder.includes('*');
+  const bufferSaved = document.getElementById('cfgBuffer').placeholder.includes('*');
+  const ch1Saved    = document.getElementById('cfgCh1').value.trim();
+
+  if(!groq && !groqSaved)  { showErr('Groq API key is required.'); return; }
+  if(!buffer && !bufferSaved){ showErr('Buffer API key is required.'); return; }
+  if(!ch1 && !ch1Saved)   { showErr('Channel 1 ID is required.'); return; }
 
   btn.disabled=true; lbl.textContent='Saving…';
   btn.querySelector('i').className='ti ti-loader-2 spin-icon';
 
-  const payload={groq_api_key:groq,buffer_api_key:buffer,serpapi_key:serp,buffer_channel_1:ch1,buffer_channel_1_name:chName1||'Channel 1'};
+  /* Only include keys that were actually typed — blank = keep existing on server */
+  const payload={};
+  if(groq)   payload.groq_api_key   = groq;
+  if(buffer) payload.buffer_api_key = buffer;
+  if(serp)   payload.serpapi_key    = serp;
+  if(ch1)    { payload.buffer_channel_1=ch1; payload.buffer_channel_1_name=chName1||'Channel 1'; }
+  else if(chName1) payload.buffer_channel_1_name=chName1;
   if(ch2){payload.buffer_channel_2=ch2;payload.buffer_channel_2_name=chName2||'Channel 2';}
   if(ch3){payload.buffer_channel_3=ch3;payload.buffer_channel_3_name=chName3||'Channel 3';}
   if(ch4){payload.buffer_channel_4=ch4;payload.buffer_channel_4_name=chName4||'Facebook Page';}

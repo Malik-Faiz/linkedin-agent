@@ -527,6 +527,11 @@ def get_status(username):
         "utc_offset": offset, "active_channels": active_chs,
         "channels_info": channels_info,
         "any_ch_set": any(cfg.get(f"buffer_channel_{i}", "").strip() for i in [1, 2, 3, 4]),
+        "config": {
+            "groq_api_key":   bool(cfg.get("groq_api_key")),
+            "buffer_api_key": bool(cfg.get("buffer_api_key")),
+            "serpapi_key":    bool(cfg.get("serpapi_key")),
+        },
     })
 
 # ── MANUAL RUN ────────────────────────────────────────────────────────────────

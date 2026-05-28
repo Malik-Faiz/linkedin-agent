@@ -410,9 +410,11 @@ function updateTzBanner(offset){
 
 /* ── API BADGES ── */
 function updateApiBadges(cfg){
+  /* cfg[key] may be a non-empty string (from /api/config) or boolean true (from /api/status) */
   [['badgeGroq','groq_api_key'],['badgeBuffer','buffer_api_key'],['badgeSerp','serpapi_key']].forEach(([id,key])=>{
     const el=document.getElementById(id); if(!el) return;
-    el.querySelector('.api-dot').className='api-dot '+(cfg&&cfg[key]?'dot-ok':'dot-warn');
+    const present = cfg && (cfg[key]===true || (typeof cfg[key]==='string' && cfg[key].length>0));
+    el.querySelector('.api-dot').className='api-dot '+(present?'dot-ok':'dot-warn');
   });
 }
 
@@ -510,7 +512,9 @@ async function fetchStatus(){
     const d=await r.json();
     connected=true;
     document.getElementById('connBanner').classList.remove('show');
-    nextRunTarget=new Date(d.next_run_iso);
+    /* next_run_iso is UTC — ensure parsed as UTC regardless of browser locale */
+    const iso=d.next_run_iso.endsWith('Z')?d.next_run_iso:d.next_run_iso+'Z';
+    nextRunTarget=new Date(iso);
     const chip=document.getElementById('statusChip');
     chip.classList.toggle('running',d.running);
     document.getElementById('statusLabel').textContent=d.running?'Running':'Waiting';
