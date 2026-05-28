@@ -459,7 +459,7 @@ def page_dashboard():
 
 @app.route("/ping")
 def ping():
-    return jsonify({"status": "alive", "time": datetime.now().strftime("%H:%M:%S")})
+    return jsonify({"status": "alive", "utc_time": datetime.utcnow().strftime("%H:%M:%S"), "utc_iso": datetime.utcnow().isoformat() + "Z"})
 
 # ════════════════════════════════════════════════════════════════════════════════
 #  AUTH ROUTES
