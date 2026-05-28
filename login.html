@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LinkedIn Agent · Welcome</title>
+<title>LinkedIn Agent</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
@@ -12,514 +12,388 @@
 
 :root {
   --bg: #030308;
-  --surface: rgba(255, 255, 255, 0.02);
-  --surface-hover: rgba(255, 255, 255, 0.04);
-  --border: rgba(255, 255, 255, 0.06);
-  --border-focus: rgba(168, 132, 255, 0.6);
+  --surface: rgba(255, 255, 255, 0.03);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-focus: #a884ff;
   --text: #f8f7ff;
-  --muted: rgba(200, 190, 255, 0.55);
-  --muted2: rgba(200, 190, 255, 0.3);
+  --muted: rgba(200, 190, 255, 0.6);
   --accent: #a884ff;
   --accent2: #ff7eb3;
   --accent3: #7eeaff;
-  --green: #4dffc3;
-  --red: #ff6b6b;
   --font: 'Bricolage Grotesque', sans-serif;
   --mono: 'JetBrains Mono', monospace;
 }
 
 html, body {
-  min-height: 100vh;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font);
-  overflow: hidden;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  width: 100%; height: 100vh;
+  background: var(--bg); color: var(--text);
+  font-family: var(--font); overflow: hidden;
 }
 
-/* ── BACKGROUND ENV ── */
-.bg-scene { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-.orb {
-  position: absolute; border-radius: 50%;
-  filter: blur(100px); opacity: 0.15; 
-  animation: float 14s ease-in-out infinite alternate;
-}
-.orb1 { width: 650px; height: 650px; background: radial-gradient(circle, var(--accent), transparent 70%); top: -20%; left: -15%; animation-delay: 0s; }
-.orb2 { width: 550px; height: 550px; background: radial-gradient(circle, var(--accent2), transparent 70%); bottom: -25%; right: -10%; animation-delay: -5s; }
-.orb3 { width: 400px; height: 400px; background: radial-gradient(circle, var(--accent3), transparent 70%); top: 40%; left: 45%; animation-delay: -10s; }
-
-@keyframes float {
-  0% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(30px, -50px) scale(1.1); }
-  100% { transform: translate(-30px, 30px) scale(0.95); }
-}
-
+/* =========================================
+   1. GLOBAL BACKGROUND & EFFECTS
+========================================= */
 .bg-grid {
-  position: fixed; inset: 0; z-index: 0;
-  background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-  background-size: 40px 40px;
-  mask-image: radial-gradient(circle at center, black 30%, transparent 90%);
-  -webkit-mask-image: radial-gradient(circle at center, black 30%, transparent 90%);
-  pointer-events: none;
+  position: fixed; inset: 0; z-index: 1; pointer-events: none;
+  background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), 
+                    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  mask-image: radial-gradient(circle at center, black 20%, transparent 80%);
+  -webkit-mask-image: radial-gradient(circle at center, black 20%, transparent 80%);
 }
 
-.bg-noise {
-  position: fixed; inset: 0; z-index: 0; opacity: 0.04;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  mix-blend-mode: overlay; pointer-events: none;
+.ambient-orbs { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.orb {
+  position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.2;
+  animation: floatOrb 12s ease-in-out infinite alternate;
+}
+.orb-1 { width: 600px; height: 600px; background: var(--accent); top: -10%; left: -10%; }
+.orb-2 { width: 500px; height: 500px; background: var(--accent2); bottom: -10%; right: -10%; animation-delay: -4s;}
+.orb-3 { width: 400px; height: 400px; background: var(--accent3); top: 30%; left: 40%; animation-delay: -8s;}
+
+@keyframes floatOrb {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(50px, -50px) scale(1.2); }
 }
 
-/* ── VIEW MANAGER ── */
-.view {
+/* =========================================
+   2. SCREEN MANAGER (TRANSITIONS)
+========================================= */
+.screen {
   position: absolute; inset: 0; z-index: 10;
   width: 100%; height: 100%;
-  display: flex;
-  visibility: hidden; opacity: 0;
-  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.8s;
-}
-.view.active {
-  visibility: visible; opacity: 1; transform: scale(1) translateY(0); pointer-events: auto;
-}
-.view.hidden-up { opacity: 0; transform: scale(0.95) translateY(-40px); visibility: hidden; pointer-events: none; }
-.view.hidden-down { opacity: 0; transform: scale(1.05) translateY(40px); visibility: hidden; pointer-events: none; }
-
-/* ── WELCOME VIEW (LANDING) ── */
-#welcomeView {
-  flex-direction: column; align-items: center; justify-content: center;
-  text-align: center; padding: 20px;
-}
-.welcome-badge {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 6px 14px; border-radius: 30px;
-  background: rgba(168,132,255,0.1); border: 1px solid rgba(168,132,255,0.2);
-  color: var(--accent); font-family: var(--mono); font-size: 12px; font-weight: 600;
-  margin-bottom: 24px; animation: revealUp 0.6s backwards;
-}
-.welcome-title {
-  font-size: clamp(48px, 6vw, 72px); font-weight: 800; line-height: 1.05;
-  letter-spacing: -2px; margin-bottom: 24px; max-width: 800px;
-  animation: revealUp 0.6s 0.1s backwards;
-}
-.welcome-title .grad {
-  background: linear-gradient(to right, var(--accent) 0%, var(--accent2) 50%, var(--accent3) 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-}
-.welcome-sub {
-  font-size: 18px; color: var(--muted); line-height: 1.6; max-width: 500px;
-  margin-bottom: 48px; font-weight: 400; animation: revealUp 0.6s 0.2s backwards;
+  transition: all 1s cubic-bezier(0.25, 1, 0.3, 1);
 }
 
-/* Animated Graphics */
-.graphics-stage {
-  position: relative; width: 100%; max-width: 600px; height: 260px;
-  margin-bottom: 40px; animation: revealUp 0.6s 0.3s backwards;
-  perspective: 1000px;
+/* The Welcome Screen */
+#welcome-screen {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  opacity: 1; transform: scale(1); pointer-events: auto;
 }
-.glass-card {
-  position: absolute;
-  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);
-  backdrop-filter: blur(12px); border-radius: 20px;
-  padding: 20px; display: flex; align-items: center; gap: 16px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
-}
-.glass-card .icon-box {
-  width: 48px; height: 48px; border-radius: 12px;
-  display: flex; align-items: center; justify-content: center; font-size: 24px;
-}
-.glass-card .c-text { text-align: left; }
-.glass-card .c-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px; }
-.glass-card .c-sub { font-size: 12px; font-family: var(--mono); color: var(--muted); }
-
-/* Positioning & floating animation for cards */
-.gc-1 {
-  top: 10%; left: 10%; z-index: 2; width: 280px;
-  animation: floatCard 6s ease-in-out infinite alternate;
-}
-.gc-1 .icon-box { background: rgba(168,132,255,0.15); color: var(--accent); }
-
-.gc-2 {
-  top: 50%; right: 5%; z-index: 3; width: 300px;
-  animation: floatCard 7s ease-in-out infinite alternate-reverse;
-}
-.gc-2 .icon-box { background: rgba(255,126,179,0.15); color: var(--accent2); }
-
-.gc-3 {
-  bottom: 0%; left: 25%; z-index: 1; width: 260px;
-  animation: floatCard 8s ease-in-out infinite alternate;
-}
-.gc-3 .icon-box { background: rgba(126,234,255,0.15); color: var(--accent3); }
-
-@keyframes floatCard {
-  0% { transform: translateY(0px) rotateX(5deg) rotateY(-5deg); }
-  100% { transform: translateY(-20px) rotateX(-5deg) rotateY(5deg); }
+#welcome-screen.hide {
+  opacity: 0; transform: scale(1.15) translateY(-50px); pointer-events: none; visibility: hidden;
 }
 
-.start-btn {
-  padding: 18px 40px; border-radius: 100px; border: none;
-  background: #fff; color: #000; font-family: var(--font);
-  font-size: 16px; font-weight: 700; cursor: pointer;
-  display: flex; align-items: center; gap: 10px;
-  transition: all 0.3s; animation: revealUp 0.6s 0.4s backwards;
-  box-shadow: 0 0 0 0 rgba(255,255,255,0.4);
-}
-.start-btn:hover {
-  transform: translateY(-3px); box-shadow: 0 10px 30px rgba(255,255,255,0.3);
-}
-.start-btn i { transition: transform 0.3s; }
-.start-btn:hover i { transform: translateX(4px); }
-
-
-/* ── AUTH VIEW (SPLIT SCREEN) ── */
-#authView {
+/* The Auth Dashboard Screen */
+#auth-screen {
+  opacity: 0; transform: translateY(100px); pointer-events: none; visibility: hidden;
   display: grid; grid-template-columns: 1fr 1fr;
 }
+#auth-screen.show {
+  opacity: 1; transform: translateY(0); pointer-events: auto; visibility: visible;
+}
 
-.left-panel {
-  display: flex; flex-direction: column; justify-content: center;
-  padding: 60px 10%; border-right: 1px solid var(--border);
+/* =========================================
+   3. WELCOME PAGE ANIMATIONS & UI
+========================================= */
+.welcome-content {
+  text-align: center; position: relative; z-index: 20; max-width: 900px; padding: 20px;
+}
+
+.pill-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: 50px;
+  background: rgba(168,132,255,0.1); border: 1px solid rgba(168,132,255,0.3);
+  color: var(--accent); font-family: var(--mono); font-size: 13px; font-weight: 600;
+  margin-bottom: 30px; animation: popIn 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.main-title {
+  font-size: clamp(48px, 7vw, 84px); font-weight: 800; line-height: 1.1;
+  letter-spacing: -2px; margin-bottom: 24px;
+  animation: slideUpFade 1s 0.2s backwards cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Moving Gradient Animation on Text */
+.gradient-text {
+  background: linear-gradient(200deg, var(--accent), var(--accent2), var(--accent3), var(--accent));
+  background-size: 300% 300%;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  animation: shineText 5s ease infinite;
+}
+@keyframes shineText { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+.sub-title {
+  font-size: 18px; color: var(--muted); max-width: 500px; margin: 0 auto 50px; line-height: 1.6;
+  animation: slideUpFade 1s 0.4s backwards cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Glowing Pulsing Button */
+.cta-btn {
+  position: relative; padding: 18px 48px; border-radius: 100px; border: none;
+  background: #fff; color: #000; font-family: var(--font); font-size: 18px; font-weight: 800;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 12px;
+  animation: slideUpFade 1s 0.6s backwards cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+.cta-btn::before {
+  content: ''; position: absolute; inset: -4px; border-radius: 100px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent3));
+  z-index: -1; filter: blur(15px); opacity: 0.6;
+  animation: pulseGlow 2s infinite alternate;
+}
+.cta-btn:hover { transform: translateY(-4px) scale(1.05); }
+.cta-btn:hover::before { opacity: 1; filter: blur(20px); }
+
+@keyframes pulseGlow { 0% { opacity: 0.4; } 100% { opacity: 0.8; } }
+
+/* Floating Orbital Cards */
+.orbit-container {
+  position: absolute; top: 50%; left: 50%; width: 100%; height: 100%;
+  transform: translate(-50%, -50%); pointer-events: none; z-index: 10;
+}
+.floating-card {
+  position: absolute; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(12px); border-radius: 20px; padding: 16px 24px;
+  display: flex; align-items: center; gap: 14px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+}
+.floating-card i { font-size: 24px; padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.1); }
+.fc-1 { top: 15%; left: 10%; animation: floatY 6s ease-in-out infinite; color: var(--accent); }
+.fc-2 { bottom: 20%; right: 10%; animation: floatY 7s ease-in-out infinite alternate-reverse; color: var(--accent2); }
+.fc-3 { top: 25%; right: 15%; animation: floatX 8s ease-in-out infinite; color: var(--accent3); }
+
+@keyframes floatY { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-30px); } }
+@keyframes floatX { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-30px); } }
+@keyframes slideUpFade { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes popIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+
+/* =========================================
+   4. AUTHENTICATION UI
+========================================= */
+.auth-left {
+  display: flex; flex-direction: column; justify-content: center; padding: 80px 10%;
+  border-right: 1px solid var(--border);
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.01));
 }
+.auth-right {
+  display: flex; align-items: center; justify-content: center; padding: 40px; position: relative;
+}
 
-.brand { display: flex; align-items: center; gap: 18px; margin-bottom: 80px; }
 .brand-icon {
-  width: 56px; height: 56px; border-radius: 18px;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 22px; font-weight: 800; color: #fff; position: relative;
-  box-shadow: 0 10px 30px rgba(168, 132, 255, 0.3);
+  width: 64px; height: 64px; border-radius: 20px; background: linear-gradient(135deg, var(--accent), var(--accent2));
+  display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; margin-bottom: 40px;
 }
-.brand-icon::after {
-  content: ''; position: absolute; inset: -2px; border-radius: 20px;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  z-index: -1; filter: blur(14px); opacity: 0.6;
-}
-.brand-name { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 2px; }
-.brand-tag  { font-size: 12px; color: var(--muted); font-family: var(--mono); font-weight: 500;}
 
-.hero-heading { font-size: clamp(38px, 4vw, 56px); font-weight: 800; line-height: 1.05; letter-spacing: -2px; margin-bottom: 24px; }
-.hero-heading .grad { background: linear-gradient(to right, var(--accent) 0%, var(--accent2) 50%, var(--accent3) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.hero-sub { font-size: 16px; color: var(--muted); line-height: 1.6; max-width: 400px; margin-bottom: 48px; }
+.auth-hero-title { font-size: 48px; font-weight: 800; margin-bottom: 20px; line-height: 1.1; }
+.auth-hero-sub { color: var(--muted); font-size: 18px; max-width: 400px; margin-bottom: 40px; }
 
-.features { display: flex; flex-direction: column; gap: 16px; max-width: 420px; }
-.feat {
-  display: flex; align-items: center; gap: 16px; padding: 16px 20px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 16px; backdrop-filter: blur(12px);
-  transition: all 0.3s; cursor: default;
-}
-.feat:hover { background: var(--surface-hover); transform: translateX(6px); border-color: rgba(255,255,255,0.12); }
-.feat-icon { width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-.fi-purple { background: rgba(168,132,255,0.15); color: var(--accent); }
-.fi-pink   { background: rgba(255,126,179,0.15); color: var(--accent2); }
-.fi-cyan   { background: rgba(126,234,255,0.15); color: var(--accent3); }
-.feat-text h4 { font-size: 15px; font-weight: 600; margin-bottom: 4px; color: #fff; }
-.feat-text p  { font-size: 12px; color: var(--muted); font-family: var(--mono); font-weight: 500;}
-
-.right-panel { display: flex; align-items: center; justify-content: center; padding: 40px; position: relative; }
+/* The Auth Box */
 .auth-box {
-  width: 100%; max-width: 440px; background: rgba(10, 10, 18, 0.4);
+  width: 100%; max-width: 440px; background: rgba(10, 10, 18, 0.6);
   border: 1px solid var(--border); border-radius: 32px; padding: 48px;
-  backdrop-filter: blur(24px); box-shadow: 0 40px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1);
+  backdrop-filter: blur(24px); box-shadow: 0 40px 100px rgba(0,0,0,0.8);
 }
 
-.auth-title { font-size: 28px; font-weight: 800; letter-spacing: -1.2px; margin-bottom: 8px; color: #fff; }
-.auth-sub { font-size: 14px; color: var(--muted); font-family: var(--mono); margin-bottom: 32px; font-weight: 500; }
-
-.tabs { display: flex; gap: 6px; background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 14px; padding: 6px; margin-bottom: 32px; }
-.tab {
-  flex: 1; padding: 12px; border: none; background: none;
-  color: var(--muted); font-family: var(--font); font-size: 14px; font-weight: 700;
-  cursor: pointer; border-radius: 10px; transition: all 0.3s; letter-spacing: -0.2px;
+.auth-tabs { display: flex; gap: 8px; background: rgba(0,0,0,0.4); border-radius: 16px; padding: 6px; margin-bottom: 30px; }
+.auth-tab {
+  flex: 1; padding: 12px; border: none; background: transparent; color: var(--muted);
+  font-family: var(--font); font-size: 15px; font-weight: 700; cursor: pointer; border-radius: 12px; transition: 0.3s;
 }
-.tab:hover:not(.on) { color: #fff; }
-.tab.on { background: rgba(168,132,255,0.15); color: var(--text); border: 1px solid rgba(168,132,255,0.3); box-shadow: 0 4px 16px rgba(168,132,255,0.2); }
+.auth-tab.active { background: rgba(168,132,255,0.2); color: #fff; border: 1px solid rgba(168,132,255,0.3); }
 
-.field { margin-bottom: 20px; }
-.field label { display: block; font-size: 11px; font-family: var(--mono); letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; font-weight: 600; }
-.input-wrap { position: relative; }
-.input-ico { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 18px; color: var(--muted2); pointer-events: none; transition: color 0.3s; }
-.input-wrap:focus-within .input-ico { color: var(--accent); }
-.field input {
-  width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 14px;
-  padding: 14px 16px 14px 48px; color: var(--text); font-family: var(--mono); font-size: 14px; outline: none; transition: all 0.3s;
+.field-group { margin-bottom: 20px; }
+.field-group label { display: block; font-size: 12px; font-family: var(--mono); color: var(--muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px;}
+.input-wrapper { position: relative; }
+.input-wrapper i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 18px; color: var(--muted); transition: 0.3s; }
+.input-wrapper input {
+  width: 100%; background: rgba(0,0,0,0.5); border: 1px solid var(--border); border-radius: 16px;
+  padding: 16px 16px 16px 50px; color: #fff; font-family: var(--mono); font-size: 14px; outline: none; transition: 0.3s;
 }
-.field input:hover { border-color: rgba(255,255,255,0.15); }
-.field input:focus { border-color: var(--border-focus); background: rgba(168,132,255,0.03); box-shadow: 0 0 0 4px rgba(168,132,255,0.15); }
-.field input::placeholder { color: var(--muted2); font-weight: 400; }
-
-.alert { display: none; align-items: center; gap: 12px; border-radius: 14px; padding: 14px 16px; font-size: 13px; font-family: var(--mono); margin-bottom: 20px; line-height: 1.5; font-weight: 500; animation: popIn 0.3s; }
-@keyframes popIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-.alert.show { display: flex; }
-.alert.err { background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.3); color: var(--red); }
-.alert.ok  { background: rgba(77,255,195,0.1); border: 1px solid rgba(77,255,195,0.3); color: var(--green); }
-.alert i   { font-size: 20px; flex-shrink: 0; }
+.input-wrapper input:focus { border-color: var(--border-focus); background: rgba(168,132,255,0.05); }
+.input-wrapper:focus-within i { color: var(--accent); }
 
 .submit-btn {
-  width: 100%; padding: 16px; margin-top: 10px;
+  width: 100%; padding: 18px; margin-top: 10px;
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
-  border: none; border-radius: 14px; color: #fff; font-family: var(--font); font-size: 16px; font-weight: 800;
-  cursor: pointer; letter-spacing: -0.3px; position: relative; overflow: hidden; transition: all 0.3s;
-  box-shadow: 0 8px 24px rgba(168,132,255,0.4);
+  border: none; border-radius: 16px; color: #fff; font-family: var(--font); font-size: 16px; font-weight: 800;
+  cursor: pointer; transition: 0.3s;
 }
-.submit-btn::before { content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent); transform: skewX(-20deg); transition: left 0.7s ease; }
-.submit-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 14px 32px rgba(168,132,255,0.5); }
-.submit-btn:hover:not(:disabled)::before { left: 150%; }
-.submit-btn:active:not(:disabled) { transform: translateY(0) scale(0.98); }
-.submit-btn:disabled { opacity: 0.6; cursor: not-allowed; filter: grayscale(50%); }
+.submit-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(168,132,255,0.4); }
 
-.note { text-align: center; font-size: 12px; color: var(--muted2); font-family: var(--mono); margin-top: 24px; line-height: 1.7; font-weight: 500; }
-.note span { color: var(--muted); }
-.spin { animation: spin 0.8s linear infinite; display: inline-block; }
-@keyframes spin { to { transform: rotate(360deg); } }
-@keyframes revealUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
-
-/* Responsive */
-@media(max-width: 960px) {
-  .welcome-title { font-size: clamp(36px, 8vw, 48px); }
-  .hero-heading { font-size: clamp(32px, 6vw, 42px); }
-  .left-panel { padding: 40px; }
-  .graphics-stage { transform: scale(0.8); }
-}
-@media(max-width: 768px) {
-  #authView { grid-template-columns: 1fr; }
-  .left-panel { display: none; }
-  .right-panel { padding: 20px; }
-  .auth-box { padding: 32px 24px; }
-  html, body { overflow: auto; }
+.error-alert {
+  display: none; padding: 14px; background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.3);
+  color: #ff6b6b; border-radius: 12px; margin-bottom: 20px; font-family: var(--mono); font-size: 13px; font-weight: 600;
 }
 </style>
 </head>
 <body>
 
-<div class="bg-scene">
-  <div class="orb orb1"></div>
-  <div class="orb orb2"></div>
-  <div class="orb orb3"></div>
-</div>
+<!-- 1. Ambient Backgrounds -->
 <div class="bg-grid"></div>
-<div class="bg-noise"></div>
-
-<!-- STAGE 1: WELCOME / LANDING PAGE -->
-<div id="welcomeView" class="view active">
-  <div class="welcome-badge"><i class="ti ti-sparkles"></i> AI Ghostwriter</div>
-  <h1 class="welcome-title">Automate your LinkedIn.<br>Build your brand <span class="grad">while you sleep.</span></h1>
-  <p class="welcome-sub">The autonomous agent that generates, schedules, and publishes high-converting posts to your network every single day.</p>
-  
-  <div class="graphics-stage">
-    <!-- Floating Data Cards -->
-    <div class="glass-card gc-1">
-      <div class="icon-box"><i class="ti ti-robot"></i></div>
-      <div class="c-text">
-        <div class="c-title">Groq LLM Engine</div>
-        <div class="c-sub">Processing prompt...</div>
-      </div>
-    </div>
-    <div class="glass-card gc-2">
-      <div class="icon-box"><i class="ti ti-calendar-clock"></i></div>
-      <div class="c-text">
-        <div class="c-title">Auto-Scheduler</div>
-        <div class="c-sub">Queued for 08:00 AM</div>
-      </div>
-    </div>
-    <div class="glass-card gc-3">
-      <div class="icon-box"><i class="ti ti-chart-network"></i></div>
-      <div class="c-text">
-        <div class="c-title">Multi-Channel</div>
-        <div class="c-sub">Syncing to LinkedIn</div>
-      </div>
-    </div>
-  </div>
-
-  <button class="start-btn" onclick="revealAuth()">Get Started <i class="ti ti-arrow-right"></i></button>
+<div class="ambient-orbs">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
 </div>
 
-<!-- STAGE 2: AUTHENTICATION FORM -->
-<div id="authView" class="view hidden-down">
-  <!-- LEFT -->
-  <div class="left-panel">
-    <div class="brand">
-      <div class="brand-icon">Li</div>
+<!-- ==========================================
+     SCREEN 1: ANIMATED WELCOME PAGE 
+=========================================== -->
+<div id="welcome-screen" class="screen">
+  
+  <div class="orbit-container">
+    <div class="floating-card fc-1">
+      <i class="ti ti-robot"></i>
       <div>
-        <div class="brand-name">LinkedIn Agent</div>
-        <div class="brand-tag">autonomous post scheduler</div>
+        <div style="font-weight: 700; font-size: 15px; color: #fff;">AI Generating</div>
+        <div style="font-family: var(--mono); font-size: 11px;">llama-3.1-70b</div>
       </div>
     </div>
-
-    <h1 class="hero-heading">
-      Ready to grow?<br>
-      Access your <span class="grad">dashboard.</span>
-    </h1>
-    <p class="hero-sub">Manage your AI prompts, review generated content, and configure your posting schedule.</p>
-
-    <div class="features">
-      <div class="feat">
-        <div class="feat-icon fi-purple"><i class="ti ti-lock-access"></i></div>
-        <div class="feat-text">
-          <h4>Secure Authentication</h4>
-          <p>Encrypted session cookies</p>
-        </div>
+    <div class="floating-card fc-2">
+      <i class="ti ti-calendar-time"></i>
+      <div>
+        <div style="font-weight: 700; font-size: 15px; color: #fff;">Auto Scheduler</div>
+        <div style="font-family: var(--mono); font-size: 11px;">08:00 AM (Local)</div>
       </div>
-      <div class="feat">
-        <div class="feat-icon fi-cyan"><i class="ti ti-world"></i></div>
-        <div class="feat-text">
-          <h4>Smart Timezones</h4>
-          <p>Auto-detects local region</p>
-        </div>
+    </div>
+    <div class="floating-card fc-3">
+      <i class="ti ti-brand-linkedin"></i>
+      <div>
+        <div style="font-weight: 700; font-size: 15px; color: #fff;">Syncing Network</div>
+        <div style="font-family: var(--mono); font-size: 11px;">Status: Active</div>
       </div>
     </div>
   </div>
 
-  <!-- RIGHT -->
-  <div class="right-panel">
+  <div class="welcome-content">
+    <div class="pill-badge"><i class="ti ti-sparkles"></i> The Future of Networking</div>
+    <h1 class="main-title">
+      Your Personal <br>
+      <span class="gradient-text">LinkedIn Ghostwriter.</span>
+    </h1>
+    <p class="sub-title">
+      Fully autonomous post generation and scheduling. Setup your tone, pick your timezone, and let the AI build your audience while you sleep.
+    </p>
+    <button class="cta-btn" onclick="enterDashboard()">
+      Access Dashboard <i class="ti ti-arrow-right"></i>
+    </button>
+  </div>
+</div>
+
+<!-- ==========================================
+     SCREEN 2: AUTHENTICATION (LOGIN/SIGNUP)
+=========================================== -->
+<div id="auth-screen" class="screen">
+  <!-- Left Graphic Side -->
+  <div class="auth-left">
+    <div class="brand-icon">Li</div>
+    <h2 class="auth-hero-title">Welcome to the<br><span class="gradient-text">Agent Interface</span></h2>
+    <p class="auth-hero-sub">Sign in to manage your prompts, view upcoming posts, and configure your daily pipeline.</p>
+  </div>
+
+  <!-- Right Form Side -->
+  <div class="auth-right">
     <div class="auth-box">
-      <div class="auth-title" id="authTitle">Welcome back</div>
-      <div class="auth-sub" id="authSub">sign in to your dashboard</div>
+      <h3 style="font-size: 24px; font-weight: 800; margin-bottom: 6px;" id="authTitle">Welcome back</h3>
+      <p style="color: var(--muted); font-family: var(--mono); font-size: 13px; margin-bottom: 30px;" id="authSub">Secure session login</p>
 
-      <div class="tabs">
-        <button class="tab on" id="tabLogin" onclick="switchTab('login')">Sign In</button>
-        <button class="tab" id="tabReg" onclick="switchTab('register')">Register</button>
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tabLogin" onclick="switchAuth('login')">Sign In</button>
+        <button class="auth-tab" id="tabReg" onclick="switchAuth('register')">Register</button>
       </div>
 
-      <div class="alert err" id="errBox">
-        <i class="ti ti-alert-circle"></i>
-        <span id="errMsg"></span>
-      </div>
+      <div class="error-alert" id="errBox"></div>
 
-      <div class="field">
+      <div class="field-group">
         <label>Username</label>
-        <div class="input-wrap">
-          <i class="ti ti-user input-ico"></i>
-          <input type="text" id="inUser" placeholder="your_username" autocomplete="username" onkeydown="if(event.key==='Enter')submit()">
+        <div class="input-wrapper">
+          <i class="ti ti-user"></i>
+          <input type="text" id="inUser" placeholder="Enter your username">
         </div>
       </div>
 
-      <div class="field">
+      <div class="field-group">
         <label>Password</label>
-        <div class="input-wrap">
-          <i class="ti ti-lock input-ico"></i>
-          <input type="password" id="inPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')submit()">
+        <div class="input-wrapper">
+          <i class="ti ti-lock"></i>
+          <input type="password" id="inPass" placeholder="••••••••">
         </div>
       </div>
 
-      <div class="field" id="confirmField" style="display:none">
+      <div class="field-group" id="confirmField" style="display:none;">
         <label>Confirm Password</label>
-        <div class="input-wrap">
-          <i class="ti ti-lock-check input-ico"></i>
-          <input type="password" id="inConfirm" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter')submit()">
+        <div class="input-wrapper">
+          <i class="ti ti-lock-check"></i>
+          <input type="password" id="inConfirm" placeholder="••••••••">
         </div>
       </div>
 
-      <button class="submit-btn" id="submitBtn" onclick="submit()">Sign In</button>
-
-      <div class="note">
-        <span>Session lasts 24 hours</span> · timezone auto-detected
-      </div>
+      <button class="submit-btn" id="submitBtn" onclick="submitAuth()">Sign In</button>
     </div>
   </div>
 </div>
 
 <script>
-// --- UI Flow Logic ---
-function revealAuth() {
-  document.getElementById('welcomeView').classList.remove('active');
-  document.getElementById('welcomeView').classList.add('hidden-up');
-  
+// --- UI Transition ---
+function enterDashboard() {
+  // Hide welcome screen with a zoom-out effect
+  document.getElementById('welcome-screen').classList.add('hide');
+  // Show auth screen sliding up from bottom
   setTimeout(() => {
-    document.getElementById('authView').classList.remove('hidden-down');
-    document.getElementById('authView').classList.add('active');
-  }, 300);
+    document.getElementById('auth-screen').classList.add('show');
+  }, 400); // Wait for the transition to partially finish before showing next
 }
 
-// --- Auth Logic ---
-const API = window.location.origin + '/api';
-const SESSION_KEY = 'li_session';
-const SESSION_MS  = 24 * 60 * 60 * 1000;
-
-function getUTCOffset() { return -(new Date().getTimezoneOffset() / 60); }
-
-function setSession(username) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ username, loginAt: Date.now(), expiresAt: Date.now() + SESSION_MS }));
-}
-function getSession() {
-  try { return JSON.parse(localStorage.getItem(SESSION_KEY)) || null; } catch { return null; }
-}
-function isSessionValid() { const s = getSession(); return s && Date.now() < s.expiresAt; }
-
-let currentTab = 'login';
-
-function switchTab(tab) {
-  currentTab = tab;
-  document.getElementById('tabLogin').classList.toggle('on', tab === 'login');
-  document.getElementById('tabReg').classList.toggle('on', tab === 'register');
+// --- Auth Tabs Switcher ---
+let mode = 'login';
+function switchAuth(target) {
+  mode = target;
+  document.getElementById('tabLogin').classList.toggle('active', mode === 'login');
+  document.getElementById('tabReg').classList.toggle('active', mode === 'register');
   
-  const isReg = tab === 'register';
-  document.getElementById('confirmField').style.display = isReg ? 'block' : 'none';
-  document.getElementById('submitBtn').textContent = isReg ? 'Create Account' : 'Sign In';
-  document.getElementById('authTitle').textContent = isReg ? 'Join the agent' : 'Welcome back';
-  document.getElementById('authSub').textContent   = isReg ? 'create your free account' : 'sign in to your dashboard';
-  document.getElementById('errBox').classList.remove('show');
-  ['inUser','inPass','inConfirm'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  document.getElementById('confirmField').style.display = mode === 'register' ? 'block' : 'none';
+  document.getElementById('authTitle').innerText = mode === 'register' ? 'Create Account' : 'Welcome back';
+  document.getElementById('authSub').innerText = mode === 'register' ? 'Initialize your agent' : 'Secure session login';
+  document.getElementById('submitBtn').innerText = mode === 'register' ? 'Register Now' : 'Sign In';
+  document.getElementById('errBox').style.display = 'none';
 }
 
-function showErr(msg) {
-  document.getElementById('errMsg').textContent = msg;
-  document.getElementById('errBox').classList.add('show');
+// --- Dummy Backend Simulation & Logic ---
+function showError(msg) {
+  const box = document.getElementById('errBox');
+  box.style.display = 'block';
+  box.innerText = msg;
 }
 
-async function submit() {
-  const u  = document.getElementById('inUser').value.trim();
-  const p  = document.getElementById('inPass').value;
+async function submitAuth() {
+  const u = document.getElementById('inUser').value.trim();
+  const p = document.getElementById('inPass').value;
   const pc = document.getElementById('inConfirm').value;
   const btn = document.getElementById('submitBtn');
 
-  document.getElementById('errBox').classList.remove('show');
-  if (!u || !p) { showErr('Please fill in all fields.'); return; }
+  document.getElementById('errBox').style.display = 'none';
 
-  if (currentTab === 'register') {
-    if (p !== pc) { showErr('Passwords do not match.'); return; }
-    if (p.length < 6) { showErr('Password must be at least 6 characters.'); return; }
-  }
+  if (!u || !p) return showError('Please fill in all fields.');
+  if (mode === 'register' && p !== pc) return showError('Passwords do not match.');
+  if (mode === 'register' && p.length < 6) return showError('Password must be at least 6 characters.');
 
   btn.disabled = true;
-  btn.innerHTML = '<span class="spin"><i class="ti ti-loader"></i></span> ' + (currentTab === 'login' ? 'Signing in...' : 'Creating...');
+  btn.innerText = 'Connecting...';
 
+  // Make the actual fetch call here as per your backend
   try {
-    const endpoint = currentTab === 'login' ? 'login' : 'register';
-    const res = await fetch(`${API}/${endpoint}`, {
+    const offset = -(new Date().getTimezoneOffset() / 60);
+    const API = window.location.origin + '/api';
+    const res = await fetch(`${API}/${mode}`, {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: u, password: p, utc_offset_hours: getUTCOffset() })
+      body: JSON.stringify({ username: u, password: p, utc_offset_hours: offset })
     });
     const data = await res.json();
+    
     if (data.ok) {
-      setSession(data.username);
-      if (data.has_config) { window.location.href = '/dashboard'; }
-      else { window.location.href = '/setup'; }
+      window.location.href = data.has_config ? '/dashboard' : '/setup';
     } else {
-      showErr(data.message || 'Authentication failed.');
+      showError(data.message || 'Authentication failed.');
       btn.disabled = false;
-      btn.textContent = currentTab === 'login' ? 'Sign In' : 'Create Account';
+      btn.innerText = mode === 'register' ? 'Register Now' : 'Sign In';
     }
   } catch(e) {
-    showErr('Cannot reach server. Ensure backend is running.');
+    showError('Could not connect to the server.');
     btn.disabled = false;
-    btn.textContent = currentTab === 'login' ? 'Sign In' : 'Create Account';
+    btn.innerText = mode === 'register' ? 'Register Now' : 'Sign In';
   }
 }
-
-// Auto-redirect if already logged in
-(async function boot() {
-  try {
-    if (isSessionValid()) {
-      const res  = await fetch(`${API}/me`, { credentials: 'include' });
-      const data = await res.json();
-      if (data.authenticated) {
-        window.location.href = data.has_config ? '/dashboard' : '/setup';
-      }
-    }
-  } catch(e) {}
-})();
 </script>
 </body>
 </html>
