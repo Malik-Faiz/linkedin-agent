@@ -3,395 +3,549 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LinkedIn Agent</title>
+<title>Lumi — LinkedIn Agent</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --bg: #030308;
-  --surface: rgba(255, 255, 255, 0.03);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-focus: #a884ff;
-  --text: #f8f7ff;
-  --muted: rgba(200, 190, 255, 0.6);
-  --accent: #a884ff;
-  --accent2: #ff7eb3;
-  --accent3: #7eeaff;
-  --font: 'Bricolage Grotesque', sans-serif;
-  --mono: 'JetBrains Mono', monospace;
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#0a0a12;
+  --ink2:#13131f;
+  --glass:rgba(255,255,255,0.04);
+  --rim:rgba(255,255,255,0.09);
+  --rim2:rgba(255,255,255,0.15);
+  --txt:#f0eeff;
+  --txt2:rgba(210,200,255,0.55);
+  --violet:#8b5cf6;
+  --violet2:#a78bfa;
+  --rose:#f472b6;
+  --cyan:#22d3ee;
+  --gold:#fbbf24;
+  --serif:'Instrument Serif',serif;
+  --sans:'Syne',sans-serif;
+  --mono:'DM Mono',monospace;
 }
+html,body{width:100%;height:100vh;background:var(--ink);color:var(--txt);font-family:var(--sans);overflow:hidden}
 
-html, body {
-  width: 100%; height: 100vh;
-  background: var(--bg); color: var(--text);
-  font-family: var(--font); overflow: hidden;
-}
-
-/* =========================================
-   1. GLOBAL BACKGROUND & EFFECTS
-========================================= */
-.bg-grid {
-  position: fixed; inset: 0; z-index: 1; pointer-events: none;
-  background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), 
-                    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 50px 50px;
-  mask-image: radial-gradient(circle at center, black 20%, transparent 80%);
-  -webkit-mask-image: radial-gradient(circle at center, black 20%, transparent 80%);
+body::before{
+  content:'';position:fixed;inset:0;z-index:1;pointer-events:none;opacity:0.4;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.15'/%3E%3C/svg%3E");
+  background-size:200px 200px;
 }
 
-.ambient-orbs { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-.orb {
-  position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.2;
-  animation: floatOrb 12s ease-in-out infinite alternate;
-}
-.orb-1 { width: 600px; height: 600px; background: var(--accent); top: -10%; left: -10%; }
-.orb-2 { width: 500px; height: 500px; background: var(--accent2); bottom: -10%; right: -10%; animation-delay: -4s;}
-.orb-3 { width: 400px; height: 400px; background: var(--accent3); top: 30%; left: 40%; animation-delay: -8s;}
-
-@keyframes floatOrb {
-  0% { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(50px, -50px) scale(1.2); }
+.mesh{
+  position:fixed;inset:0;z-index:0;
+  background:
+    radial-gradient(ellipse 80% 60% at 15% 20%, rgba(139,92,246,0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 85% 75%, rgba(244,114,182,0.14) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 60% at 50% 50%, rgba(34,211,238,0.06) 0%, transparent 60%),
+    var(--ink);
 }
 
-/* =========================================
-   2. SCREEN MANAGER (TRANSITIONS)
-========================================= */
-.screen {
-  position: absolute; inset: 0; z-index: 10;
-  width: 100%; height: 100%;
-  transition: all 1s cubic-bezier(0.25, 1, 0.3, 1);
+.aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.aurora-line{
+  position:absolute;left:-20%;width:140%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(139,92,246,0.35),rgba(244,114,182,0.25),transparent);
+  transform-origin:center;
+}
+.aurora-line:nth-child(1){top:28%;transform:rotate(-3deg);animation:sweep 8s ease-in-out infinite alternate}
+.aurora-line:nth-child(2){top:52%;transform:rotate(2deg);animation:sweep 11s ease-in-out infinite alternate-reverse;opacity:.6}
+.aurora-line:nth-child(3){top:71%;transform:rotate(-1.5deg);animation:sweep 14s ease-in-out infinite alternate;opacity:.4}
+@keyframes sweep{from{transform:rotate(-3deg) translateX(-5%)}to{transform:rotate(-3deg) translateX(5%)}}
+
+.screen{position:absolute;inset:0;z-index:10;width:100%;height:100%;transition:all 0.9s cubic-bezier(0.25,1,0.35,1)}
+
+#welcome-screen{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  opacity:1;transform:scale(1);pointer-events:auto;
+}
+#welcome-screen.hide{opacity:0;transform:scale(1.08) translateY(-40px);pointer-events:none;visibility:hidden}
+
+#auth-screen{
+  opacity:0;transform:translateY(60px);pointer-events:none;visibility:hidden;
+  display:grid;grid-template-columns:1fr 1fr;
+}
+#auth-screen.show{opacity:1;transform:translateY(0);pointer-events:auto;visibility:visible}
+
+/* ── WELCOME ── */
+.welcome-wrap{
+  position:relative;z-index:20;text-align:center;
+  max-width:860px;padding:24px;
 }
 
-/* The Welcome Screen */
-#welcome-screen {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  opacity: 1; transform: scale(1); pointer-events: auto;
+.eyebrow{
+  display:inline-flex;align-items:center;gap:9px;
+  padding:7px 18px 7px 10px;border-radius:50px;
+  background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.25);
+  color:var(--violet2);font-family:var(--mono);font-size:12px;font-weight:500;
+  margin-bottom:36px;letter-spacing:0.05em;
+  animation:riseIn 0.9s cubic-bezier(0.16,1,0.3,1) both;
 }
-#welcome-screen.hide {
-  opacity: 0; transform: scale(1.15) translateY(-50px); pointer-events: none; visibility: hidden;
+.eyebrow-dot{
+  width:6px;height:6px;border-radius:50%;background:var(--violet2);
+  box-shadow:0 0 8px var(--violet2);
+  animation:pulse-dot 2s infinite;
+}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(0.7)}}
+
+.hero-title{
+  font-family:var(--serif);
+  font-size:clamp(52px,7.5vw,96px);
+  line-height:1.05;
+  margin-bottom:8px;
+  animation:riseIn 0.9s 0.15s cubic-bezier(0.16,1,0.3,1) both;
+}
+.hero-title em{
+  font-style:italic;
+  background:linear-gradient(130deg,var(--violet2),var(--rose),var(--cyan));
+  background-size:200% 200%;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  animation:flowGrad 5s ease infinite;
+}
+@keyframes flowGrad{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+
+.hero-sub-row{
+  display:flex;align-items:center;justify-content:center;gap:16px;
+  margin-bottom:36px;
+  animation:riseIn 0.9s 0.25s cubic-bezier(0.16,1,0.3,1) both;
+}
+.hero-rule{width:48px;height:1px;background:var(--rim2)}
+.hero-sub{
+  font-size:16px;color:var(--txt2);font-weight:400;letter-spacing:0.01em;
+  font-family:var(--mono);
 }
 
-/* The Auth Dashboard Screen */
-#auth-screen {
-  opacity: 0; transform: translateY(100px); pointer-events: none; visibility: hidden;
-  display: grid; grid-template-columns: 1fr 1fr;
-}
-#auth-screen.show {
-  opacity: 1; transform: translateY(0); pointer-events: auto; visibility: visible;
+.hero-desc{
+  font-size:18px;color:rgba(210,200,255,0.7);max-width:480px;margin:0 auto 52px;
+  line-height:1.7;font-weight:400;
+  animation:riseIn 0.9s 0.35s cubic-bezier(0.16,1,0.3,1) both;
 }
 
-/* =========================================
-   3. WELCOME PAGE ANIMATIONS & UI
-========================================= */
-.welcome-content {
-  text-align: center; position: relative; z-index: 20; max-width: 900px; padding: 20px;
+.cta-wrap{
+  display:flex;align-items:center;gap:20px;justify-content:center;
+  animation:riseIn 0.9s 0.45s cubic-bezier(0.16,1,0.3,1) both;
 }
 
-.pill-badge {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 8px 16px; border-radius: 50px;
-  background: rgba(168,132,255,0.1); border: 1px solid rgba(168,132,255,0.3);
-  color: var(--accent); font-family: var(--mono); font-size: 13px; font-weight: 600;
-  margin-bottom: 30px; animation: popIn 1s cubic-bezier(0.16, 1, 0.3, 1);
+.btn-primary{
+  position:relative;padding:17px 44px;border-radius:100px;border:none;
+  background:var(--txt);color:#0a0a12;font-family:var(--sans);font-size:16px;font-weight:800;
+  cursor:pointer;display:inline-flex;align-items:center;gap:10px;
+  transition:transform 0.25s,box-shadow 0.25s;letter-spacing:-0.02em;
+}
+.btn-primary::after{
+  content:'';position:absolute;inset:-3px;border-radius:100px;
+  background:linear-gradient(135deg,var(--violet),var(--rose),var(--cyan));
+  z-index:-1;opacity:0.7;filter:blur(12px);
+  animation:glowPulse 2.5s infinite alternate;
+}
+.btn-primary:hover{transform:translateY(-3px) scale(1.03)}
+.btn-primary:hover::after{opacity:1;filter:blur(18px)}
+@keyframes glowPulse{from{opacity:0.5}to{opacity:0.85}}
+
+.btn-ghost{
+  padding:17px 28px;border-radius:100px;border:1px solid var(--rim2);
+  background:transparent;color:var(--txt2);font-family:var(--sans);font-size:16px;font-weight:600;
+  cursor:pointer;display:inline-flex;align-items:center;gap:8px;
+  transition:all 0.25s;letter-spacing:-0.02em;
+}
+.btn-ghost:hover{border-color:var(--violet2);color:var(--txt);background:rgba(139,92,246,0.1)}
+
+.stats-row{
+  display:flex;align-items:center;justify-content:center;gap:28px;margin-top:52px;
+  animation:riseIn 0.9s 0.55s cubic-bezier(0.16,1,0.3,1) both;
+}
+.stat{text-align:left}
+.stat-n{font-size:22px;font-weight:800;color:var(--txt);letter-spacing:-0.04em}
+.stat-l{font-family:var(--mono);font-size:11px;color:var(--txt2);text-transform:uppercase;letter-spacing:0.08em;margin-top:1px}
+.stats-div{width:1px;height:36px;background:var(--rim2)}
+
+.floaters{position:absolute;inset:0;pointer-events:none}
+.fcard{
+  position:absolute;
+  background:rgba(20,18,40,0.55);border:1px solid var(--rim2);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-radius:20px;padding:14px 20px;
+  display:flex;align-items:center;gap:14px;
+}
+.fcard-icon{
+  width:42px;height:42px;border-radius:14px;
+  display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;
+}
+.fcard-title{font-size:14px;font-weight:700;color:var(--txt);line-height:1}
+.fcard-sub{font-family:var(--mono);font-size:11px;color:var(--txt2);margin-top:4px}
+
+.fc1{top:14%;left:7%;animation:bob 7s ease-in-out infinite}
+.fc1 .fcard-icon{background:rgba(139,92,246,0.2);color:var(--violet2)}
+.fc2{bottom:18%;left:9%;animation:bob 9s ease-in-out infinite alternate-reverse}
+.fc2 .fcard-icon{background:rgba(34,211,238,0.15);color:var(--cyan)}
+.fc3{top:18%;right:8%;animation:bob2 8s ease-in-out infinite}
+.fc3 .fcard-icon{background:rgba(244,114,182,0.15);color:var(--rose)}
+.fc4{bottom:22%;right:8%;animation:bob2 10s ease-in-out infinite alternate-reverse}
+.fc4 .fcard-icon{background:rgba(251,191,36,0.12);color:var(--gold)}
+
+@keyframes bob{0%,100%{transform:translateY(0) rotate(-0.5deg)}50%{transform:translateY(-22px) rotate(0.5deg)}}
+@keyframes bob2{0%,100%{transform:translateY(0) rotate(0.5deg)}50%{transform:translateY(-18px) rotate(-0.5deg)}}
+
+.ticker-wrap{
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:var(--mono);font-size:13px;color:var(--txt2);
+  background:rgba(0,0,0,0.3);border:1px solid var(--rim);
+  border-radius:8px;padding:6px 14px;margin-bottom:20px;
+  animation:riseIn 0.9s 0.08s cubic-bezier(0.16,1,0.3,1) both;
+}
+.ticker-label{color:var(--violet2);font-weight:500}
+.ticker-cursor{width:2px;height:13px;background:var(--violet2);border-radius:1px;animation:blink 0.9s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes riseIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── AUTH ── */
+.auth-left{
+  display:flex;flex-direction:column;justify-content:center;padding:80px 9%;
+  border-right:1px solid var(--rim);position:relative;overflow:hidden;
+}
+.auth-left-deco{
+  position:absolute;bottom:-100px;left:-100px;width:400px;height:400px;border-radius:50%;
+  background:radial-gradient(circle,rgba(139,92,246,0.15) 0%,transparent 70%);pointer-events:none;
 }
 
-.main-title {
-  font-size: clamp(48px, 7vw, 84px); font-weight: 800; line-height: 1.1;
-  letter-spacing: -2px; margin-bottom: 24px;
-  animation: slideUpFade 1s 0.2s backwards cubic-bezier(0.16, 1, 0.3, 1);
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:60px;}
+.brand-mark{
+  width:44px;height:44px;border-radius:14px;
+  background:linear-gradient(135deg,var(--violet),var(--rose));
+  display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;
+  font-family:var(--sans);letter-spacing:-0.05em;
+}
+.brand-name{font-family:var(--sans);font-size:18px;font-weight:700;letter-spacing:-0.04em;color:var(--txt)}
+
+.auth-headline{font-family:var(--serif);font-size:52px;line-height:1.1;margin-bottom:18px;}
+.auth-headline em{font-style:italic}
+.auth-tagline{color:var(--txt2);font-size:17px;line-height:1.6;max-width:380px;margin-bottom:48px}
+
+.feature-list{display:flex;flex-direction:column;gap:14px}
+.feat{display:flex;align-items:center;gap:12px;font-size:15px;color:rgba(210,200,255,0.7);}
+.feat-check{
+  width:28px;height:28px;border-radius:10px;background:rgba(139,92,246,0.15);
+  border:1px solid rgba(139,92,246,0.3);display:flex;align-items:center;justify-content:center;
+  color:var(--violet2);font-size:14px;flex-shrink:0;
 }
 
-/* Moving Gradient Animation on Text */
-.gradient-text {
-  background: linear-gradient(200deg, var(--accent), var(--accent2), var(--accent3), var(--accent));
-  background-size: 300% 300%;
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  animation: shineText 5s ease infinite;
-}
-@keyframes shineText { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-
-.sub-title {
-  font-size: 18px; color: var(--muted); max-width: 500px; margin: 0 auto 50px; line-height: 1.6;
-  animation: slideUpFade 1s 0.4s backwards cubic-bezier(0.16, 1, 0.3, 1);
+.auth-right{
+  display:flex;align-items:center;justify-content:center;padding:40px;
+  background:linear-gradient(135deg,rgba(255,255,255,0.01) 0%,transparent 100%);
 }
 
-/* Glowing Pulsing Button */
-.cta-btn {
-  position: relative; padding: 18px 48px; border-radius: 100px; border: none;
-  background: #fff; color: #000; font-family: var(--font); font-size: 18px; font-weight: 800;
-  cursor: pointer; display: inline-flex; align-items: center; gap: 12px;
-  animation: slideUpFade 1s 0.6s backwards cubic-bezier(0.16, 1, 0.3, 1);
-  transition: transform 0.3s, box-shadow 0.3s;
-}
-.cta-btn::before {
-  content: ''; position: absolute; inset: -4px; border-radius: 100px;
-  background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent3));
-  z-index: -1; filter: blur(15px); opacity: 0.6;
-  animation: pulseGlow 2s infinite alternate;
-}
-.cta-btn:hover { transform: translateY(-4px) scale(1.05); }
-.cta-btn:hover::before { opacity: 1; filter: blur(20px); }
-
-@keyframes pulseGlow { 0% { opacity: 0.4; } 100% { opacity: 0.8; } }
-
-/* Floating Orbital Cards */
-.orbit-container {
-  position: absolute; top: 50%; left: 50%; width: 100%; height: 100%;
-  transform: translate(-50%, -50%); pointer-events: none; z-index: 10;
-}
-.floating-card {
-  position: absolute; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);
-  backdrop-filter: blur(12px); border-radius: 20px; padding: 16px 24px;
-  display: flex; align-items: center; gap: 14px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-}
-.floating-card i { font-size: 24px; padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.1); }
-.fc-1 { top: 15%; left: 10%; animation: floatY 6s ease-in-out infinite; color: var(--accent); }
-.fc-2 { bottom: 20%; right: 10%; animation: floatY 7s ease-in-out infinite alternate-reverse; color: var(--accent2); }
-.fc-3 { top: 25%; right: 15%; animation: floatX 8s ease-in-out infinite; color: var(--accent3); }
-
-@keyframes floatY { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-30px); } }
-@keyframes floatX { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-30px); } }
-@keyframes slideUpFade { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes popIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
-
-/* =========================================
-   4. AUTHENTICATION UI
-========================================= */
-.auth-left {
-  display: flex; flex-direction: column; justify-content: center; padding: 80px 10%;
-  border-right: 1px solid var(--border);
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.01));
-}
-.auth-right {
-  display: flex; align-items: center; justify-content: center; padding: 40px; position: relative;
+.auth-box{
+  width:100%;max-width:420px;
+  background:rgba(14,13,28,0.7);border:1px solid var(--rim2);
+  border-radius:28px;padding:44px;
+  backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);
 }
 
-.brand-icon {
-  width: 64px; height: 64px; border-radius: 20px; background: linear-gradient(135deg, var(--accent), var(--accent2));
-  display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; margin-bottom: 40px;
+.auth-top{margin-bottom:28px}
+.auth-box-title{font-family:var(--serif);font-size:30px;font-weight:400;margin-bottom:5px}
+.auth-box-sub{font-family:var(--mono);font-size:12px;color:var(--txt2);letter-spacing:0.04em}
+
+.tabs{
+  display:flex;gap:0;background:rgba(0,0,0,0.3);border-radius:14px;padding:5px;margin-bottom:28px;
+  border:1px solid var(--rim);
+}
+.tab{
+  flex:1;padding:11px 16px;border:none;background:transparent;color:var(--txt2);
+  font-family:var(--sans);font-size:14px;font-weight:700;cursor:pointer;border-radius:10px;transition:all 0.25s;
+}
+.tab.active{background:rgba(139,92,246,0.18);color:var(--txt);border:1px solid rgba(139,92,246,0.3)}
+
+.field{margin-bottom:18px}
+.field label{
+  display:block;font-family:var(--mono);font-size:11px;color:var(--txt2);
+  text-transform:uppercase;letter-spacing:0.1em;margin-bottom:9px;
+}
+.inp-wrap{position:relative}
+.inp-wrap i{
+  position:absolute;left:16px;top:50%;transform:translateY(-50%);
+  font-size:17px;color:var(--txt2);transition:color 0.2s;pointer-events:none;
+}
+.inp-wrap input{
+  width:100%;padding:15px 15px 15px 48px;
+  background:rgba(0,0,0,0.4);border:1px solid var(--rim);border-radius:14px;
+  color:var(--txt);font-family:var(--mono);font-size:14px;outline:none;transition:all 0.2s;
+}
+.inp-wrap input::placeholder{color:rgba(210,200,255,0.25)}
+.inp-wrap input:focus{border-color:rgba(139,92,246,0.5);background:rgba(139,92,246,0.06);box-shadow:0 0 0 3px rgba(139,92,246,0.1)}
+.inp-wrap:focus-within i{color:var(--violet2)}
+
+.submit{
+  width:100%;margin-top:8px;padding:17px;border:none;border-radius:14px;
+  background:linear-gradient(135deg,var(--violet) 0%,var(--rose) 100%);
+  color:#fff;font-family:var(--sans);font-size:16px;font-weight:800;
+  cursor:pointer;transition:all 0.25s;letter-spacing:-0.02em;position:relative;overflow:hidden;
+}
+.submit::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,0.1),transparent);
+  opacity:0;transition:opacity 0.25s;
+}
+.submit:hover::before{opacity:1}
+.submit:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(139,92,246,0.4)}
+.submit:disabled{opacity:0.6;cursor:not-allowed;transform:none}
+
+.err{
+  display:none;padding:12px 16px;margin-bottom:18px;
+  background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);
+  color:#fc9f9f;border-radius:12px;font-family:var(--mono);font-size:12px;
 }
 
-.auth-hero-title { font-size: 48px; font-weight: 800; margin-bottom: 20px; line-height: 1.1; }
-.auth-hero-sub { color: var(--muted); font-size: 18px; max-width: 400px; margin-bottom: 40px; }
-
-/* The Auth Box */
-.auth-box {
-  width: 100%; max-width: 440px; background: rgba(10, 10, 18, 0.6);
-  border: 1px solid var(--border); border-radius: 32px; padding: 48px;
-  backdrop-filter: blur(24px); box-shadow: 0 40px 100px rgba(0,0,0,0.8);
+.auth-footer{
+  text-align:center;margin-top:20px;
+  font-family:var(--mono);font-size:11px;color:var(--txt2);
 }
-
-.auth-tabs { display: flex; gap: 8px; background: rgba(0,0,0,0.4); border-radius: 16px; padding: 6px; margin-bottom: 30px; }
-.auth-tab {
-  flex: 1; padding: 12px; border: none; background: transparent; color: var(--muted);
-  font-family: var(--font); font-size: 15px; font-weight: 700; cursor: pointer; border-radius: 12px; transition: 0.3s;
-}
-.auth-tab.active { background: rgba(168,132,255,0.2); color: #fff; border: 1px solid rgba(168,132,255,0.3); }
-
-.field-group { margin-bottom: 20px; }
-.field-group label { display: block; font-size: 12px; font-family: var(--mono); color: var(--muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px;}
-.input-wrapper { position: relative; }
-.input-wrapper i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 18px; color: var(--muted); transition: 0.3s; }
-.input-wrapper input {
-  width: 100%; background: rgba(0,0,0,0.5); border: 1px solid var(--border); border-radius: 16px;
-  padding: 16px 16px 16px 50px; color: #fff; font-family: var(--mono); font-size: 14px; outline: none; transition: 0.3s;
-}
-.input-wrapper input:focus { border-color: var(--border-focus); background: rgba(168,132,255,0.05); }
-.input-wrapper:focus-within i { color: var(--accent); }
-
-.submit-btn {
-  width: 100%; padding: 18px; margin-top: 10px;
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
-  border: none; border-radius: 16px; color: #fff; font-family: var(--font); font-size: 16px; font-weight: 800;
-  cursor: pointer; transition: 0.3s;
-}
-.submit-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(168,132,255,0.4); }
-
-.error-alert {
-  display: none; padding: 14px; background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.3);
-  color: #ff6b6b; border-radius: 12px; margin-bottom: 20px; font-family: var(--mono); font-size: 13px; font-weight: 600;
-}
+.auth-footer a{color:var(--violet2);text-decoration:none}
 </style>
 </head>
 <body>
-
-<!-- 1. Ambient Backgrounds -->
-<div class="bg-grid"></div>
-<div class="ambient-orbs">
-  <div class="orb orb-1"></div>
-  <div class="orb orb-2"></div>
-  <div class="orb orb-3"></div>
+<div class="mesh"></div>
+<div class="aurora">
+  <div class="aurora-line"></div>
+  <div class="aurora-line"></div>
+  <div class="aurora-line"></div>
 </div>
 
-<!-- ==========================================
-     SCREEN 1: ANIMATED WELCOME PAGE 
-=========================================== -->
+<!-- SCREEN 1 — WELCOME -->
 <div id="welcome-screen" class="screen">
-  
-  <div class="orbit-container">
-    <div class="floating-card fc-1">
-      <i class="ti ti-robot"></i>
+  <div class="floaters">
+    <div class="fcard fc1">
+      <div class="fcard-icon"><i class="ti ti-robot"></i></div>
       <div>
-        <div style="font-weight: 700; font-size: 15px; color: #fff;">AI Generating</div>
-        <div style="font-family: var(--mono); font-size: 11px;">llama-3.1-70b</div>
+        <div class="fcard-title">AI Composing</div>
+        <div class="fcard-sub">Thought leadership post</div>
       </div>
     </div>
-    <div class="floating-card fc-2">
-      <i class="ti ti-calendar-time"></i>
+    <div class="fcard fc2">
+      <div class="fcard-icon"><i class="ti ti-calendar-event"></i></div>
       <div>
-        <div style="font-weight: 700; font-size: 15px; color: #fff;">Auto Scheduler</div>
-        <div style="font-family: var(--mono); font-size: 11px;">08:00 AM (Local)</div>
+        <div class="fcard-title">Scheduled → 08:00</div>
+        <div class="fcard-sub">Monday, Tue, Thu</div>
       </div>
     </div>
-    <div class="floating-card fc-3">
-      <i class="ti ti-brand-linkedin"></i>
+    <div class="fcard fc3">
+      <div class="fcard-icon"><i class="ti ti-trending-up"></i></div>
       <div>
-        <div style="font-weight: 700; font-size: 15px; color: #fff;">Syncing Network</div>
-        <div style="font-family: var(--mono); font-size: 11px;">Status: Active</div>
+        <div class="fcard-title">+2,340 impressions</div>
+        <div class="fcard-sub">Last 7 days ↑ 34%</div>
+      </div>
+    </div>
+    <div class="fcard fc4">
+      <div class="fcard-icon"><i class="ti ti-users"></i></div>
+      <div>
+        <div class="fcard-title">Network Synced</div>
+        <div class="fcard-sub">1,847 connections</div>
       </div>
     </div>
   </div>
 
-  <div class="welcome-content">
-    <div class="pill-badge"><i class="ti ti-sparkles"></i> The Future of Networking</div>
-    <h1 class="main-title">
-      Your Personal <br>
-      <span class="gradient-text">LinkedIn Ghostwriter.</span>
+  <div class="welcome-wrap">
+    <div class="ticker-wrap">
+      <span class="ticker-label">LIVE</span>
+      <span id="ticker-text">Generating your next viral post...</span>
+      <span class="ticker-cursor"></span>
+    </div>
+
+    <div class="eyebrow">
+      <span class="eyebrow-dot"></span>
+      Autonomous LinkedIn Agent
+    </div>
+
+    <h1 class="hero-title">
+      Your personal<br>
+      <em>ghostwriter</em>
     </h1>
-    <p class="sub-title">
-      Fully autonomous post generation and scheduling. Setup your tone, pick your timezone, and let the AI build your audience while you sleep.
+
+    <div class="hero-sub-row">
+      <div class="hero-rule"></div>
+      <div class="hero-sub">powered by state-of-the-art AI</div>
+      <div class="hero-rule"></div>
+    </div>
+
+    <p class="hero-desc">
+      Set your tone, pick your schedule, and wake up to posts your audience already loves.
     </p>
-    <button class="cta-btn" onclick="enterDashboard()">
-      Access Dashboard <i class="ti ti-arrow-right"></i>
-    </button>
+
+    <div class="cta-wrap">
+      <button class="btn-primary" onclick="enterDashboard()">
+        Start for free <i class="ti ti-arrow-right"></i>
+      </button>
+      <button class="btn-ghost">
+        <i class="ti ti-player-play"></i> Watch demo
+      </button>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat">
+        <div class="stat-n">12k+</div>
+        <div class="stat-l">Creators</div>
+      </div>
+      <div class="stats-div"></div>
+      <div class="stat">
+        <div class="stat-n">340M</div>
+        <div class="stat-l">Impressions</div>
+      </div>
+      <div class="stats-div"></div>
+      <div class="stat">
+        <div class="stat-n">98%</div>
+        <div class="stat-l">Satisfaction</div>
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- ==========================================
-     SCREEN 2: AUTHENTICATION (LOGIN/SIGNUP)
-=========================================== -->
+<!-- SCREEN 2 — AUTH -->
 <div id="auth-screen" class="screen">
-  <!-- Left Graphic Side -->
   <div class="auth-left">
-    <div class="brand-icon">Li</div>
-    <h2 class="auth-hero-title">Welcome to the<br><span class="gradient-text">Agent Interface</span></h2>
-    <p class="auth-hero-sub">Sign in to manage your prompts, view upcoming posts, and configure your daily pipeline.</p>
+    <div class="auth-left-deco"></div>
+    <div class="brand">
+      <div class="brand-mark">Lu</div>
+      <div class="brand-name">Lumi</div>
+    </div>
+    <h2 class="auth-headline">
+      Build your<br>
+      <em>audience</em><br>
+      on autopilot
+    </h2>
+    <p class="auth-tagline">
+      Sign in to manage your AI posts, monitor engagement, and configure your daily pipeline.
+    </p>
+    <div class="feature-list">
+      <div class="feat">
+        <div class="feat-check"><i class="ti ti-check"></i></div>
+        AI-generated posts tailored to your voice
+      </div>
+      <div class="feat">
+        <div class="feat-check"><i class="ti ti-check"></i></div>
+        Smart scheduling across your timezone
+      </div>
+      <div class="feat">
+        <div class="feat-check"><i class="ti ti-check"></i></div>
+        Real-time engagement analytics
+      </div>
+      <div class="feat">
+        <div class="feat-check"><i class="ti ti-check"></i></div>
+        No LinkedIn account required to start
+      </div>
+    </div>
   </div>
 
-  <!-- Right Form Side -->
   <div class="auth-right">
     <div class="auth-box">
-      <h3 style="font-size: 24px; font-weight: 800; margin-bottom: 6px;" id="authTitle">Welcome back</h3>
-      <p style="color: var(--muted); font-family: var(--mono); font-size: 13px; margin-bottom: 30px;" id="authSub">Secure session login</p>
-
-      <div class="auth-tabs">
-        <button class="auth-tab active" id="tabLogin" onclick="switchAuth('login')">Sign In</button>
-        <button class="auth-tab" id="tabReg" onclick="switchAuth('register')">Register</button>
+      <div class="auth-top">
+        <div class="auth-box-title" id="authTitle">Welcome back</div>
+        <div class="auth-box-sub" id="authSub">// secure session</div>
       </div>
 
-      <div class="error-alert" id="errBox"></div>
+      <div class="tabs">
+        <button class="tab active" id="tabLogin" onclick="switchAuth('login')">Sign In</button>
+        <button class="tab" id="tabReg" onclick="switchAuth('register')">Register</button>
+      </div>
 
-      <div class="field-group">
+      <div class="err" id="errBox"></div>
+
+      <div class="field">
         <label>Username</label>
-        <div class="input-wrapper">
-          <i class="ti ti-user"></i>
-          <input type="text" id="inUser" placeholder="Enter your username">
+        <div class="inp-wrap">
+          <i class="ti ti-at"></i>
+          <input type="text" id="inUser" placeholder="your_handle">
         </div>
       </div>
 
-      <div class="field-group">
+      <div class="field">
         <label>Password</label>
-        <div class="input-wrapper">
-          <i class="ti ti-lock"></i>
-          <input type="password" id="inPass" placeholder="••••••••">
+        <div class="inp-wrap">
+          <i class="ti ti-key"></i>
+          <input type="password" id="inPass" placeholder="••••••••••">
         </div>
       </div>
 
-      <div class="field-group" id="confirmField" style="display:none;">
+      <div class="field" id="confirmField" style="display:none">
         <label>Confirm Password</label>
-        <div class="input-wrapper">
-          <i class="ti ti-lock-check"></i>
-          <input type="password" id="inConfirm" placeholder="••••••••">
+        <div class="inp-wrap">
+          <i class="ti ti-shield-check"></i>
+          <input type="password" id="inConfirm" placeholder="••••••••••">
         </div>
       </div>
 
-      <button class="submit-btn" id="submitBtn" onclick="submitAuth()">Sign In</button>
+      <button class="submit" id="submitBtn" onclick="submitAuth()">Sign In →</button>
+
+      <div class="auth-footer">
+        By continuing, you agree to our <a href="#">Terms</a> &amp; <a href="#">Privacy Policy</a>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-// --- UI Transition ---
-function enterDashboard() {
-  // Hide welcome screen with a zoom-out effect
+const tickers=["Generating your next viral post...","Analyzing engagement patterns...","Crafting thought leadership content...","Optimizing for peak posting times...","Syncing with your LinkedIn audience..."];
+let ti=0;
+setInterval(()=>{
+  ti=(ti+1)%tickers.length;
+  const el=document.getElementById('ticker-text');
+  el.style.opacity=0;
+  setTimeout(()=>{el.textContent=tickers[ti];el.style.opacity=1},300);
+},3000);
+document.getElementById('ticker-text').style.transition='opacity 0.3s';
+
+function enterDashboard(){
   document.getElementById('welcome-screen').classList.add('hide');
-  // Show auth screen sliding up from bottom
-  setTimeout(() => {
-    document.getElementById('auth-screen').classList.add('show');
-  }, 400); // Wait for the transition to partially finish before showing next
+  setTimeout(()=>{document.getElementById('auth-screen').classList.add('show')},420);
 }
 
-// --- Auth Tabs Switcher ---
-let mode = 'login';
-function switchAuth(target) {
-  mode = target;
-  document.getElementById('tabLogin').classList.toggle('active', mode === 'login');
-  document.getElementById('tabReg').classList.toggle('active', mode === 'register');
-  
-  document.getElementById('confirmField').style.display = mode === 'register' ? 'block' : 'none';
-  document.getElementById('authTitle').innerText = mode === 'register' ? 'Create Account' : 'Welcome back';
-  document.getElementById('authSub').innerText = mode === 'register' ? 'Initialize your agent' : 'Secure session login';
-  document.getElementById('submitBtn').innerText = mode === 'register' ? 'Register Now' : 'Sign In';
-  document.getElementById('errBox').style.display = 'none';
+let mode='login';
+function switchAuth(t){
+  mode=t;
+  document.getElementById('tabLogin').classList.toggle('active',mode==='login');
+  document.getElementById('tabReg').classList.toggle('active',mode==='register');
+  document.getElementById('confirmField').style.display=mode==='register'?'block':'none';
+  document.getElementById('authTitle').innerText=mode==='register'?'Create account':'Welcome back';
+  document.getElementById('authSub').innerText=mode==='register'?'// initialize your agent':'// secure session';
+  document.getElementById('submitBtn').innerText=mode==='register'?'Create account →':'Sign In →';
+  document.getElementById('errBox').style.display='none';
 }
 
-// --- Dummy Backend Simulation & Logic ---
-function showError(msg) {
-  const box = document.getElementById('errBox');
-  box.style.display = 'block';
-  box.innerText = msg;
+function showErr(m){
+  const b=document.getElementById('errBox');
+  b.style.display='block';
+  b.innerText='⚠ '+m;
 }
 
-async function submitAuth() {
-  const u = document.getElementById('inUser').value.trim();
-  const p = document.getElementById('inPass').value;
-  const pc = document.getElementById('inConfirm').value;
-  const btn = document.getElementById('submitBtn');
-
-  document.getElementById('errBox').style.display = 'none';
-
-  if (!u || !p) return showError('Please fill in all fields.');
-  if (mode === 'register' && p !== pc) return showError('Passwords do not match.');
-  if (mode === 'register' && p.length < 6) return showError('Password must be at least 6 characters.');
-
-  btn.disabled = true;
-  btn.innerText = 'Connecting...';
-
-  // Make the actual fetch call here as per your backend
-  try {
-    const offset = -(new Date().getTimezoneOffset() / 60);
-    const API = window.location.origin + '/api';
-    const res = await fetch(`${API}/${mode}`, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: u, password: p, utc_offset_hours: offset })
+async function submitAuth(){
+  const u=document.getElementById('inUser').value.trim();
+  const p=document.getElementById('inPass').value;
+  const pc=document.getElementById('inConfirm').value;
+  const btn=document.getElementById('submitBtn');
+  document.getElementById('errBox').style.display='none';
+  if(!u||!p)return showErr('Please fill in all fields.');
+  if(mode==='register'&&p!==pc)return showErr('Passwords do not match.');
+  if(mode==='register'&&p.length<6)return showErr('Password must be at least 6 characters.');
+  btn.disabled=true;
+  btn.innerText='Connecting...';
+  try{
+    const offset=-(new Date().getTimezoneOffset()/60);
+    const res=await fetch(`${window.location.origin}/api/${mode}`,{
+      method:'POST',credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:u,password:p,utc_offset_hours:offset})
     });
-    const data = await res.json();
-    
-    if (data.ok) {
-      window.location.href = data.has_config ? '/dashboard' : '/setup';
-    } else {
-      showError(data.message || 'Authentication failed.');
-      btn.disabled = false;
-      btn.innerText = mode === 'register' ? 'Register Now' : 'Sign In';
+    const data=await res.json();
+    if(data.ok){
+      window.location.href=data.has_config?'/dashboard':'/setup';
+    }else{
+      showErr(data.message||'Authentication failed.');
+      btn.disabled=false;
+      btn.innerText=mode==='register'?'Create account →':'Sign In →';
     }
-  } catch(e) {
-    showError('Could not connect to the server.');
-    btn.disabled = false;
-    btn.innerText = mode === 'register' ? 'Register Now' : 'Sign In';
+  }catch(e){
+    showErr('Could not connect to the server.');
+    btn.disabled=false;
+    btn.innerText=mode==='register'?'Create account →':'Sign In →';
   }
 }
 </script>
