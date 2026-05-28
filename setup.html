@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LinkedIn Agent · API Setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #03030a;
+  --surface: rgba(255,255,255,0.03);
+  --surface2: rgba(255,255,255,0.055);
+  --surface3: rgba(255,255,255,0.08);
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+  --text: #f0eeff;
+  --muted: rgba(200,190,255,0.45);
+  --muted2: rgba(200,190,255,0.25);
+  --accent: #a884ff;
+  --accent2: #ff7eb3;
+  --accent3: #7eeaff;
+  --green: #4dffc3;
+  --red: #ff6b6b;
+  --amber: #ffcc5c;
+  --font: 'Bricolage Grotesque', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+
+html, body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  overflow-x: hidden;
+}
+
+/* ── BACKGROUND ── */
+.bg-orb { position: fixed; border-radius: 50%; filter: blur(100px); opacity: 0.12; pointer-events: none; }
+.orb1 { width: 700px; height: 700px; background: radial-gradient(circle, #a884ff, transparent); top: -30%; right: -20%; }
+.orb2 { width: 500px; height: 500px; background: radial-gradient(circle, #ff7eb3, transparent); bottom: -20%; left: -15%; }
+.bg-grid {
+  position: fixed; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(168,132,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168,132,255,0.03) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* ── LAYOUT ── */
+.wrapper {
+  position: relative; z-index: 10;
+  max-width: 680px; margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+
+/* ── NAV BAR ── */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 48px;
+}
+.brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+.brand-icon {
+  width: 42px; height: 42px; border-radius: 13px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; font-weight: 800; color: #fff;
+}
+.brand-name { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+.skip-link {
+  font-size: 12px; font-family: var(--mono); color: var(--muted);
+  text-decoration: none; padding: 8px 16px;
+  border: 1px solid var(--border2); border-radius: 10px;
+  transition: all 0.2s; cursor: pointer; background: none;
+}
+.skip-link:hover { color: var(--text); border-color: var(--accent); background: rgba(168,132,255,0.06); }
+
+/* ── HEADER ── */
+.page-header { margin-bottom: 40px; }
+.step-label {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; font-family: var(--mono); letter-spacing: 2px;
+  text-transform: uppercase; color: var(--accent);
+  background: rgba(168,132,255,0.1); border: 1px solid rgba(168,132,255,0.2);
+  border-radius: 20px; padding: 5px 14px; margin-bottom: 16px;
+}
+.page-title { font-size: 36px; font-weight: 800; letter-spacing: -1.5px; margin-bottom: 10px; }
+.page-sub { font-size: 15px; color: var(--muted); line-height: 1.6; }
+
+/* ── ALERTS ── */
+.alert {
+  display: none; align-items: center; gap: 10px;
+  border-radius: 14px; padding: 14px 16px;
+  font-size: 13px; font-family: var(--mono);
+  margin-bottom: 24px; line-height: 1.5;
+}
+.alert.show { display: flex; }
+.alert.err { background: rgba(255,107,107,0.07); border: 1px solid rgba(255,107,107,0.2); color: var(--red); }
+.alert.ok  { background: rgba(77,255,195,0.06); border: 1px solid rgba(77,255,195,0.2); color: var(--green); }
+
+/* ── CARDS ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 20px; padding: 28px;
+  margin-bottom: 16px;
+  position: relative; overflow: hidden;
+  transition: border-color 0.2s;
+}
+.card:hover { border-color: rgba(168,132,255,0.2); }
+.card::before {
+  content: ''; position: absolute; inset: 0; border-radius: 20px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.015), transparent);
+  pointer-events: none;
+}
+
+.card-head {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 22px;
+}
+.card-badge {
+  width: 44px; height: 44px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 800; font-family: var(--mono);
+  flex-shrink: 0; position: relative;
+}
+.badge-groq   { background: rgba(168,132,255,0.15); color: var(--accent); border: 1px solid rgba(168,132,255,0.2); }
+.badge-buffer { background: rgba(126,234,255,0.12); color: var(--accent3); border: 1px solid rgba(126,234,255,0.2); }
+.badge-serp   { background: rgba(255,204,92,0.12); color: var(--amber); border: 1px solid rgba(255,204,92,0.2); }
+.card-head-info h3 { font-size: 16px; font-weight: 700; margin-bottom: 3px; }
+.card-head-info p  { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+/* ── FORM FIELDS ── */
+.field { margin-bottom: 16px; }
+.field:last-child { margin-bottom: 0; }
+.field label {
+  display: block; font-size: 10px; font-family: var(--mono);
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 8px;
+}
+.input-wrap { position: relative; }
+.input-ico {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  font-size: 16px; color: var(--muted2); pointer-events: none; transition: color 0.2s;
+}
+.input-wrap:focus-within .input-ico { color: var(--accent); }
+.field input {
+  width: 100%; background: rgba(0,0,0,0.35);
+  border: 1px solid var(--border2); border-radius: 12px;
+  padding: 13px 14px 13px 44px;
+  color: var(--text); font-family: var(--mono); font-size: 13px;
+  outline: none; transition: all 0.2s;
+}
+.field input:focus {
+  border-color: rgba(168,132,255,0.4);
+  background: rgba(168,132,255,0.04);
+  box-shadow: 0 0 0 3px rgba(168,132,255,0.08);
+}
+.field input::placeholder { color: var(--muted2); }
+
+/* ── CHANNEL SECTION ── */
+.ch-label {
+  font-size: 10px; font-family: var(--mono); letter-spacing: 2px;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+.ch-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+.ch-row {
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--border);
+  border-radius: 14px; padding: 16px 18px; margin-bottom: 10px;
+  transition: border-color 0.2s;
+}
+.ch-row:hover { border-color: var(--border2); }
+.ch-row.ch-required { border-color: rgba(168,132,255,0.2); }
+.ch-row-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.ch-slot-label {
+  font-size: 10px; font-family: var(--mono); letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--muted);
+}
+.ch-slot-label .req { color: var(--accent); }
+.ch-slot-label .opt { color: var(--muted2); }
+.del-btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 7px;
+  background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.2);
+  color: var(--red); font-size: 11px; font-family: var(--mono);
+  cursor: pointer; transition: all 0.2s;
+}
+.del-btn:hover { background: rgba(255,107,107,0.18); }
+.ch-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* ── SUBMIT ── */
+.submit-area { margin-top: 28px; display: flex; flex-direction: column; gap: 10px; }
+.btn-primary {
+  width: 100%; padding: 17px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border: none; border-radius: 14px;
+  color: #fff; font-family: var(--font); font-size: 16px; font-weight: 700;
+  cursor: pointer; letter-spacing: -0.3px;
+  position: relative; overflow: hidden;
+  box-shadow: 0 10px 30px rgba(168,132,255,0.3);
+  transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+}
+.btn-primary::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.15), transparent);
+}
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.9; transform: translateY(-1px);
+  box-shadow: 0 14px 40px rgba(168,132,255,0.4);
+}
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-ghost {
+  width: 100%; padding: 14px;
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: 14px; color: var(--muted);
+  font-family: var(--font); font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+}
+.btn-ghost:hover { border-color: rgba(168,132,255,0.3); color: var(--text); background: var(--surface3); }
+
+.footnote {
+  text-align: center; font-size: 11px; color: var(--muted2);
+  font-family: var(--mono); margin-top: 16px; line-height: 1.8;
+}
+.footnote span { color: var(--muted); }
+
+.spin { animation: spin 0.8s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="bg-orb orb1"></div>
+<div class="bg-orb orb2"></div>
+<div class="bg-grid"></div>
+
+<div class="wrapper">
+
+  <div class="topbar">
+    <a class="brand" href="/">
+      <div class="brand-icon">Li</div>
+      <span class="brand-name">LinkedIn Agent</span>
+    </a>
+    <button class="skip-link" onclick="goToDash()">
+      Skip for now →
+    </button>
+  </div>
+
+  <div class="page-header">
+    <div class="step-label">
+      <i class="ti ti-settings-2" style="font-size:13px"></i>
+      API Configuration
+    </div>
+    <h1 class="page-title">Connect your services</h1>
+    <p class="page-sub">Enter your API keys below to enable post generation, scheduling, and publishing. Keys are encrypted and stored privately per account.</p>
+  </div>
+
+  <div class="alert err" id="errBox">
+    <i class="ti ti-alert-circle" style="font-size:18px;flex-shrink:0"></i>
+    <span id="errMsg"></span>
+  </div>
+  <div class="alert ok" id="okBox">
+    <i class="ti ti-circle-check" style="font-size:18px;flex-shrink:0"></i>
+    <span id="okMsg"></span>
+  </div>
+
+  <!-- GROQ -->
+  <div class="card">
+    <div class="card-head">
+      <div class="card-badge badge-groq">G</div>
+      <div class="card-head-info">
+        <h3>Groq API Key</h3>
+        <p>llama-3.1 · post generation · groq.com</p>
+      </div>
+    </div>
+    <div class="field">
+      <label>API Key</label>
+      <div class="input-wrap">
+        <i class="ti ti-key input-ico"></i>
+        <input type="password" id="cfgGroq" placeholder="gsk_••••••••••••••••••••••••">
+      </div>
+    </div>
+  </div>
+
+  <!-- BUFFER -->
+  <div class="card">
+    <div class="card-head">
+      <div class="card-badge badge-buffer">B</div>
+      <div class="card-head-info">
+        <h3>Buffer API Key</h3>
+        <p>publish & queue posts · buffer.com</p>
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:22px">
+      <label>API Key</label>
+      <div class="input-wrap">
+        <i class="ti ti-key input-ico"></i>
+        <input type="password" id="cfgBuffer" placeholder="OEF_••••••••••••••••••">
+      </div>
+    </div>
+
+    <div class="ch-label">Channel Slots</div>
+
+    <!-- Ch1 required -->
+    <div class="ch-row ch-required" id="chRow1">
+      <div class="ch-row-header">
+        <span class="ch-slot-label">Channel 1 <span class="req">(required)</span></span>
+      </div>
+      <div class="ch-grid">
+        <div class="field" style="margin-bottom:0">
+          <label>Name</label>
+          <div class="input-wrap">
+            <i class="ti ti-tag input-ico"></i>
+            <input type="text" id="cfgChName1" placeholder="e.g. Personal">
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Channel ID</label>
+          <div class="input-wrap">
+            <i class="ti ti-hash input-ico"></i>
+            <input type="text" id="cfgCh1" placeholder="670d••••••••">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ch2 optional -->
+    <div class="ch-row" id="chRow2">
+      <div class="ch-row-header">
+        <span class="ch-slot-label">Channel 2 <span class="opt">(optional)</span></span>
+        <button class="del-btn" onclick="clearChannel(2)">
+          <i class="ti ti-trash" style="font-size:12px"></i> Delete
+        </button>
+      </div>
+      <div class="ch-grid">
+        <div class="field" style="margin-bottom:0">
+          <label>Name</label>
+          <div class="input-wrap">
+            <i class="ti ti-tag input-ico"></i>
+            <input type="text" id="cfgChName2" placeholder="e.g. Company">
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Channel ID</label>
+          <div class="input-wrap">
+            <i class="ti ti-hash input-ico"></i>
+            <input type="text" id="cfgCh2" placeholder="670d••••••••">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ch3 optional -->
+    <div class="ch-row" id="chRow3">
+      <div class="ch-row-header">
+        <span class="ch-slot-label">Channel 3 <span class="opt">(optional)</span></span>
+        <button class="del-btn" onclick="clearChannel(3)">
+          <i class="ti ti-trash" style="font-size:12px"></i> Delete
+        </button>
+      </div>
+      <div class="ch-grid">
+        <div class="field" style="margin-bottom:0">
+          <label>Name</label>
+          <div class="input-wrap">
+            <i class="ti ti-tag input-ico"></i>
+            <input type="text" id="cfgChName3" placeholder="e.g. Agency">
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Channel ID</label>
+          <div class="input-wrap">
+            <i class="ti ti-hash input-ico"></i>
+            <input type="text" id="cfgCh3" placeholder="670d••••••••">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ch4 Facebook -->
+    <div class="ch-row" id="chRow4">
+      <div class="ch-row-header">
+        <span class="ch-slot-label">Channel 4 — Facebook <span class="opt">(optional)</span></span>
+        <button class="del-btn" onclick="clearChannel(4)">
+          <i class="ti ti-trash" style="font-size:12px"></i> Delete
+        </button>
+      </div>
+      <div class="ch-grid">
+        <div class="field" style="margin-bottom:0">
+          <label>Name</label>
+          <div class="input-wrap">
+            <i class="ti ti-tag input-ico"></i>
+            <input type="text" id="cfgChName4" placeholder="e.g. Facebook Page">
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Channel ID</label>
+          <div class="input-wrap">
+            <i class="ti ti-hash input-ico"></i>
+            <input type="text" id="cfgCh4" placeholder="670d••••••••">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SERP -->
+  <div class="card">
+    <div class="card-head">
+      <div class="card-badge badge-serp">S</div>
+      <div class="card-head-info">
+        <h3>SerpAPI Key</h3>
+        <p>auto image search · optional · serpapi.com</p>
+      </div>
+    </div>
+    <div class="field">
+      <label>API Key</label>
+      <div class="input-wrap">
+        <i class="ti ti-key input-ico"></i>
+        <input type="password" id="cfgSerp" placeholder="77b4••••••••••••••••••••">
+      </div>
+    </div>
+  </div>
+
+  <div class="submit-area">
+    <button class="btn-primary" id="saveBtn" onclick="saveConfig()">
+      Save Configuration &amp; Continue →
+    </button>
+    <button class="btn-ghost" onclick="goToDash()">
+      Skip — go to Dashboard
+    </button>
+  </div>
+
+  <div class="footnote">
+    <span>Keys are stored per account · encrypted at rest</span><br>
+    You can update these anytime from the dashboard settings.
+  </div>
+
+</div>
+
+<script>
+const API = window.location.origin + '/api';
+
+async function saveConfig() {
+  const btn = document.getElementById('saveBtn');
+  const errBox = document.getElementById('errBox');
+  const okBox  = document.getElementById('okBox');
+  errBox.classList.remove('show'); okBox.classList.remove('show');
+
+  const groq   = document.getElementById('cfgGroq').value.trim();
+  const buffer = document.getElementById('cfgBuffer').value.trim();
+  const serp   = document.getElementById('cfgSerp').value.trim();
+  const ch1    = document.getElementById('cfgCh1').value.trim();
+  const ch2    = document.getElementById('cfgCh2').value.trim();
+  const ch3    = document.getElementById('cfgCh3').value.trim();
+  const ch4    = document.getElementById('cfgCh4').value.trim();
+  const chName1 = document.getElementById('cfgChName1').value.trim();
+  const chName2 = document.getElementById('cfgChName2').value.trim();
+  const chName3 = document.getElementById('cfgChName3').value.trim();
+  const chName4 = document.getElementById('cfgChName4').value.trim();
+
+  if (!groq || !buffer) {
+    document.getElementById('errMsg').textContent = 'Groq and Buffer API keys are required.';
+    errBox.classList.add('show'); return;
+  }
+  if (!ch1) {
+    document.getElementById('errMsg').textContent = 'Channel 1 ID is required.';
+    errBox.classList.add('show'); return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">⟳</span> Saving...';
+
+  try {
+    const payload = {
+      groq_api_key: groq,
+      buffer_api_key: buffer,
+      serpapi_key: serp,
+      buffer_channel_1: ch1,
+      buffer_channel_1_name: chName1 || 'Channel 1',
+    };
+    if (ch2) { payload.buffer_channel_2 = ch2; payload.buffer_channel_2_name = chName2 || 'Channel 2'; }
+    if (ch3) { payload.buffer_channel_3 = ch3; payload.buffer_channel_3_name = chName3 || 'Channel 3'; }
+    if (ch4) { payload.buffer_channel_4 = ch4; payload.buffer_channel_4_name = chName4 || 'Facebook Page'; }
+
+    const res  = await fetch(`${API}/config`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('okMsg').textContent = 'Saved! Redirecting to dashboard...';
+      okBox.classList.add('show');
+      setTimeout(goToDash, 900);
+    } else {
+      document.getElementById('errMsg').textContent = data.message || 'Save failed.';
+      errBox.classList.add('show');
+      btn.disabled = false;
+      btn.textContent = 'Save Configuration & Continue →';
+    }
+  } catch(e) {
+    document.getElementById('errMsg').textContent = 'Cannot reach server.';
+    errBox.classList.add('show');
+    btn.disabled = false;
+    btn.textContent = 'Save Configuration & Continue →';
+  }
+}
+
+async function clearChannel(slot) {
+  if (!confirm(`Delete Channel ${slot}? This removes it from your config.`)) return;
+  document.getElementById(`cfgCh${slot}`).value     = '';
+  document.getElementById(`cfgChName${slot}`).value = '';
+  try {
+    const res  = await fetch(`${API}/channel/delete`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel: slot })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      const row = document.getElementById(`chRow${slot}`);
+      if (row) {
+        row.style.borderColor = 'rgba(77,255,195,0.3)';
+        setTimeout(() => row.style.borderColor = '', 1500);
+      }
+    }
+  } catch(e) {}
+}
+
+function goToDash() { window.location.href = '/dashboard'; }
+
+// Pre-fill from existing config
+(async function prefill() {
+  try {
+    const res  = await fetch(`${API}/config`, { credentials: 'include' });
+    const data = await res.json();
+    if (!data.ok) return;
+    const c = data.config;
+    const set = (id, val) => { const el = document.getElementById(id); if(el && val && !val.includes('*')) el.value = val; };
+    set('cfgCh1', c.buffer_channel_1);  set('cfgChName1', c.buffer_channel_1_name);
+    set('cfgCh2', c.buffer_channel_2);  set('cfgChName2', c.buffer_channel_2_name);
+    set('cfgCh3', c.buffer_channel_3);  set('cfgChName3', c.buffer_channel_3_name);
+    set('cfgCh4', c.buffer_channel_4);  set('cfgChName4', c.buffer_channel_4_name);
+  } catch(e) {}
+})();
+
+// Auth check
+(async function authCheck() {
+  try {
+    const res  = await fetch(`${API}/me`, { credentials: 'include' });
+    const data = await res.json();
+    if (!data.authenticated) window.location.href = '/';
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LinkedIn Agent · Sign In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #03030a;
+  --surface: rgba(255,255,255,0.035);
+  --surface-hover: rgba(255,255,255,0.06);
+  --border: rgba(255,255,255,0.08);
+  --border-focus: rgba(168,132,255,0.5);
+  --text: #f0eeff;
+  --muted: rgba(200,190,255,0.45);
+  --muted2: rgba(200,190,255,0.25);
+  --accent: #a884ff;
+  --accent2: #ff7eb3;
+  --accent3: #7eeaff;
+  --green: #4dffc3;
+  --red: #ff6b6b;
+  --font: 'Bricolage Grotesque', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+
+html, body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  overflow: hidden;
+}
+
+/* ── BACKGROUND ── */
+.bg-scene {
+  position: fixed; inset: 0; z-index: 0; overflow: hidden;
+}
+.orb {
+  position: absolute; border-radius: 50%;
+  filter: blur(80px); opacity: 0.18; animation: float 12s ease-in-out infinite;
+}
+.orb1 { width: 600px; height: 600px; background: radial-gradient(circle, #a884ff, transparent 70%); top: -20%; left: -15%; animation-delay: 0s; }
+.orb2 { width: 500px; height: 500px; background: radial-gradient(circle, #ff7eb3, transparent 70%); bottom: -25%; right: -10%; animation-delay: -4s; }
+.orb3 { width: 350px; height: 350px; background: radial-gradient(circle, #7eeaff, transparent 70%); top: 50%; left: 55%; animation-delay: -8s; }
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -40px) scale(1.05); }
+  66% { transform: translate(-20px, 20px) scale(0.97); }
+}
+
+/* Grid overlay */
+.bg-grid {
+  position: fixed; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(168,132,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168,132,255,0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* Noise texture */
+.bg-noise {
+  position: fixed; inset: 0; z-index: 0; opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── MAIN LAYOUT ── */
+.stage {
+  position: relative; z-index: 10;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+/* LEFT PANEL */
+.left-panel {
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 60px 70px;
+  border-right: 1px solid var(--border);
+  position: relative;
+}
+
+.brand {
+  display: flex; align-items: center; gap: 16px; margin-bottom: 80px;
+}
+.brand-icon {
+  width: 52px; height: 52px; border-radius: 16px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 800; color: #fff;
+  position: relative;
+}
+.brand-icon::after {
+  content: ''; position: absolute; inset: -1px; border-radius: 17px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  z-index: -1; filter: blur(12px); opacity: 0.5;
+}
+.brand-name { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+.brand-tag  { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+.hero-heading {
+  font-size: clamp(38px, 4vw, 56px);
+  font-weight: 800; line-height: 1.08;
+  letter-spacing: -2px; margin-bottom: 24px;
+}
+.hero-heading .grad {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 50%, var(--accent3) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+
+.hero-sub {
+  font-size: 16px; color: var(--muted); line-height: 1.7; max-width: 360px;
+  margin-bottom: 48px;
+}
+
+.features { display: flex; flex-direction: column; gap: 16px; }
+.feat {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+  transition: background 0.2s;
+}
+.feat:hover { background: var(--surface-hover); }
+.feat-icon {
+  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 16px;
+}
+.fi-purple { background: rgba(168,132,255,0.15); }
+.fi-pink   { background: rgba(255,126,179,0.15); }
+.fi-cyan   { background: rgba(126,234,255,0.15); }
+.feat-text h4 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+.feat-text p  { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+
+/* RIGHT PANEL */
+.right-panel {
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px;
+}
+
+.auth-box {
+  width: 100%; max-width: 420px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  padding: 40px;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 40px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04) inset;
+  animation: slideUp 0.5s cubic-bezier(0.16,1,0.3,1) both;
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.auth-title {
+  font-size: 26px; font-weight: 800; letter-spacing: -1px;
+  margin-bottom: 6px;
+}
+.auth-sub {
+  font-size: 13px; color: var(--muted); font-family: var(--mono);
+  margin-bottom: 28px;
+}
+
+/* Tab switcher */
+.tabs {
+  display: flex; gap: 4px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border);
+  border-radius: 12px; padding: 4px;
+  margin-bottom: 28px;
+}
+.tab {
+  flex: 1; padding: 10px;
+  border: none; background: none;
+  color: var(--muted); font-family: var(--font);
+  font-size: 13px; font-weight: 700;
+  cursor: pointer; border-radius: 9px;
+  transition: all 0.2s; letter-spacing: -0.2px;
+}
+.tab.on {
+  background: rgba(168,132,255,0.15);
+  color: var(--accent);
+  border: 1px solid rgba(168,132,255,0.3);
+  box-shadow: 0 2px 12px rgba(168,132,255,0.15);
+}
+
+/* Fields */
+.field { margin-bottom: 16px; }
+.field label {
+  display: block; font-size: 11px; font-family: var(--mono);
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 8px;
+}
+.input-wrap { position: relative; }
+.input-ico {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  font-size: 16px; color: var(--muted2); pointer-events: none;
+  transition: color 0.2s;
+}
+.input-wrap:focus-within .input-ico { color: var(--accent); }
+.field input {
+  width: 100%;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 13px 14px 13px 44px;
+  color: var(--text); font-family: var(--mono); font-size: 13px;
+  outline: none;
+  transition: border 0.2s, background 0.2s, box-shadow 0.2s;
+}
+.field input:focus {
+  border-color: var(--border-focus);
+  background: rgba(168,132,255,0.05);
+  box-shadow: 0 0 0 3px rgba(168,132,255,0.1);
+}
+.field input::placeholder { color: var(--muted2); }
+
+/* Error / OK */
+.alert {
+  display: none; align-items: center; gap: 10px;
+  border-radius: 12px; padding: 12px 14px;
+  font-size: 12px; font-family: var(--mono);
+  margin-bottom: 16px; line-height: 1.5;
+}
+.alert.show { display: flex; }
+.alert.err { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.25); color: var(--red); }
+.alert.ok  { background: rgba(77,255,195,0.07); border: 1px solid rgba(77,255,195,0.2); color: var(--green); }
+.alert i   { font-size: 18px; flex-shrink: 0; }
+
+/* Submit button */
+.submit-btn {
+  width: 100%; padding: 15px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+  border: none; border-radius: 14px;
+  color: #fff; font-family: var(--font); font-size: 15px; font-weight: 700;
+  cursor: pointer; letter-spacing: -0.3px;
+  position: relative; overflow: hidden;
+  transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 8px 24px rgba(168,132,255,0.3);
+}
+.submit-btn::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.15), transparent);
+}
+.submit-btn:hover:not(:disabled) {
+  opacity: 0.92; transform: translateY(-1px);
+  box-shadow: 0 12px 32px rgba(168,132,255,0.4);
+}
+.submit-btn:active:not(:disabled) { transform: scale(0.98); }
+.submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.note {
+  text-align: center; font-size: 11px; color: var(--muted2);
+  font-family: var(--mono); margin-top: 16px; line-height: 1.7;
+}
+.note span { color: var(--muted); }
+
+/* Spinner */
+.spin { animation: spin 0.8s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Responsive */
+@media(max-width: 768px) {
+  .stage { grid-template-columns: 1fr; }
+  .left-panel { display: none; }
+  .right-panel { padding: 24px; }
+  html, body { overflow: auto; }
+}
+</style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+</head>
+<body>
+
+<div class="bg-scene">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+</div>
+<div class="bg-grid"></div>
+<div class="bg-noise"></div>
+
+<div class="stage">
+
+  <!-- LEFT -->
+  <div class="left-panel">
+    <div class="brand">
+      <div class="brand-icon">Li</div>
+      <div>
+        <div class="brand-name">LinkedIn Agent</div>
+        <div class="brand-tag">autonomous post scheduler</div>
+      </div>
+    </div>
+
+    <h1 class="hero-heading">
+      Post smarter.<br>
+      Grow <span class="grad">faster.</span><br>
+      Automate.
+    </h1>
+    <p class="hero-sub">
+      AI-powered LinkedIn ghostwriting that schedules, generates, and publishes posts to multiple channels — on your timezone, every day.
+    </p>
+
+    <div class="features">
+      <div class="feat">
+        <div class="feat-icon fi-purple">🤖</div>
+        <div class="feat-text">
+          <h4>Groq-powered AI Writing</h4>
+          <p>llama-3.1 · ultra-fast generation</p>
+        </div>
+      </div>
+      <div class="feat">
+        <div class="feat-icon fi-pink">📅</div>
+        <div class="feat-text">
+          <h4>Timezone-aware Scheduling</h4>
+          <p>fires at 08:00 your local time · daily</p>
+        </div>
+      </div>
+      <div class="feat">
+        <div class="feat-icon fi-cyan">🔗</div>
+        <div class="feat-text">
+          <h4>Multi-channel Buffer</h4>
+          <p>LinkedIn + Facebook · 4 channels</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right-panel">
+    <div class="auth-box">
+      <div class="auth-title" id="authTitle">Welcome back</div>
+      <div class="auth-sub" id="authSub">sign in to your dashboard</div>
+
+      <div class="tabs">
+        <button class="tab on" id="tabLogin" onclick="switchTab('login')">Sign In</button>
+        <button class="tab" id="tabReg" onclick="switchTab('register')">Register</button>
+      </div>
+
+      <div class="alert err" id="errBox">
+        <i class="ti ti-alert-circle"></i>
+        <span id="errMsg"></span>
+      </div>
+
+      <div class="field">
+        <label>Username</label>
+        <div class="input-wrap">
+          <i class="ti ti-user input-ico"></i>
+          <input type="text" id="inUser" placeholder="your_username" autocomplete="username" onkeydown="if(event.key==='Enter')submit()">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <div class="input-wrap">
+          <i class="ti ti-lock input-ico"></i>
+          <input type="password" id="inPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')submit()">
+        </div>
+      </div>
+
+      <div class="field" id="confirmField" style="display:none">
+        <label>Confirm Password</label>
+        <div class="input-wrap">
+          <i class="ti ti-lock-check input-ico"></i>
+          <input type="password" id="inConfirm" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter')submit()">
+        </div>
+      </div>
+
+      <button class="submit-btn" id="submitBtn" onclick="submit()">Sign In</button>
+
+      <div class="note">
+        <span>Session lasts 24 hours</span> · timezone auto-detected
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = window.location.origin + '/api';
+const SESSION_KEY = 'li_session';
+const SESSION_MS  = 24 * 60 * 60 * 1000;
+
+function getUTCOffset() { return -(new Date().getTimezoneOffset() / 60); }
+
+function setSession(username) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify({
+    username, loginAt: Date.now(), expiresAt: Date.now() + SESSION_MS
+  }));
+}
+function getSession() {
+  try { return JSON.parse(localStorage.getItem(SESSION_KEY)) || null; } catch { return null; }
+}
+function isSessionValid() { const s = getSession(); return s && Date.now() < s.expiresAt; }
+
+let currentTab = 'login';
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tabLogin').classList.toggle('on', tab === 'login');
+  document.getElementById('tabReg').classList.toggle('on', tab === 'register');
+  document.getElementById('confirmField').style.display = tab === 'register' ? 'block' : 'none';
+  document.getElementById('submitBtn').textContent = tab === 'login' ? 'Sign In' : 'Create Account';
+  document.getElementById('authTitle').textContent = tab === 'login' ? 'Welcome back' : 'Join the agent';
+  document.getElementById('authSub').textContent   = tab === 'login' ? 'sign in to your dashboard' : 'create your free account';
+  document.getElementById('errBox').classList.remove('show');
+  ['inUser','inPass','inConfirm'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+}
+
+function showErr(msg) {
+  document.getElementById('errMsg').textContent = msg;
+  document.getElementById('errBox').classList.add('show');
+}
+
+async function submit() {
+  const u  = document.getElementById('inUser').value.trim();
+  const p  = document.getElementById('inPass').value;
+  const pc = document.getElementById('inConfirm').value;
+  const btn = document.getElementById('submitBtn');
+
+  document.getElementById('errBox').classList.remove('show');
+  if (!u || !p) { showErr('Please fill in all fields.'); return; }
+
+  if (currentTab === 'register') {
+    if (p !== pc) { showErr('Passwords do not match.'); return; }
+    if (p.length < 6) { showErr('Password must be at least 6 characters.'); return; }
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin">⟳</span> ' + (currentTab === 'login' ? 'Signing in...' : 'Creating...');
+
+  try {
+    const endpoint = currentTab === 'login' ? 'login' : 'register';
+    const res = await fetch(`${API}/${endpoint}`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p, utc_offset_hours: getUTCOffset() })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setSession(data.username);
+      if (data.has_config) { window.location.href = '/dashboard'; }
+      else { window.location.href = '/setup'; }
+    } else {
+      showErr(data.message || 'Authentication failed.');
+      btn.disabled = false;
+      btn.textContent = currentTab === 'login' ? 'Sign In' : 'Create Account';
+    }
+  } catch(e) {
+    showErr('Cannot reach server. Make sure python app.py is running.');
+    btn.disabled = false;
+    btn.textContent = currentTab === 'login' ? 'Sign In' : 'Create Account';
+  }
+}
+
+// Auto-redirect if already logged in
+(async function boot() {
+  try {
+    const res  = await fetch(`${API}/me`, { credentials: 'include' });
+    const data = await res.json();
+    if (data.authenticated && isSessionValid()) {
+      window.location.href = data.has_config ? '/dashboard' : '/setup';
+    }
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>
