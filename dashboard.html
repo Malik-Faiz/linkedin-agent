@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LinkedIn Agent</title>
+<title>LinkedIn Agent — Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
@@ -19,472 +19,164 @@
 }
 html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:var(--font);overflow-x:hidden}
 
-body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");background-size:200px 200px;pointer-events:none;z-index:0;opacity:.5}
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");background-size:200px;pointer-events:none;z-index:0;opacity:.5}
 body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(124,106,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(124,106,255,.04) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
 
-/* ── SHARED PAGE WRAPPER ── */
-.fullpage{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;background:var(--bg);overflow-y:auto}
-.fullpage.active{display:flex}
+.page{max-width:920px;margin:0 auto;padding:28px 24px 60px;position:relative;z-index:1}
 
-/* ── AUTH / SETUP CARD ── */
-.auth-card{position:relative;z-index:1;background:var(--surface);border:1px solid var(--border2);border-radius:24px;padding:44px 40px 40px;width:100%;max-width:460px;margin:24px auto}
-.auth-card::before{content:'';position:absolute;top:-100px;right:-80px;width:300px;height:300px;background:radial-gradient(circle,rgba(124,106,255,.1) 0%,transparent 65%);pointer-events:none;border-radius:50%}
-.auth-card::after{content:'';position:absolute;bottom:-80px;left:-60px;width:220px;height:220px;background:radial-gradient(circle,rgba(255,107,157,.07) 0%,transparent 65%);pointer-events:none;border-radius:50%}
-
-.logo-center{display:flex;justify-content:center;margin-bottom:28px}
-.logo-box{width:60px;height:60px;border-radius:18px;background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:#fff;letter-spacing:-1px;position:relative}
-.logo-glow{position:absolute;inset:-8px;border-radius:24px;background:radial-gradient(circle,rgba(124,106,255,.35),transparent 70%);z-index:-1;animation:glow 3s ease-in-out infinite}
 @keyframes glow{0%,100%{opacity:.6}50%{opacity:1}}
-
-.card-title{text-align:center;font-size:24px;font-weight:800;letter-spacing:-1px;margin-bottom:4px}
-.card-sub{text-align:center;font-size:12px;color:var(--muted);font-family:var(--mono);margin-bottom:32px}
-
-.tab-row{display:flex;gap:0;background:var(--surface2);border-radius:12px;padding:4px;margin-bottom:28px;border:1px solid var(--border)}
-.tab-btn{flex:1;padding:9px;border:none;background:none;color:var(--muted);font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;border-radius:9px;transition:all .2s}
-.tab-btn.active{background:var(--surface3);color:var(--text);border:1px solid var(--border2)}
-
-.field{margin-bottom:18px}
-.field label{display:block;font-size:11px;font-family:var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
-.field-wrap{position:relative}
-.field-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted2);font-size:16px;pointer-events:none}
-.field input,.field textarea,.field select{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:13px 14px 13px 42px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;transition:border .2s,background .2s}
-.field input:focus,.field textarea:focus{border-color:var(--accent);background:var(--surface3)}
-.field input.err{border-color:var(--red)}
-.field textarea{padding-left:14px;min-height:90px;resize:vertical}
-.field .no-icon{padding-left:14px}
-
-.err-box{display:none;align-items:center;gap:8px;background:rgba(255,95,95,.08);border:1px solid rgba(255,95,95,.2);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--red);font-family:var(--mono);margin-bottom:16px}
-.err-box.show{display:flex}
-.ok-box{display:none;align-items:center;gap:8px;background:rgba(0,229,160,.07);border:1px solid rgba(0,229,160,.18);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--green);font-family:var(--mono);margin-bottom:16px}
-.ok-box.show{display:flex}
-
-.pri-btn{width:100%;padding:15px;border-radius:12px;background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);border:none;color:#fff;font-family:var(--font);font-size:15px;font-weight:700;cursor:pointer;letter-spacing:-.3px;position:relative;overflow:hidden;transition:opacity .2s,transform .1s}
-.pri-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.15),transparent);pointer-events:none}
-.pri-btn:hover:not(:disabled){opacity:.88;transform:translateY(-1px)}
-.pri-btn:active:not(:disabled){transform:scale(.98)}
-.pri-btn:disabled{opacity:.45;cursor:not-allowed}
-
-.ghost-btn{width:100%;padding:13px;border-radius:12px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;margin-top:10px}
-.ghost-btn:hover{border-color:var(--accent);color:var(--text);background:var(--surface3)}
-
-.note-text{text-align:center;font-size:11px;color:var(--muted2);font-family:var(--mono);margin-top:18px;line-height:1.7}
-.note-text span{color:var(--muted)}
-
-/* ── API SETUP PAGE ── */
-.setup-scroll{width:100%;max-height:100vh;overflow-y:auto;padding:32px 24px}
-.setup-inner{max-width:520px;margin:0 auto}
-.setup-step{font-size:10px;font-family:var(--mono);letter-spacing:3px;color:var(--accent);text-transform:uppercase;margin-bottom:8px}
-.api-grid{display:grid;gap:14px;margin-top:4px}
-.api-row{background:var(--surface2);border:1px solid var(--border2);border-radius:14px;padding:16px 18px}
-.api-row-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
-.api-badge-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;font-family:var(--mono);flex-shrink:0}
-.bg-groq{background:rgba(124,106,255,.18);color:var(--accent)}
-.bg-buf{background:rgba(79,195,247,.15);color:var(--blue)}
-.bg-serp{background:rgba(255,179,71,.15);color:var(--amber)}
-.api-row-head-text h3{font-size:14px;font-weight:700;margin-bottom:1px}
-.api-row-head-text p{font-size:11px;color:var(--muted);font-family:var(--mono)}
-.api-row .field{margin-bottom:0}
-.api-row .field input{background:var(--surface3);border-color:var(--border)}
-
-/* ── DASHBOARD PAGE ── */
-#dashPage{position:relative;z-index:1;overflow-y:auto}
-.page{max-width:900px;margin:0 auto;padding:32px 24px 60px;position:relative;z-index:1}
-
-.header{display:flex;align-items:center;gap:16px;margin-bottom:36px;flex-wrap:wrap}
-.logo-sm{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;letter-spacing:-1px;flex-shrink:0;position:relative}
-.logo-sm-glow{position:absolute;inset:-6px;border-radius:20px;background:radial-gradient(circle,rgba(124,106,255,.3),transparent 70%);z-index:-1;animation:glow 3s ease-in-out infinite}
-.header-text h1{font-size:22px;font-weight:800;letter-spacing:-0.8px;line-height:1}
-.header-text p{font-size:12px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
-.header-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.status-chip{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:24px;padding:8px 16px;font-size:12px;font-family:var(--mono);white-space:nowrap}
-.live-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(0,229,160,.2);animation:livepulse 2s infinite}
 @keyframes livepulse{0%,100%{box-shadow:0 0 0 3px rgba(0,229,160,.2)}50%{box-shadow:0 0 0 6px rgba(0,229,160,.05)}}
+@keyframes colonblink{50%{opacity:.08}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── HEADER ── */
+.header{display:flex;align-items:center;gap:14px;margin-bottom:28px;flex-wrap:wrap;animation:slideUp .4s ease}
+.logo{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;letter-spacing:-1px;position:relative;flex-shrink:0}
+.logo-glow{position:absolute;inset:-6px;border-radius:20px;background:radial-gradient(circle,rgba(124,106,255,.3),transparent 70%);z-index:-1;animation:glow 3s ease-in-out infinite}
+.header-text h1{font-size:20px;font-weight:800;letter-spacing:-.7px;line-height:1}
+.header-text p{font-size:11px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+.status-chip{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:20px;padding:7px 14px;font-size:11px;font-family:var(--mono);white-space:nowrap}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(0,229,160,.2);animation:livepulse 2s infinite}
 .status-chip.running .live-dot{background:var(--amber);box-shadow:0 0 0 3px rgba(255,179,71,.2)}
-.icon-btn{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:8px 12px;font-size:12px;font-family:var(--mono);color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
+
+.icon-btn{display:flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:7px 11px;font-size:11px;font-family:var(--mono);color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap;text-decoration:none}
 .icon-btn:hover{border-color:var(--accent);color:var(--text)}
 .icon-btn.danger:hover{border-color:var(--red);color:var(--red);background:rgba(255,95,95,.06)}
 
-.expiry-banner{display:none;align-items:center;gap:10px;background:rgba(255,179,71,.08);border:1px solid rgba(255,179,71,.2);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--amber)}
-.expiry-banner.show{display:flex}
-.conn-banner{display:none;align-items:center;gap:10px;background:rgba(255,95,95,.08);border:1px solid rgba(255,95,95,.25);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--red)}
-.conn-banner.show{display:flex}
+/* ── BANNERS ── */
+.banner{display:none;align-items:center;gap:10px;border-radius:12px;padding:11px 14px;margin-bottom:14px;font-size:12px}
+.banner.show{display:flex}
+.banner.expiry{background:rgba(255,179,71,.08);border:1px solid rgba(255,179,71,.2);color:var(--amber)}
+.banner.error{background:rgba(255,95,95,.08);border:1px solid rgba(255,95,95,.25);color:var(--red)}
+.banner.info{background:rgba(124,106,255,.07);border:1px solid rgba(124,106,255,.2);color:var(--accent);font-family:var(--mono);font-size:11px}
 
-/* ── TIMEZONE BANNER ── */
-.tz-banner{display:flex;align-items:center;gap:10px;background:rgba(124,106,255,.07);border:1px solid rgba(124,106,255,.2);border-radius:12px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:var(--accent);font-family:var(--mono)}
-.tz-banner.hidden{display:none}
-
-/* timer */
-.timer-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px 28px;margin-bottom:20px;position:relative;overflow:hidden}
-.timer-card::before{content:'';position:absolute;top:-80px;right:-80px;width:280px;height:280px;background:radial-gradient(circle,rgba(124,106,255,.12) 0%,transparent 65%);pointer-events:none}
-.timer-card::after{content:'';position:absolute;bottom:-60px;left:-60px;width:200px;height:200px;background:radial-gradient(circle,rgba(255,107,157,.08) 0%,transparent 65%);pointer-events:none}
-.tc-label{font-size:10px;font-family:var(--mono);letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+/* ── TIMER ── */
+.timer-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px;margin-bottom:18px;position:relative;overflow:hidden;animation:slideUp .4s .05s ease both}
+.timer-card::before{content:'';position:absolute;top:-80px;right:-80px;width:280px;height:280px;background:radial-gradient(circle,rgba(124,106,255,.12),transparent 65%);pointer-events:none}
+.timer-card::after{content:'';position:absolute;bottom:-60px;left:-60px;width:200px;height:200px;background:radial-gradient(circle,rgba(255,107,157,.08),transparent 65%);pointer-events:none}
+.tc-label{font-size:10px;font-family:var(--mono);letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:18px;display:flex;align-items:center;gap:8px}
 .tc-label::after{content:'';flex:1;height:1px;background:var(--border)}
-.timer-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:24px}
+.timer-row{display:flex;align-items:flex-start;gap:6px;margin-bottom:20px}
 .t-block{text-align:center}
-.t-num{font-family:var(--mono);font-size:68px;font-weight:700;line-height:1;background:linear-gradient(180deg,#ffffff 0%,var(--accent) 120%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;min-width:96px;display:block;transition:transform .1s}
+.t-num{font-family:var(--mono);font-size:64px;font-weight:700;line-height:1;background:linear-gradient(180deg,#fff 0%,var(--accent) 130%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;min-width:90px;display:block;transition:transform .1s}
 .t-num.tick{transform:scale(1.04)}
-.t-unit{font-size:10px;color:var(--muted);letter-spacing:2px;margin-top:4px;text-transform:uppercase}
-.t-colon{font-size:56px;font-weight:700;color:var(--accent);opacity:.5;padding:0 4px;line-height:1.05;animation:colonblink 1s step-end infinite;align-self:flex-start;margin-top:2px}
-@keyframes colonblink{50%{opacity:.08}}
-.target-info{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);margin-bottom:14px}
-.target-info .highlight{color:var(--amber);font-family:var(--mono);font-weight:700}
-.prog-track{background:var(--surface3);border-radius:99px;height:3px;overflow:hidden;margin-bottom:18px}
-.prog-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px;transition:width 1s linear;width:0%}
-.apis{display:flex;gap:16px;flex-wrap:wrap}
-.api-badge{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:11px;font-family:var(--mono);color:var(--muted)}
+.t-unit{font-size:9px;color:var(--muted);letter-spacing:2px;margin-top:3px;text-transform:uppercase}
+.t-colon{font-size:52px;font-weight:700;color:var(--accent);opacity:.5;padding:0 3px;line-height:1.05;animation:colonblink 1s step-end infinite;align-self:flex-start;margin-top:2px}
+.target-info{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:12px}
+.target-info .hl{color:var(--amber);font-family:var(--mono);font-weight:700}
+.prog-track{background:var(--surface3);border-radius:99px;height:3px;overflow:hidden;margin-bottom:16px}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px;transition:width 1s linear;width:0}
+.api-badges{display:flex;gap:10px;flex-wrap:wrap}
+.api-badge{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px;font-size:10px;font-family:var(--mono);color:var(--muted)}
 .api-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .dot-ok{background:var(--green)}.dot-warn{background:var(--amber)}.dot-err{background:var(--red)}
 
-/* stats */
-.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:20px}
-.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px 18px;position:relative;overflow:hidden}
-.stat-card::before{content:'';position:absolute;inset:0;border-radius:16px;background:linear-gradient(135deg,rgba(255,255,255,.02),transparent);pointer-events:none}
-.sc-label{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;font-family:var(--mono);margin-bottom:10px}
-.sc-val{font-size:32px;font-weight:800;line-height:1;letter-spacing:-1px}
-.sc-sub{font-size:11px;color:var(--muted);margin-top:6px}
+/* ── STATS ── */
+.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:18px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px 16px;animation:slideUp .4s .1s ease both}
+.sc-label{font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;font-family:var(--mono);margin-bottom:8px}
+.sc-val{font-size:30px;font-weight:800;line-height:1;letter-spacing:-1px}
+.sc-sub{font-size:10px;color:var(--muted);margin-top:5px}
 .c-green{color:var(--green)}.c-purple{color:var(--accent)}.c-blue{color:var(--blue)}
 
-/* two col */
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:14px}
-.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+/* ── CARD ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px;animation:slideUp .4s .15s ease both}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .card-head h2{font-size:14px;font-weight:700;letter-spacing:-.3px}
-.chip{font-size:11px;font-family:var(--mono);background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:3px 8px;color:var(--muted)}
-.next-alert{display:flex;align-items:center;gap:8px;background:rgba(255,179,71,.08);border:1px solid rgba(255,179,71,.2);border-radius:10px;padding:8px 12px;font-size:12px;color:var(--amber);margin-bottom:12px;font-family:var(--mono)}
-.subj-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;font-size:13px;transition:background .15s;cursor:default}
+.chip{font-size:10px;font-family:var(--mono);background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:3px 7px;color:var(--muted)}
+
+/* ── CHANNELS ── */
+.ch-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+.ch-toggle{border:1.5px solid var(--border2);border-radius:12px;padding:10px 10px 8px;cursor:pointer;transition:all .2s;background:var(--surface2);position:relative;display:flex;flex-direction:column;gap:5px}
+.ch-toggle:hover:not(.no-id){border-color:var(--accent);background:var(--surface3)}
+.ch-toggle.active{border-color:var(--green);background:rgba(0,229,160,.06)}
+.ch-toggle.active .ch-ind{background:var(--green);box-shadow:0 0 0 3px rgba(0,229,160,.2)}
+.ch-toggle.no-id{opacity:.4;cursor:not-allowed}
+.ch-toggle-row{display:flex;align-items:center;gap:6px}
+.ch-ind{width:7px;height:7px;border-radius:50%;background:var(--muted2);transition:all .3s;flex-shrink:0}
+.ch-name{font-size:11px;font-weight:700;line-height:1;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch-state{font-size:9px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+.pill-sw{width:30px;height:17px;border-radius:9px;background:var(--surface3);border:1px solid var(--border2);position:relative;transition:background .2s;flex-shrink:0}
+.pill-sw .knob{position:absolute;top:3px;left:3px;width:9px;height:9px;border-radius:50%;background:var(--muted2);transition:all .2s}
+.ch-toggle.active .pill-sw{background:var(--green);border-color:var(--green)}
+.ch-toggle.active .pill-sw .knob{left:16px;background:#fff}
+.ch-del{display:none;position:absolute;top:5px;right:5px;width:18px;height:18px;border-radius:4px;border:none;background:rgba(255,95,95,.12);color:var(--red);cursor:pointer;font-size:10px;align-items:center;justify-content:center;transition:background .15s;line-height:1}
+.ch-del:hover{background:rgba(255,95,95,.25)}
+.ch-toggle:hover .ch-del{display:flex}
+.ch-toggle.no-id .ch-del{display:none!important}
+
+/* ── TWO COL ── */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+
+/* ── QUEUE ── */
+.next-alert{display:flex;align-items:center;gap:7px;background:rgba(255,179,71,.08);border:1px solid rgba(255,179,71,.2);border-radius:9px;padding:7px 11px;font-size:11px;color:var(--amber);margin-bottom:11px;font-family:var(--mono)}
+.subj-item{display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:9px;font-size:12px;transition:background .15s}
 .subj-item:hover{background:var(--surface2)}
-.subj-item.next{background:rgba(124,106,255,.07);border:1px solid rgba(124,106,255,.15)}
-.si-num{font-family:var(--mono);font-size:11px;color:var(--muted2);min-width:22px}
+.subj-item.next{background:rgba(124,106,255,.07);border:1px solid rgba(124,106,255,.14)}
+.si-num{font-family:var(--mono);font-size:10px;color:var(--muted2);min-width:20px}
 .si-text{flex:1;line-height:1.3}
-.si-tag{font-size:10px;font-family:var(--mono);border-radius:5px;padding:3px 7px;white-space:nowrap}
+.si-tag{font-size:9px;font-family:var(--mono);border-radius:4px;padding:2px 6px;white-space:nowrap}
 .tag-img{background:rgba(124,106,255,.15);color:var(--accent)}
 .tag-auto{background:rgba(0,212,170,.12);color:var(--accent3)}
 .tag-txt{background:rgba(0,229,160,.1);color:var(--green)}
-.empty-state{text-align:center;padding:24px;color:var(--muted);font-size:13px}
+.empty-st{text-align:center;padding:20px;color:var(--muted);font-size:12px}
 
-/* ── 3-MODE ADD SUBJECTS ── */
-.mode-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px}
-.mode-btn{padding:10px 6px;border-radius:10px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);font-family:var(--mono);font-size:10px;cursor:pointer;transition:all .2s;text-align:center;line-height:1.5}
-.mode-btn i{display:block;font-size:18px;margin-bottom:4px}
+/* ── ADD MODE ── */
+.mode-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:13px}
+.mode-btn{padding:9px 4px;border-radius:9px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted);font-family:var(--mono);font-size:9px;cursor:pointer;transition:all .2s;text-align:center;line-height:1.5}
+.mode-btn i{display:block;font-size:17px;margin-bottom:3px}
 .mode-btn:hover{border-color:var(--accent);color:var(--text)}
 .mode-btn.active.no-img{border-color:var(--green);background:rgba(0,229,160,.07);color:var(--green)}
 .mode-btn.active.auto-img{border-color:var(--accent3);background:rgba(0,212,170,.07);color:var(--accent3)}
 .mode-btn.active.manual-img{border-color:var(--accent);background:rgba(124,106,255,.1);color:var(--accent)}
-
-.add-area{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;color:var(--text);font-family:var(--mono);font-size:12px;resize:vertical;min-height:80px;outline:none;transition:border .2s}
+.add-area{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:9px;padding:9px 11px;color:var(--text);font-family:var(--mono);font-size:11px;resize:vertical;min-height:78px;outline:none;transition:border .2s}
 .add-area:focus{border-color:var(--accent)}
-
 .mode-panel{display:none}
 .mode-panel.show{display:block}
-.img-upload-area{margin-top:10px;border:1.5px dashed var(--border2);border-radius:10px;padding:18px;text-align:center;cursor:pointer;transition:all .2s}
-.img-upload-area:hover{border-color:var(--accent);background:rgba(124,106,255,.04)}
-.img-upload-area.has-file{border-color:var(--accent);background:rgba(124,106,255,.06)}
-.img-upload-area p{font-size:12px;color:var(--muted);font-family:var(--mono);margin-top:6px}
-.img-upload-area .file-name{color:var(--accent);font-size:11px;margin-top:4px}
-.auto-note{margin-top:10px;background:rgba(0,212,170,.07);border:1px solid rgba(0,212,170,.18);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--accent3);font-family:var(--mono);line-height:1.6}
+.auto-note{margin-top:9px;background:rgba(0,212,170,.07);border:1px solid rgba(0,212,170,.18);border-radius:7px;padding:9px 11px;font-size:10px;color:var(--accent3);font-family:var(--mono);line-height:1.6}
+.serp-warn{display:none;margin-top:9px;background:rgba(255,179,71,.08);border:1px solid rgba(255,179,71,.3);border-radius:7px;padding:9px 11px;font-size:10px;color:var(--amber);font-family:var(--mono);line-height:1.6}
+.upload-zone{margin-top:9px;border:1.5px dashed var(--border2);border-radius:9px;padding:16px;text-align:center;cursor:pointer;transition:all .2s}
+.upload-zone:hover,.upload-zone.has-file{border-color:var(--accent);background:rgba(124,106,255,.04)}
+.upload-zone p{font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:5px}
+.upload-zone .fname{color:var(--accent);font-size:10px;margin-top:3px}
+.btn-add{margin-top:11px;width:100%;padding:11px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:opacity .2s,transform .1s;position:relative;overflow:hidden}
+.btn-add::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.15),transparent);pointer-events:none}
+.btn-add:hover:not(:disabled){opacity:.88;transform:translateY(-1px)}
+.btn-add:disabled{opacity:.45;cursor:not-allowed}
 
-.add-submit-btn{margin-top:12px;width:100%;padding:12px;border-radius:10px;background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);border:none;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .2s,transform .1s;position:relative;overflow:hidden}
-.add-submit-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.15),transparent);pointer-events:none}
-.add-submit-btn:hover:not(:disabled){opacity:.88;transform:translateY(-1px)}
-.add-submit-btn:disabled{opacity:.45;cursor:not-allowed}
+/* ── RUN BTN ── */
+.btn-run{width:100%;padding:15px;border-radius:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;font-family:var(--font);font-size:15px;font-weight:700;cursor:pointer;letter-spacing:-.3px;position:relative;overflow:hidden;transition:opacity .2s,transform .1s;margin-bottom:13px;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn-run::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.15),transparent);pointer-events:none}
+.btn-run:hover:not(:disabled){opacity:.88;transform:translateY(-1px)}
+.btn-run:active:not(:disabled){transform:scale(.98)}
+.btn-run:disabled{opacity:.4;cursor:not-allowed}
 
-/* run button */
-.run-btn{width:100%;padding:16px;border-radius:14px;background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);border:none;color:#fff;font-family:var(--font);font-size:16px;font-weight:700;cursor:pointer;letter-spacing:-.4px;position:relative;overflow:hidden;transition:opacity .2s,transform .1s;margin-bottom:14px}
-.run-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.15),transparent);pointer-events:none}
-.run-btn:hover:not(:disabled){opacity:.88;transform:translateY(-1px)}
-.run-btn:active:not(:disabled){transform:scale(.98)}
-.run-btn:disabled{opacity:.4;cursor:not-allowed}
-.run-btn .bi{display:flex;align-items:center;justify-content:center;gap:8px;position:relative;z-index:1}
-
-/* log */
-.log-wrap{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px 20px}
-.log-head{font-size:10px;font-family:var(--mono);letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:12px}
-.log-lines{font-family:var(--mono);font-size:12px;line-height:1.9;max-height:180px;overflow-y:auto}
+/* ── LOG ── */
+.log-wrap{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 18px}
+.log-head{font-size:9px;font-family:var(--mono);letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:10px}
+.log-lines{font-family:var(--mono);font-size:11px;line-height:1.9;max-height:170px;overflow-y:auto}
 .log-lines::-webkit-scrollbar{width:3px}
 .log-lines::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.l-line{display:flex;gap:9px;padding:1px 0}
 .l-t{color:var(--muted2)}.l-ok{color:var(--green)}.l-info{color:var(--blue)}.l-warn{color:var(--amber)}.l-err{color:var(--red)}
-.l-line{display:flex;gap:10px;padding:1px 0}
-
-.spin{animation:spin .8s linear infinite}
-@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-
-/* ── CHANNEL TOGGLE ── */
-.ch-toggle{
-  border:1.5px solid var(--border2);border-radius:12px;padding:12px 12px 10px;
-  cursor:pointer;transition:all .2s;background:var(--surface2);position:relative;
-  display:flex;flex-direction:column;gap:6px
-}
-.ch-toggle:hover:not(.no-id){border-color:var(--accent);background:var(--surface3)}
-.ch-toggle.active{border-color:var(--green);background:rgba(0,229,160,.06)}
-.ch-toggle.active .ch-indicator{background:var(--green);box-shadow:0 0 0 3px rgba(0,229,160,.2)}
-.ch-toggle.no-id{opacity:.4;cursor:not-allowed}
-.ch-indicator{width:8px;height:8px;border-radius:50%;background:var(--muted2);transition:all .3s;flex-shrink:0}
-.ch-name{font-size:12px;font-weight:700;line-height:1;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ch-slot{font-size:10px;color:var(--muted);font-family:var(--mono)}
-.ch-toggle-row{display:flex;align-items:center;gap:6px}
-/* pill switch */
-.pill-switch{width:32px;height:18px;border-radius:9px;background:var(--surface3);border:1px solid var(--border2);position:relative;transition:background .2s;flex-shrink:0}
-.pill-switch .knob{position:absolute;top:3px;left:3px;width:10px;height:10px;border-radius:50%;background:var(--muted2);transition:all .2s}
-.ch-toggle.active .pill-switch{background:var(--green);border-color:var(--green)}
-.ch-toggle.active .pill-switch .knob{left:17px;background:#fff}
-/* delete btn */
-.ch-del-btn{
-  display:none;position:absolute;top:6px;right:6px;
-  width:20px;height:20px;border-radius:5px;border:none;
-  background:rgba(255,95,95,.12);color:var(--red);cursor:pointer;
-  font-size:11px;align-items:center;justify-content:center;
-  transition:background .15s;line-height:1
-}
-.ch-del-btn:hover{background:rgba(255,95,95,.25)}
-.ch-toggle:hover .ch-del-btn{display:flex}
-.ch-toggle.no-id .ch-del-btn{display:none!important}
 
 @media(max-width:600px){
   .stats-row{grid-template-columns:1fr 1fr}
   .two-col{grid-template-columns:1fr}
-  .t-num{font-size:48px;min-width:68px}
-  .mode-row{grid-template-columns:1fr 1fr 1fr}
-  .auth-card{padding:32px 22px 28px}
+  .t-num{font-size:44px;min-width:64px}
+  .ch-grid{grid-template-columns:1fr 1fr}
 }
 </style>
 </head>
 <body>
-
-<!-- ══════════════════════════════════════════════════════
-  PAGE 1 — AUTH (Login / Register)
-══════════════════════════════════════════════════════ -->
-<div class="fullpage active" id="authPage">
-  <div class="auth-card">
-    <div class="logo-center">
-      <div class="logo-box">Li<div class="logo-glow"></div></div>
-    </div>
-    <div class="card-title">LinkedIn Agent</div>
-    <div class="card-sub" id="authSub">Sign in or create an account</div>
-
-    <div class="tab-row">
-      <button class="tab-btn active" id="tabLogin" onclick="switchTab('login')">Sign In</button>
-      <button class="tab-btn" id="tabRegister" onclick="switchTab('register')">Register</button>
-    </div>
-
-    <div id="authErr" class="err-box"><i class="ti ti-alert-circle" style="font-size:16px;flex-shrink:0"></i><span id="authErrMsg"></span></div>
-
-    <div class="field">
-      <label>Username</label>
-      <div class="field-wrap">
-        <i class="ti ti-user field-icon"></i>
-        <input type="text" id="authUser" placeholder="your_username" autocomplete="username" onkeydown="if(event.key==='Enter')doAuth()">
-      </div>
-    </div>
-
-    <div class="field">
-      <label>Password</label>
-      <div class="field-wrap">
-        <i class="ti ti-lock field-icon"></i>
-        <input type="password" id="authPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doAuth()">
-      </div>
-    </div>
-
-    <div class="field" id="passConfirmField" style="display:none">
-      <label>Confirm Password</label>
-      <div class="field-wrap">
-        <i class="ti ti-lock field-icon"></i>
-        <input type="password" id="authPassConfirm" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter')doAuth()">
-      </div>
-    </div>
-
-    <button class="pri-btn" id="authBtn" onclick="doAuth()">Sign In</button>
-
-    <div class="note-text">
-      <span>Session expires after</span> 24 hours · <span>timezone auto-detected</span>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════════
-  PAGE 2 — API SETUP
-══════════════════════════════════════════════════════ -->
-<div class="fullpage" id="setupPage">
-  <div class="setup-scroll">
-    <div class="setup-inner">
-      <div class="auth-card" style="max-width:100%;margin:0">
-        <div class="logo-center">
-          <div class="logo-box">Li<div class="logo-glow"></div></div>
-        </div>
-        <div class="card-title">API Configuration</div>
-        <div class="card-sub">Connect your services to start posting</div>
-
-        <div class="setup-step">Step 1 of 1 — Enter your API keys</div>
-
-        <div id="setupErr" class="err-box" style="margin-top:14px"><i class="ti ti-alert-circle" style="font-size:16px;flex-shrink:0"></i><span id="setupErrMsg"></span></div>
-        <div id="setupOk" class="ok-box" style="margin-top:14px"><i class="ti ti-circle-check" style="font-size:16px;flex-shrink:0"></i><span id="setupOkMsg"></span></div>
-
-        <div class="api-grid" style="margin-top:20px">
-          <!-- GROQ -->
-          <div class="api-row">
-            <div class="api-row-head">
-              <div class="api-badge-icon bg-groq">G</div>
-              <div class="api-row-head-text">
-                <h3>Groq API Key</h3>
-                <p>LLM for post generation · groq.com</p>
-              </div>
-            </div>
-            <div class="field">
-              <div class="field-wrap">
-                <i class="ti ti-key field-icon"></i>
-                <input type="password" id="cfgGroq" placeholder="gsk_••••••••••••••••••••••••">
-              </div>
-            </div>
-          </div>
-
-          <!-- BUFFER -->
-          <div class="api-row">
-            <div class="api-row-head">
-              <div class="api-badge-icon bg-buf">B</div>
-              <div class="api-row-head-text">
-                <h3>Buffer API Key</h3>
-                <p>Publish posts · buffer.com</p>
-              </div>
-            </div>
-            <div class="field" style="margin-bottom:14px">
-              <div class="field-wrap">
-                <i class="ti ti-key field-icon"></i>
-                <input type="password" id="cfgBuffer" placeholder="OEF_••••••••••••••••••">
-              </div>
-            </div>
-            <!-- 3 Channel Slots -->
-            <div style="font-size:10px;font-family:var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Channel Slots</div>
-            <div style="display:grid;gap:10px">
-
-              <!-- Channel 1 — mandatory, no delete -->
-              <div style="background:var(--surface3);border-radius:10px;padding:10px 12px">
-                <div style="font-size:10px;font-family:var(--mono);color:var(--accent);margin-bottom:8px;letter-spacing:1px">
-                  CHANNEL 1 <span style="color:var(--muted2)">(required)</span>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                  <div class="field" style="margin-bottom:0">
-                    <label>Name</label>
-                    <div class="field-wrap"><i class="ti ti-tag field-icon"></i><input type="text" id="cfgChName1" placeholder="e.g. Personal"></div>
-                  </div>
-                  <div class="field" style="margin-bottom:0">
-                    <label>Channel ID</label>
-                    <div class="field-wrap"><i class="ti ti-hash field-icon"></i><input type="text" id="cfgCh1" placeholder="670d••••••••"></div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Channel 2 — optional, has delete -->
-              <div style="background:var(--surface3);border-radius:10px;padding:10px 12px;position:relative" id="chRow2">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                  <span style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:1px">CHANNEL 2 <span style="color:var(--muted2)">(optional)</span></span>
-                  <button type="button" onclick="clearChannelRow(2)" title="Delete channel 2"
-                    style="background:rgba(255,95,95,.1);border:1px solid rgba(255,95,95,.2);border-radius:6px;color:var(--red);font-size:11px;font-family:var(--mono);padding:3px 8px;cursor:pointer;display:flex;align-items:center;gap:4px;transition:background .15s"
-                    onmouseover="this.style.background='rgba(255,95,95,.22)'" onmouseout="this.style.background='rgba(255,95,95,.1)'">
-                    <i class="ti ti-trash" style="font-size:12px"></i> Delete
-                  </button>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                  <div class="field" style="margin-bottom:0">
-                    <label>Name</label>
-                    <div class="field-wrap"><i class="ti ti-tag field-icon"></i><input type="text" id="cfgChName2" placeholder="e.g. Company"></div>
-                  </div>
-                  <div class="field" style="margin-bottom:0">
-                    <label>Channel ID</label>
-                    <div class="field-wrap"><i class="ti ti-hash field-icon"></i><input type="text" id="cfgCh2" placeholder="670d••••••••"></div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Channel 3 — optional, has delete -->
-              <div style="background:var(--surface3);border-radius:10px;padding:10px 12px;position:relative" id="chRow3">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                  <span style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:1px">CHANNEL 3 <span style="color:var(--muted2)">(optional)</span></span>
-                  <button type="button" onclick="clearChannelRow(3)" title="Delete channel 3"
-                    style="background:rgba(255,95,95,.1);border:1px solid rgba(255,95,95,.2);border-radius:6px;color:var(--red);font-size:11px;font-family:var(--mono);padding:3px 8px;cursor:pointer;display:flex;align-items:center;gap:4px;transition:background .15s"
-                    onmouseover="this.style.background='rgba(255,95,95,.22)'" onmouseout="this.style.background='rgba(255,95,95,.1)'">
-                    <i class="ti ti-trash" style="font-size:12px"></i> Delete
-                  </button>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                  <div class="field" style="margin-bottom:0">
-                    <label>Name</label>
-                    <div class="field-wrap"><i class="ti ti-tag field-icon"></i><input type="text" id="cfgChName3" placeholder="e.g. Agency"></div>
-                  </div>
-                  <div class="field" style="margin-bottom:0">
-                    <label>Channel ID</label>
-                    <div class="field-wrap"><i class="ti ti-hash field-icon"></i><input type="text" id="cfgCh3" placeholder="670d••••••••"></div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Channel 4 — Facebook, optional, has delete -->
-          <div style="background:var(--surface3);border-radius:10px;padding:10px 12px;position:relative" id="chRow4">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-              <span style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:1px">CHANNEL 4 — FACEBOOK <span style="color:var(--muted2)">(optional)</span></span>
-              <button type="button" onclick="clearChannelRow(4)" title="Delete channel 4"
-                style="background:rgba(255,95,95,.1);border:1px solid rgba(255,95,95,.2);border-radius:6px;color:var(--red);font-size:11px;font-family:var(--mono);padding:3px 8px;cursor:pointer;display:flex;align-items:center;gap:4px;transition:background .15s"
-                onmouseover="this.style.background='rgba(255,95,95,.22)'" onmouseout="this.style.background='rgba(255,95,95,.1)'">
-                <i class="ti ti-trash" style="font-size:12px"></i> Delete
-              </button>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              <div class="field" style="margin-bottom:0">
-                <label>Name</label>
-                <div class="field-wrap"><i class="ti ti-tag field-icon"></i><input type="text" id="cfgChName4" placeholder="e.g. Facebook Page"></div>
-              </div>
-              <div class="field" style="margin-bottom:0">
-                <label>Channel ID</label>
-                <div class="field-wrap"><i class="ti ti-hash field-icon"></i><input type="text" id="cfgCh4" placeholder="670d••••••••"></div>
-              </div>
-            </div>
-          </div>
-            </div>
-          </div>
-
-          <!-- SERP -->
-          <div class="api-row">
-            <div class="api-row-head">
-              <div class="api-badge-icon bg-serp">S</div>
-              <div class="api-row-head-text">
-                <h3>SerpAPI Key</h3>
-                <p>Auto image search · serpapi.com</p>
-              </div>
-            </div>
-            <div class="field">
-              <div class="field-wrap">
-                <i class="ti ti-key field-icon"></i>
-                <input type="password" id="cfgSerp" placeholder="77b4••••••••••••••••••••">
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <button class="pri-btn" id="setupSaveBtn" onclick="saveConfig()" style="margin-top:24px">
-          Save &amp; Go to Dashboard
-        </button>
-        <button class="ghost-btn" id="setupSkipBtn" onclick="goToDash()">
-          Skip for now — go to Dashboard
-        </button>
-
-        <div class="note-text" style="margin-top:14px">
-          Keys are stored privately per account.<br>
-          <span>You can update them anytime from the dashboard.</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════════════
-  PAGE 3 — DASHBOARD
-══════════════════════════════════════════════════════ -->
-<div id="dashPage" style="display:none;position:relative;z-index:1;min-height:100vh">
 <div class="page">
 
+  <!-- Header -->
   <header class="header">
-    <div class="logo-sm">
-      Li
-      <div class="logo-sm-glow"></div>
-    </div>
+    <div class="logo">Li<div class="logo-glow"></div></div>
     <div class="header-text">
       <h1>LinkedIn Agent</h1>
       <p id="headerSub">auto-scheduler active · timezone-aware</p>
@@ -492,40 +184,34 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
     <div class="header-right">
       <div class="status-chip" id="statusChip">
         <div class="live-dot"></div>
-        <span id="statusLabel">Connecting...</span>
+        <span id="statusLabel">Connecting…</span>
       </div>
-      <button class="icon-btn" onclick="showSetup()" title="API settings">
-        <i class="ti ti-settings" style="font-size:14px"></i>
-        <span>APIs</span>
-      </button>
-      <button class="icon-btn danger" onclick="doLogout()" title="Sign out">
-        <i class="ti ti-logout" style="font-size:14px"></i>
-        <span>Logout</span>
+      <a class="icon-btn" href="api.html" title="API settings">
+        <i class="ti ti-settings" style="font-size:13px"></i>APIs
+      </a>
+      <button class="icon-btn danger" onclick="doLogout()">
+        <i class="ti ti-logout" style="font-size:13px"></i>Logout
       </button>
     </div>
   </header>
 
-  <!-- Session expiry warning -->
-  <div class="expiry-banner" id="expiryBanner">
-    <i class="ti ti-clock-exclamation" style="font-size:18px;flex-shrink:0"></i>
-    <span>Session expires in <strong id="expiryCountdown">—</strong>. Re-login to continue.</span>
+  <!-- Banners -->
+  <div class="banner expiry" id="expiryBanner">
+    <i class="ti ti-clock-exclamation" style="font-size:17px;flex-shrink:0"></i>
+    <span>Session expires in <strong id="expiryCountdown">—</strong>. <a href="login.html" style="color:var(--amber)">Re-login</a> to continue.</span>
   </div>
-
-  <!-- Connection error -->
-  <div class="conn-banner" id="connBanner">
-    <i class="ti ti-wifi-off" style="font-size:18px"></i>
+  <div class="banner error" id="connBanner">
+    <i class="ti ti-wifi-off" style="font-size:17px;flex-shrink:0"></i>
     Cannot reach Flask server — make sure <code>python app.py</code> is running.
   </div>
-
-  <!-- Timezone info banner -->
-  <div class="tz-banner" id="tzBanner">
-    <i class="ti ti-world" style="font-size:15px;flex-shrink:0"></i>
-    <span id="tzBannerText">Detecting timezone...</span>
+  <div class="banner info" id="tzBanner">
+    <i class="ti ti-world" style="font-size:14px;flex-shrink:0"></i>
+    <span id="tzBannerText">Detecting timezone…</span>
   </div>
 
-  <!-- TIMER -->
+  <!-- Timer -->
   <div class="timer-card">
-    <div class="tc-label"><i class="ti ti-clock" style="font-size:14px"></i> next auto-run countdown</div>
+    <div class="tc-label"><i class="ti ti-clock" style="font-size:13px"></i> next auto-run countdown</div>
     <div class="timer-row">
       <div class="t-block"><span class="t-num" id="th">00</span><div class="t-unit">Hours</div></div>
       <div class="t-colon">:</div>
@@ -534,18 +220,18 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
       <div class="t-block"><span class="t-num" id="ts">00</span><div class="t-unit">Secs</div></div>
     </div>
     <div class="target-info">
-      <i class="ti ti-player-play" style="font-size:14px"></i>
-      Scheduled for <span class="highlight">08:00 AM</span> your local time · batch size <span class="highlight">2</span>
+      <i class="ti ti-player-play" style="font-size:13px"></i>
+      Scheduled for <span class="hl">08:00 AM</span> your local time · batch size <span class="hl">2</span>
     </div>
     <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
-    <div class="apis">
-      <div class="api-badge" id="badgeGroq"><div class="api-dot dot-warn"></div>Groq LLM</div>
+    <div class="api-badges">
+      <div class="api-badge" id="badgeGroq">  <div class="api-dot dot-warn"></div>Groq LLM</div>
       <div class="api-badge" id="badgeBuffer"><div class="api-dot dot-warn"></div>Buffer API</div>
-      <div class="api-badge" id="badgeSerp"><div class="api-dot dot-warn"></div>SerpAPI</div>
+      <div class="api-badge" id="badgeSerp">  <div class="api-dot dot-warn"></div>SerpAPI</div>
     </div>
   </div>
 
-  <!-- STATS -->
+  <!-- Stats -->
   <div class="stats-row">
     <div class="stat-card">
       <div class="sc-label">Posts Today</div>
@@ -564,21 +250,19 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
     </div>
   </div>
 
-  <!-- CHANNEL SWITCHER -->
-  <div class="card" style="margin-bottom:20px;padding:18px 20px">
-    <div class="card-head" style="margin-bottom:6px">
-      <h2><i class="ti ti-toggle-right" style="font-size:15px;vertical-align:-2px;margin-right:6px"></i>Buffer Channels</h2>
-      <span class="chip" id="activeChipLabel">Loading...</span>
+  <!-- Channels -->
+  <div class="card">
+    <div class="card-head">
+      <h2><i class="ti ti-toggle-right" style="font-size:14px;vertical-align:-2px;margin-right:5px"></i>Buffer Channels</h2>
+      <span class="chip" id="activeChipLabel">Loading…</span>
     </div>
-    <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:14px">
-      Toggle ON any channels you want — post goes to <strong style="color:var(--text)">all active channels</strong> at once
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px" id="channelToggles">
-      <!-- rendered by JS -->
-    </div>
+    <p style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:12px">
+      Toggle ON the channels you want — post goes to <strong style="color:var(--text)">all active</strong> at once
+    </p>
+    <div class="ch-grid" id="channelToggles"></div>
   </div>
 
-  <!-- MAIN COLS -->
+  <!-- Two col -->
   <div class="two-col">
     <!-- Queue -->
     <div class="card" style="margin-bottom:0">
@@ -587,699 +271,344 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
         <span class="chip" id="queueChip">0 subjects</span>
       </div>
       <div class="next-alert">
-        <i class="ti ti-alarm" style="font-size:14px"></i>
+        <i class="ti ti-alarm" style="font-size:13px"></i>
         Next 2 fire at 08:00 AM your time
       </div>
       <div id="subjectList"></div>
     </div>
 
-    <!-- Add Subjects -->
+    <!-- Add -->
     <div class="card" style="margin-bottom:0">
       <div class="card-head">
         <h2>Add Subjects</h2>
         <span class="chip">one per line</span>
       </div>
-
       <div class="mode-row">
         <button class="mode-btn no-img active" id="modeNoImg" onclick="setMode('no_image')">
-          <i class="ti ti-text-size"></i>
-          No Image
+          <i class="ti ti-text-size"></i>No Image
         </button>
         <button class="mode-btn auto-img" id="modeAutoImg" onclick="setMode('auto_image')">
-          <i class="ti ti-wand"></i>
-          Auto Image
+          <i class="ti ti-wand"></i>Auto Image
         </button>
         <button class="mode-btn manual-img" id="modeManualImg" onclick="setMode('manual_image')">
-          <i class="ti ti-upload"></i>
-          Upload Image
+          <i class="ti ti-upload"></i>Upload Image
         </button>
       </div>
-
       <textarea class="add-area" id="newSubjects" placeholder="AI tools for marketers&#10;Remote leadership tips&#10;Personal branding in 2025"></textarea>
-
-      <!-- AUTO IMAGE PANEL -->
+      <!-- auto panel -->
       <div class="mode-panel" id="panelAuto">
-        <div class="auto-note">
-          <i class="ti ti-wand" style="font-size:13px;vertical-align:-2px"></i>
-          SerpAPI will auto-fetch a relevant image for each subject.<br>
-          No extra text needed — just write your subjects normally.
-        </div>
-        <div id="serpWarn" style="display:none;margin-top:10px;background:rgba(255,179,71,.08);border:1px solid rgba(255,179,71,.3);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--amber);font-family:var(--mono);line-height:1.6">
-          <i class="ti ti-alert-triangle" style="font-size:13px;vertical-align:-2px"></i>
-          <strong>SerpAPI key not set.</strong> Posts will be created but sent <u>without an image</u>.<br>
-          Go to <span style="cursor:pointer;text-decoration:underline" onclick="showSetup()">API Settings</span> to add your SerpAPI key.
+        <div class="auto-note"><i class="ti ti-wand" style="font-size:12px;vertical-align:-2px"></i> SerpAPI will auto-fetch a relevant image for each subject.</div>
+        <div class="serp-warn" id="serpWarn">
+          <i class="ti ti-alert-triangle" style="font-size:12px;vertical-align:-2px"></i>
+          <strong>SerpAPI key not set.</strong> Posts sent <u>without an image</u>.<br>
+          <span style="cursor:pointer;text-decoration:underline" onclick="window.location.href='api.html'">Go to API Settings →</span>
         </div>
       </div>
-
-      <!-- MANUAL IMAGE PANEL -->
+      <!-- manual panel -->
       <div class="mode-panel" id="panelManual">
-        <div class="img-upload-area" id="uploadDropzone" onclick="document.getElementById('imageFile').click()">
-          <i class="ti ti-cloud-upload" style="font-size:28px;color:var(--muted)"></i>
+        <div class="upload-zone" id="uploadDropzone" onclick="document.getElementById('imageFile').click()">
+          <i class="ti ti-cloud-upload" style="font-size:26px;color:var(--muted)"></i>
           <p>Click to select an image</p>
-          <div class="file-name" id="fileName"></div>
+          <div class="fname" id="fileName"></div>
         </div>
         <input type="file" id="imageFile" accept="image/*" style="display:none" onchange="onFileChange()">
       </div>
-
-      <button class="add-submit-btn" id="addBtn" onclick="addSubjects()">
-        <i class="ti ti-plus" style="font-size:16px"></i>
+      <button class="btn-add" id="addBtn" onclick="addSubjects()">
+        <i class="ti ti-plus" style="font-size:15px"></i>
         <span id="addBtnLabel">Add to Queue</span>
       </button>
     </div>
   </div>
 
-  <br>
-
-  <!-- RUN BUTTON -->
-  <button class="run-btn" id="runBtn" onclick="triggerManual()">
-    <div class="bi">
-      <i class="ti ti-player-play" id="runIcon" style="font-size:18px"></i>
-      <span id="runLabel">Run Batch Now — Manual Trigger</span>
-    </div>
+  <!-- Run -->
+  <button class="btn-run" id="runBtn" onclick="triggerManual()">
+    <i class="ti ti-player-play" id="runIcon" style="font-size:17px"></i>
+    <span id="runLabel">Run Batch Now — Manual Trigger</span>
   </button>
 
-  <!-- LOG -->
+  <!-- Log -->
   <div class="log-wrap">
-    <div class="log-head"><i class="ti ti-terminal-2" style="font-size:13px;vertical-align:-2px"></i>&nbsp; Activity Log</div>
+    <div class="log-head"><i class="ti ti-terminal-2" style="font-size:12px;vertical-align:-1px"></i> &nbsp;Activity Log</div>
     <div class="log-lines" id="logBox">
-      <div class="l-line"><span class="l-t">[--:--:--]</span>&nbsp;<span class="l-info">Connecting to Flask agent...</span></div>
+      <div class="l-line"><span class="l-t">[--:--:--]</span>&nbsp;<span class="l-info">Connecting to Flask agent…</span></div>
     </div>
   </div>
 
 </div>
-</div>
 
-<!-- ══════════════════════════════════════════════════════
-  JAVASCRIPT
-══════════════════════════════════════════════════════ -->
 <script>
-const API = window.location.origin + '/api';
+/* ── CONFIG ── */
+const API         = window.location.origin + '/api';
 const SESSION_KEY = 'li_session';
 const SESSION_MS  = 24 * 60 * 60 * 1000;
 const WARN_BEFORE = 30 * 60 * 1000;
 
-/* ── TIMEZONE HELPERS ── */
-function getUTCOffset() {
-  // getTimezoneOffset() returns minutes BEHIND UTC; negate to get offset
-  return -(new Date().getTimezoneOffset() / 60);
-}
-
-function formatOffset(hours) {
-  if (hours === null || hours === undefined) return 'UTC';
-  const sign = hours >= 0 ? '+' : '-';
-  const abs  = Math.abs(hours);
-  const h    = Math.floor(abs);
-  const m    = Math.round((abs - h) * 60);
-  return m > 0 ? `UTC${sign}${h}:${String(m).padStart(2,'0')}` : `UTC${sign}${h}`;
-}
-
-function getLocalTZName() {
-  try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch(e) { return ''; }
-}
-
-/* ── SESSION STORAGE ── */
-function setSession(username) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify({
-    username, loginAt: Date.now(), expiresAt: Date.now() + SESSION_MS
-  }));
-}
-function getSession()       { try { return JSON.parse(localStorage.getItem(SESSION_KEY)) || null; } catch { return null; } }
+/* ── SESSION ── */
+function getSession(){ try{return JSON.parse(localStorage.getItem(SESSION_KEY))||null;}catch{return null;} }
+function isSessionValid(){ const s=getSession(); return s&&Date.now()<s.expiresAt; }
+function msLeft(){ const s=getSession(); return s?Math.max(0,s.expiresAt-Date.now()):0; }
 function clearLocalSession(){ localStorage.removeItem(SESSION_KEY); }
-function isSessionValid()   { const s = getSession(); return s && Date.now() < s.expiresAt; }
-function msLeft()           { const s = getSession(); return s ? Math.max(0, s.expiresAt - Date.now()) : 0; }
 
-/* ── PAGE SWITCHING ── */
-function showPage(id) {
-  ['authPage','setupPage'].forEach(p => {
-    const el = document.getElementById(p);
-    if (el) el.classList.toggle('active', p === id);
-  });
-  document.getElementById('dashPage').style.display = id === 'dashPage' ? 'block' : 'none';
+/* ── TIMEZONE ── */
+function getUTCOffset(){ return -(new Date().getTimezoneOffset()/60); }
+function formatOffset(h){
+  if(h===null||h===undefined) return 'UTC';
+  const s=h>=0?'+':'-',a=Math.abs(h),hh=Math.floor(a),mm=Math.round((a-hh)*60);
+  return mm>0?`UTC${s}${hh}:${String(mm).padStart(2,'0')}`:`UTC${s}${hh}`;
+}
+function getLocalTZName(){ try{return Intl.DateTimeFormat().resolvedOptions().timeZone;}catch{return '';} }
+
+/* ── HELPERS ── */
+function pad(n){ return String(n).padStart(2,'0'); }
+function fmtLeft(ms){
+  const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000),s=Math.floor((ms%60000)/1000);
+  return h>0?`${h}h ${m}m`:m>0?`${m}m ${s}s`:`${s}s`;
 }
 
-/* ── AUTH TABS ── */
-let currentTab = 'login';
-function switchTab(tab) {
-  currentTab = tab;
-  document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
-  document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
-  document.getElementById('passConfirmField').style.display = tab === 'register' ? 'block' : 'none';
-  document.getElementById('authBtn').textContent  = tab === 'login' ? 'Sign In' : 'Create Account';
-  document.getElementById('authSub').textContent  = tab === 'login' ? 'Sign in to your account' : 'Create a new account';
-  document.getElementById('authErr').classList.remove('show');
-  document.getElementById('authUser').value = '';
-  document.getElementById('authPass').value = '';
-  document.getElementById('authPassConfirm').value = '';
-}
-
-async function doAuth() {
-  const u  = document.getElementById('authUser').value.trim();
-  const p  = document.getElementById('authPass').value;
-  const pc = document.getElementById('authPassConfirm').value;
-  const btn = document.getElementById('authBtn');
-
-  document.getElementById('authErr').classList.remove('show');
-  if (!u || !p) { showAuthErr('Please fill in all fields.'); return; }
-
-  if (currentTab === 'register') {
-    if (p !== pc) { showAuthErr('Passwords do not match.'); return; }
-    if (p.length < 6) { showAuthErr('Password must be at least 6 characters.'); return; }
-  }
-
-  btn.disabled = true;
-  btn.textContent = currentTab === 'login' ? 'Signing in...' : 'Creating account...';
-
-  try {
-    const res  = await fetch(`${API}/${currentTab === 'login' ? 'login' : 'register'}`, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: u,
-        password: p,
-        utc_offset_hours: getUTCOffset()   // ← send timezone on every auth
-      })
-    });
-    const data = await res.json();
-    if (data.ok) {
-      setSession(data.username);
-      if (data.has_config) { goToDash(); }
-      else { showPage('setupPage'); }
-    } else {
-      showAuthErr(data.message || 'Authentication failed.');
-      btn.disabled = false;
-      btn.textContent = currentTab === 'login' ? 'Sign In' : 'Create Account';
-    }
-  } catch(e) {
-    showAuthErr('Cannot reach server. Make sure python app.py is running.');
-    btn.disabled = false;
-    btn.textContent = currentTab === 'login' ? 'Sign In' : 'Create Account';
-  }
-}
-
-function showAuthErr(msg) {
-  document.getElementById('authErrMsg').textContent = msg;
-  document.getElementById('authErr').classList.add('show');
-}
-
-/* ── API SETUP ── */
-async function saveConfig() {
-  const btn   = document.getElementById('setupSaveBtn');
-  const errEl = document.getElementById('setupErr');
-  const okEl  = document.getElementById('setupOk');
-  errEl.classList.remove('show'); okEl.classList.remove('show');
-
-  // Read all values first
-  const groq    = document.getElementById('cfgGroq').value.trim();
-  const buffer  = document.getElementById('cfgBuffer').value.trim();
-  const serp    = document.getElementById('cfgSerp').value.trim();
-  const ch1     = document.getElementById('cfgCh1').value.trim();
-  const ch2     = document.getElementById('cfgCh2').value.trim();       // optional
-  const ch3     = document.getElementById('cfgCh3').value.trim();       // optional
-  const ch4     = document.getElementById('cfgCh4').value.trim();
-  const chName4 = document.getElementById('cfgChName4').value.trim();
-  const chName1 = document.getElementById('cfgChName1').value.trim();
-  const chName2 = document.getElementById('cfgChName2').value.trim();   // optional
-  const chName3 = document.getElementById('cfgChName3').value.trim();   // optional
-
-  // Validate — only Groq, Buffer key, and Channel 1 are required
-  if (!groq || !buffer) {
-    document.getElementById('setupErrMsg').textContent = 'Groq and Buffer API key are required.';
-    errEl.classList.add('show'); return;
-  }
-  if (!ch1) {
-    document.getElementById('setupErrMsg').textContent = 'Channel 1 ID is required. Channels 2 and 3 are optional.';
-    errEl.classList.add('show'); return;
-  }
-
-  btn.disabled = true; btn.textContent = 'Saving...';
-
-  try {
-    const payload = {
-      groq_api_key: groq,
-      buffer_api_key: buffer,
-      serpapi_key: serp,
-      buffer_channel_1: ch1,
-      buffer_channel_1_name: chName1 || 'Channel 1',
-    };
-    // Only include ch2/ch3 if provided (optional)
-    if (ch2) { payload.buffer_channel_2 = ch2; payload.buffer_channel_2_name = chName2 || 'Channel 2'; }
-    if (ch3) { payload.buffer_channel_3 = ch3; payload.buffer_channel_3_name = chName3 || 'Channel 3'; }
-    if (ch4) { payload.buffer_channel_4 = ch4; payload.buffer_channel_4_name = chName4 || 'Facebook Page'; }
-    
-    const res  = await fetch(`${API}/config`, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-    if (data.ok) {
-      document.getElementById('setupOkMsg').textContent = 'Configuration saved! Redirecting...';
-      okEl.classList.add('show');
-      setTimeout(goToDash, 900);
-    } else {
-      document.getElementById('setupErrMsg').textContent = data.message || 'Save failed.';
-      errEl.classList.add('show');
-      btn.disabled = false; btn.textContent = 'Save & Go to Dashboard';
-    }
-  } catch(e) {
-    document.getElementById('setupErrMsg').textContent = 'Cannot reach server.';
-    errEl.classList.add('show');
-    btn.disabled = false; btn.textContent = 'Save & Go to Dashboard';
-  }
-}
-
-function showSetup() {
-  stopDashboard();
-  showPage('setupPage');
-  document.getElementById('setupSaveBtn').disabled    = false;
-  document.getElementById('setupSaveBtn').textContent = 'Save & Go to Dashboard';
-  document.getElementById('setupErr').classList.remove('show');
-  document.getElementById('setupOk').classList.remove('show');
-}
-
-/* ── DASHBOARD ── */
-function goToDash() {
-  showPage('dashPage');
-  startDashboard();
-}
-
-async function doLogout() {
-  try { await fetch(`${API}/logout`, { method: 'POST', credentials: 'include' }); } catch(e) {}
+/* ── LOGOUT ── */
+async function doLogout(){
+  try{ await fetch(`${API}/logout`,{method:'POST',credentials:'include'}); } catch(e){}
   clearLocalSession();
-  stopDashboard();
-  showPage('authPage');
-  switchTab('login');
+  window.location.href='login.html';
 }
 
-/* ── MODE SELECTOR ── */
-let currentMode = 'no_image';
-function setMode(mode) {
-  currentMode = mode;
-  ['no_image','auto_image','manual_image'].forEach(m => {
-    const id  = m === 'no_image' ? 'modeNoImg' : m === 'auto_image' ? 'modeAutoImg' : 'modeManualImg';
-    const cls = m === 'no_image' ? 'no-img'    : m === 'auto_image' ? 'auto-img'    : 'manual-img';
-    const el  = document.getElementById(id);
-    el.classList.toggle('active', m === mode);
+/* ── BOOT: auth check ── */
+(async function(){
+  if(!isSessionValid()){
+    try{
+      const r=await fetch(`${API}/me`,{credentials:'include'});
+      const d=await r.json();
+      if(!d.authenticated){ window.location.href='login.html'; return; }
+    } catch(e){ window.location.href='login.html'; return; }
+  }
+  startDashboard();
+})();
+
+/* ── COUNTDOWN ── */
+let nextRunTarget=null;
+function tickNum(el,val){
+  if(el.textContent!==val){ el.classList.add('tick'); el.textContent=val; setTimeout(()=>el.classList.remove('tick'),100); }
+}
+function updateCountdown(){
+  if(!nextRunTarget) return;
+  const diff=nextRunTarget-new Date();
+  if(diff<=0){ ['th','tm','ts'].forEach(id=>tickNum(document.getElementById(id),'00')); return; }
+  tickNum(document.getElementById('th'),pad(Math.floor(diff/3600000)));
+  tickNum(document.getElementById('tm'),pad(Math.floor((diff%3600000)/60000)));
+  tickNum(document.getElementById('ts'),pad(Math.floor((diff%60000)/1000)));
+  document.getElementById('progFill').style.width=Math.min(100,(86400000-diff)/86400000*100).toFixed(2)+'%';
+}
+
+/* ── TZ BANNER ── */
+function updateTzBanner(offset){
+  const tz=getLocalTZName(), fmt=formatOffset(offset!==null&&offset!==undefined?offset:getUTCOffset());
+  document.getElementById('tzBannerText').textContent = tz
+    ? `Your timezone: ${tz} (${fmt}) · Scheduler fires at 08:00 your local time`
+    : `Your timezone: ${fmt} · Scheduler fires at 08:00 your local time`;
+  document.getElementById('tzBanner').classList.add('show');
+}
+
+/* ── API BADGES ── */
+function updateApiBadges(cfg){
+  [['badgeGroq','groq_api_key'],['badgeBuffer','buffer_api_key'],['badgeSerp','serpapi_key']].forEach(([id,key])=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.querySelector('.api-dot').className='api-dot '+(cfg&&cfg[key]?'dot-ok':'dot-warn');
   });
-  document.getElementById('panelAuto').classList.toggle('show', mode === 'auto_image');
-  document.getElementById('panelManual').classList.toggle('show', mode === 'manual_image');
-  const labels = {
-    no_image:     'Add to Queue — Text Only',
-    auto_image:   'Add to Queue — Auto Image',
-    manual_image: 'Add to Queue — With Image'
-  };
-  document.getElementById('addBtnLabel').textContent = labels[mode];
-  // Show SerpAPI warning if auto image selected and key missing
-  if (mode === 'auto_image') checkSerpKey();
-  else { const w = document.getElementById('serpWarn'); if(w) w.style.display='none'; }
 }
 
-function checkSerpKey() {
-  const warn = document.getElementById('serpWarn');
-  if (!warn) return;
-  // Check badge dot — dot-warn means key not set
-  const dot = document.querySelector('#badgeSerp .api-dot');
-  const missing = dot && dot.classList.contains('dot-warn');
-  warn.style.display = missing ? 'block' : 'none';
-}
-
-function onFileChange() {
-  const f  = document.getElementById('imageFile').files[0];
-  const dz = document.getElementById('uploadDropzone');
-  const fn = document.getElementById('fileName');
-  if (f) { fn.textContent = f.name; dz.classList.add('has-file'); }
-  else   { fn.textContent = '';      dz.classList.remove('has-file'); }
-}
-
-/* ── ADD SUBJECTS ── */
-async function addSubjects() {
-  const ta    = document.getElementById('newSubjects');
-  const btn   = document.getElementById('addBtn');
-  const lines = ta.value.split('\n').map(s => s.trim()).filter(Boolean);
-  if (!lines.length) return;
-
-  if (currentMode === 'manual_image') {
-    const fi = document.getElementById('imageFile');
-    if (!fi.files.length) { alert('Please select an image first.'); return; }
-  }
-
-  const origHTML = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<i class="ti ti-loader-2 spin" style="font-size:16px"></i> Processing...';
-
-  let payload = { subjects: lines, mode: currentMode };
-
-  if (currentMode === 'manual_image') {
-    const file = document.getElementById('imageFile').files[0];
-    payload.filename     = file.name;
-    payload.image_base64 = await new Promise(res => {
-      const r = new FileReader();
-      r.onload = e => res(e.target.result);
-      r.readAsDataURL(file);
-    });
-  }
-
-  try {
-    const res  = await fetch(`${API}/subjects`, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-    if (data.ok) {
-      ta.value = '';
-      document.getElementById('imageFile').value = '';
-      document.getElementById('fileName').textContent = '';
-      document.getElementById('uploadDropzone').classList.remove('has-file');
-      fetchStatus();
-    } else {
-      alert(data.message || 'Failed to add subjects.');
-    }
-  } catch(e) { alert('Cannot reach server.'); }
-  finally    { btn.innerHTML = origHTML; btn.disabled = false; }
-}
-
-/* ── DASHBOARD POLLING ── */
-let nextRunTarget = null, connected = false, prevLogLen = 0;
-let dashIntervals = [], sessionWatcher = null;
-
-function pad(n) { return String(n).padStart(2, '0'); }
-function tickNum(el, val) {
-  if (el.textContent !== val) {
-    el.classList.add('tick'); el.textContent = val;
-    setTimeout(() => el.classList.remove('tick'), 100);
-  }
-}
-
-function updateCountdown() {
-  if (!nextRunTarget) return;
-  const diff = nextRunTarget - new Date();
-  if (diff <= 0) {
-    ['th','tm','ts'].forEach(id => tickNum(document.getElementById(id), '00'));
+/* ── SUBJECTS ── */
+function renderSubjects(subjects){
+  document.getElementById('subjLeft').textContent=subjects.length;
+  document.getElementById('queueChip').textContent=subjects.length+' subject'+(subjects.length!==1?'s':'');
+  const list=document.getElementById('subjectList');
+  if(!subjects.length){
+    list.innerHTML='<div class="empty-st"><i class="ti ti-inbox" style="font-size:22px;display:block;margin-bottom:5px"></i>Queue empty — add subjects above</div>';
     return;
   }
-  tickNum(document.getElementById('th'), pad(Math.floor(diff / 3600000)));
-  tickNum(document.getElementById('tm'), pad(Math.floor((diff % 3600000) / 60000)));
-  tickNum(document.getElementById('ts'), pad(Math.floor((diff % 60000) / 1000)));
-  document.getElementById('progFill').style.width =
-    Math.min(100, ((86400000 - diff) / 86400000 * 100)).toFixed(2) + '%';
-}
-
-function renderSubjects(subjects) {
-  document.getElementById('subjLeft').textContent = subjects.length;
-  document.getElementById('queueChip').textContent = subjects.length + ' subject' + (subjects.length !== 1 ? 's' : '');
-  const list = document.getElementById('subjectList');
-  if (!subjects.length) {
-    list.innerHTML = '<div class="empty-state"><i class="ti ti-inbox" style="font-size:24px;display:block;margin-bottom:6px"></i>Queue empty — add subjects above</div>';
-    return;
-  }
-  list.innerHTML = subjects.slice(0, 8).map((s, i) => {
-    const isNext     = i < 2;
-    const hasManual  = s.includes('| IMG:');
-    const hasAuto    = s.toLowerCase().includes('(create image)');
-    const clean      = s.split('| IMG:')[0].replace('(create image)', '').trim();
-    const tag        = hasManual
-      ? `<span class="si-tag tag-img">manual img</span>`
-      : hasAuto
-        ? `<span class="si-tag tag-auto">auto img</span>`
-        : `<span class="si-tag tag-txt">text</span>`;
-    return `<div class="subj-item${isNext ? ' next' : ''}">
-      <span class="si-num">${pad(i + 1)}</span>
-      <span class="si-text" style="color:${isNext ? 'var(--text)' : 'var(--muted)'}">${clean}</span>
+  list.innerHTML=subjects.slice(0,8).map((s,i)=>{
+    const isNext=i<2, hasManual=s.includes('| IMG:'), hasAuto=s.toLowerCase().includes('(create image)');
+    const clean=s.split('| IMG:')[0].replace('(create image)','').trim();
+    const tag=hasManual?'<span class="si-tag tag-img">manual img</span>':hasAuto?'<span class="si-tag tag-auto">auto img</span>':'<span class="si-tag tag-txt">text</span>';
+    return `<div class="subj-item${isNext?' next':''}">
+      <span class="si-num">${pad(i+1)}</span>
+      <span class="si-text" style="color:${isNext?'var(--text)':'var(--muted)'}">${clean}</span>
       ${tag}</div>`;
-  }).join('') + (subjects.length > 8
-    ? `<div style="text-align:center;padding:8px;font-size:12px;color:var(--muted)">+${subjects.length - 8} more</div>`
-    : '');
+  }).join('')+(subjects.length>8?`<div style="text-align:center;padding:7px;font-size:11px;color:var(--muted)">+${subjects.length-8} more</div>`:'');
 }
 
-function renderLogs(logs) {
-  if (!logs || logs.length === prevLogLen) return;
-  prevLogLen = logs.length;
-  const box = document.getElementById('logBox');
-  box.innerHTML = logs.map(l =>
-    `<div class="l-line"><span class="l-t">[${l.time}]</span>&nbsp;<span class="l-${l.level === 'ok' ? 'ok' : l.level === 'error' ? 'err' : l.level === 'warn' ? 'warn' : 'info'}">${l.msg}</span></div>`
-  ).join('');
-  box.scrollTop = box.scrollHeight;
+/* ── LOGS ── */
+let prevLogLen=0;
+function renderLogs(logs){
+  if(!logs||logs.length===prevLogLen) return;
+  prevLogLen=logs.length;
+  const box=document.getElementById('logBox');
+  box.innerHTML=logs.map(l=>{
+    const cls=l.level==='ok'?'l-ok':l.level==='error'?'l-err':l.level==='warn'?'l-warn':'l-info';
+    return `<div class="l-line"><span class="l-t">[${l.time}]</span>&nbsp;<span class="${cls}">${l.msg}</span></div>`;
+  }).join('');
+  box.scrollTop=box.scrollHeight;
 }
 
-function updateApiBadges(cfg) {
-  const set = (id, key) => {
-    const el  = document.getElementById(id);
-    const dot = el.querySelector('.api-dot');
-    dot.className = 'api-dot ' + (cfg && cfg[key] ? 'dot-ok' : 'dot-warn');
-  };
-  set('badgeGroq',   'groq_api_key');
-  set('badgeBuffer', 'buffer_api_key');
-  set('badgeSerp',   'serpapi_key');
-}
-
-function updateTzBanner(offset) {
-  const banner = document.getElementById('tzBanner');
-  const text   = document.getElementById('tzBannerText');
-  const tzName = getLocalTZName();
-  const fmtOff = formatOffset(offset !== null && offset !== undefined ? offset : getUTCOffset());
-  if (tzName) {
-    text.textContent = `Your timezone: ${tzName} (${fmtOff}) · Scheduler fires at 08:00 your local time`;
-  } else {
-    text.textContent = `Your timezone: ${fmtOff} · Scheduler fires at 08:00 your local time`;
-  }
-  banner.classList.remove('hidden');
-}
-
-async function fetchStatus() {
-  try {
-    const res = await fetch(`${API}/status`, { credentials: 'include' });
-    if (res.status === 401) { doLogout(); return; }
-    const data = await res.json();
-    connected = true;
-    document.getElementById('connBanner').classList.remove('show');
-
-    // next_run_iso comes back as UTC; parse directly
-    nextRunTarget = new Date(data.next_run_iso);
-
-    const chip = document.getElementById('statusChip');
-    const lbl  = document.getElementById('statusLabel');
-    chip.classList.toggle('running', data.running);
-    lbl.textContent = data.running ? 'Running' : 'Waiting';
-
-    document.getElementById('todayCount').textContent = data.today_count;
-    document.getElementById('totalRun').textContent   = data.total_run;
-
-    const btn = document.getElementById('runBtn');
-    btn.disabled = data.running;
-    document.getElementById('runIcon').className = data.running ? 'ti ti-loader-2 spin' : 'ti ti-player-play';
-    document.getElementById('runLabel').textContent  = data.running ? 'Batch Running...' : 'Run Batch Now — Manual Trigger';
-
-    renderSubjects(data.subjects || []);
-    renderLogs(data.logs || []);
-    if (data.config) updateApiBadges(data.config);
-    if (data.channels_info) renderChannels(data);
-
-    // Update TZ banner with server-stored offset
-    updateTzBanner(data.utc_offset);
-
-  } catch(e) {
-    if (connected) {
-      connected = false;
-      document.getElementById('connBanner').classList.add('show');
-      document.getElementById('statusLabel').textContent = 'Offline';
-    }
-  }
-}
-
-async function triggerManual() {
-  try {
-    const res  = await fetch(`${API}/run`, { method: 'POST', credentials: 'include' });
-    const data = await res.json();
-    if (!data.ok) alert(data.message);
-    else fetchStatus();
-  } catch(e) { alert('Cannot reach server.'); }
-}
-
-/* ── SESSION WATCH ── */
-function fmtLeft(ms) {
-  const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000), s = Math.floor((ms % 60000) / 1000);
-  return h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s}s` : `${s}s`;
-}
-
-function watchSession() {
-  if (!isSessionValid()) { doLogout(); return; }
-  const left   = msLeft();
-  const banner = document.getElementById('expiryBanner');
-  banner.classList.toggle('show', left < WARN_BEFORE);
-  if (left < WARN_BEFORE) document.getElementById('expiryCountdown').textContent = fmtLeft(left);
-}
-
-/* ── CHANNEL TOGGLE RENDER ── */
-let _chConfig = {};
-
-function renderChannels(statusData) {
-  const channels  = statusData.channels_info || [];
-  const container = document.getElementById('channelToggles');
-  const chip      = document.getElementById('activeChipLabel');
-  if (!container) return;
-
-  // Only show channel 1 always + ch2/ch3 only if they have an ID configured
-  const visible = channels.filter(ch => ch.slot === 1 || ch.exists);
-
-  // Adjust grid columns based on how many visible
-  container.style.gridTemplateColumns = visible.length === 1
-    ? '1fr' : visible.length === 2 ? '1fr 1fr' : visible.length === 3 ? '1fr 1fr 1fr' : '1fr 1fr';
-  
-  let html = '';
-  visible.forEach(ch => {
-    const isOn   = ch.active && ch.exists;
-    const canDel = ch.slot > 1;   // ch2 & ch3 always deletable when visible
-
-    html += `<div class="ch-toggle${isOn ? ' active' : ''}${!ch.exists ? ' no-id' : ''}"
-                  onclick="toggleChannel(${ch.slot})"
-                  title="${ch.exists ? (isOn ? 'Click to turn OFF' : 'Click to turn ON') : 'Not configured'}">
-      ${canDel ? `<button class="ch-del-btn" onclick="event.stopPropagation();deleteChannel(${ch.slot})" title="Delete channel ${ch.slot}">✕</button>` : ''}
+/* ── CHANNELS ── */
+function renderChannels(statusData){
+  const channels=statusData.channels_info||[];
+  const container=document.getElementById('channelToggles');
+  const chip=document.getElementById('activeChipLabel');
+  if(!container) return;
+  const visible=channels.filter(ch=>ch.slot===1||ch.exists);
+  container.style.gridTemplateColumns=visible.length===1?'1fr':visible.length===2?'1fr 1fr':'1fr 1fr 1fr';
+  let html='';
+  visible.forEach(ch=>{
+    const isOn=ch.active&&ch.exists, canDel=ch.slot>1;
+    html+=`<div class="ch-toggle${isOn?' active':''}${!ch.exists?' no-id':''}" onclick="toggleChannel(${ch.slot})" title="${ch.exists?(isOn?'Click to turn OFF':'Click to turn ON'):'Not configured'}">
+      ${canDel?`<button class="ch-del" onclick="event.stopPropagation();deleteChannel(${ch.slot})">✕</button>`:''}
       <div class="ch-toggle-row">
-        <div class="ch-indicator"></div>
+        <div class="ch-ind"></div>
         <span class="ch-name">${ch.name}</span>
-        <div class="pill-switch"><div class="knob"></div></div>
+        <div class="pill-sw"><div class="knob"></div></div>
       </div>
-      <div style="margin-top:4px">
-        <span class="ch-slot">${ch.exists ? (isOn ? '● ACTIVE' : '○ off') : 'not configured'}</span>
-      </div>
+      <div class="ch-state">${ch.exists?(isOn?'● ACTIVE':'○ off'):'not configured'}</div>
     </div>`;
   });
-
-  // If ch2 or ch3 slots are missing, show an "+ Add Channel" hint card
-  const missingSlots = [2, 3, 4].filter(s => !channels.find(c => c.slot === s && c.exists));
-  if (missingSlots.length > 0) {
-    html += `<div class="ch-toggle no-id" onclick="showSetup()" title="Add channels in API Settings"
-                  style="border-style:dashed;justify-content:center;align-items:center;flex-direction:row;gap:8px;opacity:.5;cursor:pointer;pointer-events:all">
-      <i class="ti ti-plus" style="font-size:16px;color:var(--muted)"></i>
-      <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">Add Channel</span>
+  const hasGaps=[2,3,4].some(s=>!channels.find(c=>c.slot===s&&c.exists));
+  if(hasGaps){
+    html+=`<div class="ch-toggle no-id" onclick="window.location.href='api.html'" title="Add channels in API Settings"
+      style="border-style:dashed;justify-content:center;align-items:center;flex-direction:row;gap:7px;opacity:.5;cursor:pointer;pointer-events:all">
+      <i class="ti ti-plus" style="font-size:15px;color:var(--muted)"></i>
+      <span style="font-size:10px;color:var(--muted);font-family:var(--mono)">Add Channel</span>
     </div>`;
   }
-
-  container.innerHTML = html;
-
-  // Chip shows count of active channels
-  const activeCount = channels.filter(c => c.active && c.exists).length;
-  const activeNames = channels.filter(c => c.active && c.exists).map(c => c.name).join(', ');
-  chip.textContent = activeCount > 0 ? `${activeCount} active` : 'None active';
-  chip.style.color = activeCount > 0 ? 'var(--green)' : 'var(--red)';
-  chip.title       = activeNames || 'No channels active';
+  container.innerHTML=html;
+  const ac=channels.filter(c=>c.active&&c.exists).length;
+  chip.textContent=ac>0?`${ac} active`:'None active';
+  chip.style.color=ac>0?'var(--green)':'var(--red)';
 }
 
-async function toggleChannel(num) {
-  try {
-    const res  = await fetch(`${API}/channel/toggle`, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channel: num })
-    });
-    const data = await res.json();
-    if (data.ok) fetchStatus();
-    else { alert(data.message); }
-  } catch(e) { alert('Cannot reach server.'); }
+async function toggleChannel(num){
+  try{
+    const r=await fetch(`${API}/channel/toggle`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({channel:num})});
+    const d=await r.json();
+    if(d.ok) fetchStatus(); else alert(d.message);
+  } catch(e){ alert('Cannot reach server.'); }
 }
 
-async function deleteChannel(num) {
-  if (!confirm(`Delete Channel ${num}? This removes it from your config permanently.`)) return;
-  try {
-    const res  = await fetch(`${API}/channel/delete`, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channel: num })
-    });
-    const data = await res.json();
-    if (data.ok) { fetchStatus(); fetchConfig(); }
-    else alert(data.message);
-  } catch(e) { alert('Cannot reach server.'); }
+async function deleteChannel(num){
+  if(!confirm(`Delete Channel ${num}?`)) return;
+  try{
+    const r=await fetch(`${API}/channel/delete`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({channel:num})});
+    const d=await r.json();
+    if(d.ok) fetchStatus(); else alert(d.message);
+  } catch(e){ alert('Cannot reach server.'); }
 }
 
-/* ── CLEAR CHANNEL ROW (setup page delete button) ── */
-async function clearChannelRow(slot) {
-  if (!confirm(`Delete Channel ${slot}? This clears both the name and ID from your config.`)) return;
-
-  // Clear the input fields immediately in the UI
-  document.getElementById(`cfgCh${slot}`).value     = '';
-  document.getElementById(`cfgChName${slot}`).value = '';
-
-  // Call backend to wipe from config.json
-  try {
-    const res  = await fetch(`${API}/channel/delete`, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channel: slot })
-    });
-    const data = await res.json();
-    if (data.ok) {
-      // Show green confirmation briefly
-      const row = document.getElementById(`chRow${slot}`);
-      if (row) {
-        row.style.border = '1px solid rgba(0,229,160,.3)';
-        row.style.background = 'rgba(0,229,160,.04)';
-        setTimeout(() => {
-          row.style.border = '';
-          row.style.background = 'var(--surface3)';
-        }, 1500);
-      }
-    } else {
-      alert(data.message || 'Delete failed.');
-    }
-  } catch(e) {
-    alert('Cannot reach server.');
+/* ── STATUS POLL ── */
+let connected=false;
+async function fetchStatus(){
+  try{
+    const r=await fetch(`${API}/status`,{credentials:'include'});
+    if(r.status===401){ doLogout(); return; }
+    const d=await r.json();
+    connected=true;
+    document.getElementById('connBanner').classList.remove('show');
+    nextRunTarget=new Date(d.next_run_iso);
+    const chip=document.getElementById('statusChip');
+    chip.classList.toggle('running',d.running);
+    document.getElementById('statusLabel').textContent=d.running?'Running':'Waiting';
+    document.getElementById('todayCount').textContent=d.today_count;
+    document.getElementById('totalRun').textContent=d.total_run;
+    const rb=document.getElementById('runBtn');
+    rb.disabled=d.running;
+    document.getElementById('runIcon').className=d.running?'ti ti-loader-2 spin':'ti ti-player-play';
+    document.getElementById('runLabel').textContent=d.running?'Batch Running…':'Run Batch Now — Manual Trigger';
+    renderSubjects(d.subjects||[]);
+    renderLogs(d.logs||[]);
+    if(d.config){ updateApiBadges(d.config); }
+    if(d.channels_info) renderChannels(d);
+    updateTzBanner(d.utc_offset);
+  } catch(e){
+    if(connected){ connected=false; document.getElementById('connBanner').classList.add('show'); document.getElementById('statusLabel').textContent='Offline'; }
   }
 }
 
-function startDashboard() {
-  connected = false; prevLogLen = 0;
+async function triggerManual(){
+  try{
+    const r=await fetch(`${API}/run`,{method:'POST',credentials:'include'});
+    const d=await r.json();
+    if(!d.ok) alert(d.message); else fetchStatus();
+  } catch(e){ alert('Cannot reach server.'); }
+}
+
+/* ── SESSION WATCHER ── */
+function watchSession(){
+  if(!isSessionValid()){ doLogout(); return; }
+  const left=msLeft();
+  const banner=document.getElementById('expiryBanner');
+  banner.classList.toggle('show',left<WARN_BEFORE);
+  if(left<WARN_BEFORE) document.getElementById('expiryCountdown').textContent=fmtLeft(left);
+}
+
+/* ── ADD MODE ── */
+let currentMode='no_image';
+function setMode(mode){
+  currentMode=mode;
+  document.getElementById('modeNoImg').classList.toggle('active',mode==='no_image');
+  document.getElementById('modeAutoImg').classList.toggle('active',mode==='auto_image');
+  document.getElementById('modeManualImg').classList.toggle('active',mode==='manual_image');
+  document.getElementById('panelAuto').classList.toggle('show',mode==='auto_image');
+  document.getElementById('panelManual').classList.toggle('show',mode==='manual_image');
+  const labels={no_image:'Add to Queue — Text Only',auto_image:'Add to Queue — Auto Image',manual_image:'Add to Queue — With Image'};
+  document.getElementById('addBtnLabel').textContent=labels[mode];
+  if(mode==='auto_image'){
+    const dot=document.querySelector('#badgeSerp .api-dot');
+    document.getElementById('serpWarn').style.display=(dot&&dot.classList.contains('dot-warn'))?'block':'none';
+  } else { document.getElementById('serpWarn').style.display='none'; }
+}
+
+function onFileChange(){
+  const f=document.getElementById('imageFile').files[0];
+  const dz=document.getElementById('uploadDropzone');
+  const fn=document.getElementById('fileName');
+  if(f){ fn.textContent=f.name; dz.classList.add('has-file'); }
+  else { fn.textContent=''; dz.classList.remove('has-file'); }
+}
+
+async function addSubjects(){
+  const ta=document.getElementById('newSubjects');
+  const btn=document.getElementById('addBtn');
+  const lines=ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!lines.length) return;
+  if(currentMode==='manual_image'&&!document.getElementById('imageFile').files.length){ alert('Please select an image first.'); return; }
+  const orig=btn.innerHTML;
+  btn.disabled=true; btn.innerHTML='<i class="ti ti-loader-2 spin" style="font-size:15px"></i> Processing…';
+  const payload={subjects:lines,mode:currentMode};
+  if(currentMode==='manual_image'){
+    const file=document.getElementById('imageFile').files[0];
+    payload.filename=file.name;
+    payload.image_base64=await new Promise(res=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.readAsDataURL(file); });
+  }
+  try{
+    const r=await fetch(`${API}/subjects`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const d=await r.json();
+    if(d.ok){ ta.value=''; document.getElementById('imageFile').value=''; document.getElementById('fileName').textContent=''; document.getElementById('uploadDropzone').classList.remove('has-file'); fetchStatus(); }
+    else alert(d.message||'Failed to add subjects.');
+  } catch(e){ alert('Cannot reach server.'); }
+  finally{ btn.innerHTML=orig; btn.disabled=false; }
+}
+
+/* ── LIFECYCLE ── */
+let dashIntervals=[];
+function startDashboard(){
   fetchStatus();
-  fetchConfig();
-  dashIntervals.push(setInterval(updateCountdown, 1000));
-  dashIntervals.push(setInterval(fetchStatus, 2000));
-  sessionWatcher = setInterval(watchSession, 10000);
+  dashIntervals.push(setInterval(updateCountdown,1000));
+  dashIntervals.push(setInterval(fetchStatus,2000));
+  dashIntervals.push(setInterval(watchSession,10000));
   watchSession();
 }
 
-function stopDashboard() {
-  dashIntervals.forEach(clearInterval); dashIntervals = [];
-  if (sessionWatcher) { clearInterval(sessionWatcher); sessionWatcher = null; }
-}
-
-async function fetchConfig() {
-  try {
-    const res  = await fetch(`${API}/config`, { credentials: 'include' });
-    const data = await res.json();
-    if (data.ok) {
-      _chConfig = data.config;
-      updateApiBadges(data.config);
-      // Pre-fill setup page channel fields when opened
-      const f = (id, val) => { const el = document.getElementById(id); if(el && val && !val.includes('*')) el.value = val; };
-      f('cfgCh1',     data.config.buffer_channel_1);
-      f('cfgCh2',     data.config.buffer_channel_2);
-      f('cfgCh3',     data.config.buffer_channel_3);
-      f('cfgCh4',     data.config.buffer_channel_4);
-      f('cfgChName1', data.config.buffer_channel_1_name);
-      f('cfgChName2', data.config.buffer_channel_2_name);
-      f('cfgChName3', data.config.buffer_channel_3_name);
-      f('cfgChName4', data.config.buffer_channel_4_name);
-    }
-  } catch(e) {}
-}
-
-/* ── BOOT ── */
-(async function boot() {
-  try {
-    const res  = await fetch(`${API}/me`, { credentials: 'include' });
-    const data = await res.json();
-    if (data.authenticated && isSessionValid()) {
-      if (data.has_config) { goToDash(); }
-      else { showPage('setupPage'); }
-    } else {
-      clearLocalSession();
-      showPage('authPage');
-    }
-  } catch(e) {
-    showPage('authPage');
-  }
-})();
+/* spin class for inline use */
+const style=document.createElement('style');
+style.textContent='.spin{animation:spin .8s linear infinite}';
+document.head.appendChild(style);
 </script>
 </body>
 </html>
