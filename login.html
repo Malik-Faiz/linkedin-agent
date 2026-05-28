@@ -539,7 +539,11 @@ async function checkPing(){
     const res=await fetch(`${API.replace('/api','')}/ping`,{cache:'no-store'});
     const d=await res.json();
     dot.className='ping-dot live';
-    lbl.textContent='server live · '+d.time;
+    // Convert UTC time from server to user local time
+    const localTime = d.utc_iso
+      ? new Date(d.utc_iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})
+      : d.utc_time || d.time || '--:--:--';
+    lbl.textContent='server live · '+localTime;
   }catch(e){
     dot.className='ping-dot dead';
     lbl.textContent='server offline';
