@@ -536,14 +536,17 @@ async function checkPing(){
   const dot=document.getElementById('pingDot');
   const lbl=document.getElementById('pingLabel');
   try{
-    const res=await fetch(`${API.replace('/api','')}/ping`,{cache:'no-store'});
+    const res=await fetch(window.location.origin+'/ping',{cache:'no-store'});
     const d=await res.json();
     dot.className='ping-dot live';
-    // Convert UTC time from server to user local time
-    const localTime = d.utc_iso
-      ? new Date(d.utc_iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false})
-      : d.utc_time || d.time || '--:--:--';
-    lbl.textContent='server live · '+localTime;
+    let t='--:--';
+    if(d.utc_iso){
+      t=new Date(d.utc_iso).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+    } else if(d.utc_time){
+      const p=d.utc_time.split(':'),n=new Date();
+      t=new Date(Date.UTC(n.getUTCFullYear(),n.getUTCMonth(),n.getUTCDate(),+p[0],+p[1],+p[2])).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+    }
+    lbl.textContent='server live · '+t;
   }catch(e){
     dot.className='ping-dot dead';
     lbl.textContent='server offline';
