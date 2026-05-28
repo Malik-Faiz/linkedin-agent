@@ -186,7 +186,7 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
   <div class="divider">already have an account?</div>
 
   <div class="login-link">
-    <a href="login.html">← Sign in instead</a>
+    <a href="/login">← Sign in instead</a>
   </div>
 
   <p class="note"><span>Your keys are encrypted &amp; stored privately.</span><br>Session lasts 24 hours · timezone auto-detected.</p>
@@ -310,7 +310,7 @@ async function doRegister(){
     const data=await res.json();
     if(data.ok){
       localStorage.setItem(SESSION_KEY,JSON.stringify({username:data.username,loginAt:Date.now(),expiresAt:Date.now()+SESSION_MS}));
-      window.location.href='api.html';
+      window.location.href='/api-setup';
     } else {
       showErr(data.message||'Registration failed.');
       btn.disabled=false; lbl.textContent='Create Account';

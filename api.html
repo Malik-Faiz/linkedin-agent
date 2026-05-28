@@ -126,7 +126,7 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
       <h1>API Configuration</h1>
       <p>Connect your services to start posting</p>
     </div>
-    <a href="dashboard.html" class="back-btn">
+    <a href="/dashboard" class="back-btn">
       <i class="ti ti-layout-dashboard" style="font-size:13px"></i>
       Dashboard
     </a>
@@ -301,7 +301,7 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
     <i class="ti ti-device-floppy"></i>
     <span id="saveBtnLabel">Save &amp; Go to Dashboard</span>
   </button>
-  <button class="btn-ghost" onclick="window.location.href='dashboard.html'">
+  <button class="btn-ghost" onclick="window.location.href='/dashboard'">
     <i class="ti ti-arrow-right" style="font-size:13px"></i>
     Skip for now — go to Dashboard
   </button>
@@ -320,8 +320,8 @@ function isSessionValid(){ try{const s=JSON.parse(localStorage.getItem(SESSION_K
     try{
       const r=await fetch(`${API}/me`,{credentials:'include'});
       const d=await r.json();
-      if(!d.authenticated){ window.location.href='login.html'; return; }
-    } catch(e){ window.location.href='login.html'; return; }
+      if(!d.authenticated){ window.location.href='/login'; return; }
+    } catch(e){ window.location.href='/login'; return; }
   }
   /* pre-fill existing config */
   try{
@@ -393,7 +393,7 @@ async function saveConfig(){
     const d=await r.json();
     if(d.ok){
       showOk('Saved! Redirecting to dashboard…');
-      setTimeout(()=>window.location.href='dashboard.html',900);
+      setTimeout(()=>window.location.href='/dashboard',900);
     } else {
       showErr(d.message||'Save failed.');
       btn.disabled=false; lbl.textContent='Save & Go to Dashboard';

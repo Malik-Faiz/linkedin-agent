@@ -186,7 +186,7 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
         <div class="live-dot"></div>
         <span id="statusLabel">Connecting…</span>
       </div>
-      <a class="icon-btn" href="api.html" title="API settings">
+      <a class="icon-btn" href="/api-setup" title="API settings">
         <i class="ti ti-settings" style="font-size:13px"></i>APIs
       </a>
       <button class="icon-btn danger" onclick="doLogout()">
@@ -198,7 +198,7 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
   <!-- Banners -->
   <div class="banner expiry" id="expiryBanner">
     <i class="ti ti-clock-exclamation" style="font-size:17px;flex-shrink:0"></i>
-    <span>Session expires in <strong id="expiryCountdown">—</strong>. <a href="login.html" style="color:var(--amber)">Re-login</a> to continue.</span>
+    <span>Session expires in <strong id="expiryCountdown">—</strong>. <a href="/login" style="color:var(--amber)">Re-login</a> to continue.</span>
   </div>
   <div class="banner error" id="connBanner">
     <i class="ti ti-wifi-off" style="font-size:17px;flex-shrink:0"></i>
@@ -301,7 +301,7 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
         <div class="serp-warn" id="serpWarn">
           <i class="ti ti-alert-triangle" style="font-size:12px;vertical-align:-2px"></i>
           <strong>SerpAPI key not set.</strong> Posts sent <u>without an image</u>.<br>
-          <span style="cursor:pointer;text-decoration:underline" onclick="window.location.href='api.html'">Go to API Settings →</span>
+          <span style="cursor:pointer;text-decoration:underline" onclick="window.location.href='/api-setup'">Go to API Settings →</span>
         </div>
       </div>
       <!-- manual panel -->
@@ -369,7 +369,7 @@ function fmtLeft(ms){
 async function doLogout(){
   try{ await fetch(`${API}/logout`,{method:'POST',credentials:'include'}); } catch(e){}
   clearLocalSession();
-  window.location.href='login.html';
+  window.location.href='/login';
 }
 
 /* ── BOOT: auth check ── */
@@ -378,8 +378,8 @@ async function doLogout(){
     try{
       const r=await fetch(`${API}/me`,{credentials:'include'});
       const d=await r.json();
-      if(!d.authenticated){ window.location.href='login.html'; return; }
-    } catch(e){ window.location.href='login.html'; return; }
+      if(!d.authenticated){ window.location.href='/login'; return; }
+    } catch(e){ window.location.href='/login'; return; }
   }
   startDashboard();
 })();
@@ -472,7 +472,7 @@ function renderChannels(statusData){
   });
   const hasGaps=[2,3,4].some(s=>!channels.find(c=>c.slot===s&&c.exists));
   if(hasGaps){
-    html+=`<div class="ch-toggle no-id" onclick="window.location.href='api.html'" title="Add channels in API Settings"
+    html+=`<div class="ch-toggle no-id" onclick="window.location.href='/api-setup'" title="Add channels in API Settings"
       style="border-style:dashed;justify-content:center;align-items:center;flex-direction:row;gap:7px;opacity:.5;cursor:pointer;pointer-events:all">
       <i class="ti ti-plus" style="font-size:15px;color:var(--muted)"></i>
       <span style="font-size:10px;color:var(--muted);font-family:var(--mono)">Add Channel</span>

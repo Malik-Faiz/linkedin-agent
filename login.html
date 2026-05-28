@@ -141,7 +141,7 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
   <div class="divider">or</div>
 
   <div class="reg-link">
-    Don't have an account? <a href="register.html">Create one →</a>
+    Don't have an account? <a href="/register">Create one →</a>
   </div>
 
   <p class="note"><span>Session expires after 24 hours</span> · timezone auto-detected</p>
@@ -198,7 +198,7 @@ async function doLogin(){
     const data = await res.json();
     if(data.ok){
       setSession(data.username);
-      window.location.href = data.has_config ? 'dashboard.html' : 'api.html';
+      window.location.href = data.has_config ? '/dashboard' : '/api-setup';
     } else {
       showErr(data.message||'Invalid username or password.');
       btn.disabled=false; lbl.textContent='Sign In';
@@ -217,7 +217,7 @@ async function doLogin(){
   try{
     const res  = await fetch(`${API}/me`,{credentials:'include'});
     const data = await res.json();
-    if(data.authenticated) window.location.href = data.has_config ? 'dashboard.html' : 'api.html';
+    if(data.authenticated) window.location.href = data.has_config ? '/dashboard' : '/api-setup';
   } catch(e){}
 })();
 </script>
