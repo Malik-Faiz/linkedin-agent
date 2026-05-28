@@ -156,6 +156,31 @@ def get_next_run_time_for_user(username):
         target_local += timedelta(days=1)
     return target_local - timedelta(hours=offset)
 
+# ─── IMAGE VALIDATION ─────────────────────────────────────────────────────────
+def validate_image_url(url, timeout=8):
+    """
+    Check that a URL actually returns a reachable image.
+    Returns True only if HTTP 200 and content-type is image/*.
+    Falls back to streaming GET if server rejects HEAD.
+    """
+    try:
+        r = requests.head(url, timeout=timeout, allow_redirects=True,
+                          headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code == 200:
+            ct = r.headers.get("content-type", "")
+            if "image" in ct:
+                return True
+        # Some servers reject HEAD — fall back to a tiny streaming GET
+        if r.status_code in (405, 403, 0):
+            r2 = requests.get(url, timeout=timeout, stream=True,
+                              headers={"User-Agent": "Mozilla/5.0"})
+            if r2.status_code == 200 and "image" in r2.headers.get("content-type", ""):
+                r2.close()
+                return True
+        return False
+    except Exception:
+        return False
+
 # ─── AI / POST FUNCTIONS ──────────────────────────────────────────────────────
 def generate_post(username, subject):
     cfg      = load_config(username)
@@ -184,17 +209,38 @@ def get_image_url(username, subject):
     if not serp_key:
         add_log(username, "SerpAPI key not set — post sent without image.", "warn")
         return None
+
     clean = subject.replace("(create image)", "").strip()
     try:
         response = requests.get("https://serpapi.com/search.json", params={
-            "engine": "google_images", "q": f"{clean} infographic", "api_key": serp_key
+            "engine": "google_images",
+            "q": f"{clean} infographic",
+            "api_key": serp_key
         }, timeout=20).json()
-        if "images_results" in response and response["images_results"]:
-            return response["images_results"][0]["original"]
-        add_log(username, "SerpAPI returned no images.", "warn")
+
+        results = response.get("images_results", [])
+        if not results:
+            add_log(username, "SerpAPI returned no images.", "warn")
+            return None
+
+        # Try up to 5 candidates — skip any that are unreachable or expired
+        for i, img in enumerate(results[:5]):
+            url = img.get("original", "")
+            if not url:
+                continue
+            add_log(username, f"Checking image {i+1}/5...", "info")
+            if validate_image_url(url):
+                add_log(username, f"Image {i+1} reachable ✓", "ok")
+                return url
+            else:
+                add_log(username, f"Image {i+1} unreachable — trying next", "warn")
+
+        add_log(username, "All candidate images unreachable — post sent without image.", "warn")
+        return None
+
     except Exception as e:
         add_log(username, f"SerpAPI Error: {e}", "error")
-    return None
+        return None
 
 def get_active_channels(cfg):
     """Return list of (slot_num, channel_id, channel_name) for all active channels."""
@@ -248,16 +294,33 @@ def send_to_buffer(username, post_text, image_url=None):
         status, result = send_to_one_channel(buf_key, cid, post_text, image_url, is_facebook=is_fb)
 
         if status != 200:
-            add_log(username, f"  → [{name}] HTTP {status}: {result}", "error"); continue
+            add_log(username, f"  → [{name}] HTTP {status}: {result}", "error")
+            continue
 
         if "errors" in result:
             errs = "; ".join(e.get("message", str(e)) for e in result["errors"])
-            add_log(username, f"  → [{name}] GraphQL error: {errs}", "error"); continue
+            add_log(username, f"  → [{name}] GraphQL error: {errs}", "error")
+            continue
 
         create_post = (result.get("data") or {}).get("createPost") or {}
 
         if "message" in create_post:
-            add_log(username, f"  → [{name}] Buffer error: {create_post['message']}", "error"); continue
+            # ── IMAGE FALLBACK: if Buffer rejects image, retry without it ──
+            err_msg = create_post["message"]
+            if image_url and ("image" in err_msg.lower() or "dimensions" in err_msg.lower() or "fetch" in err_msg.lower()):
+                add_log(username, f"  → [{name}] Image rejected by Buffer — retrying without image", "warn")
+                status2, result2 = send_to_one_channel(buf_key, cid, post_text, None, is_facebook=is_fb)
+                create_post2 = (result2.get("data") or {}).get("createPost") or {}
+                if status2 == 200 and "post" in create_post2:
+                    pid = (create_post2.get("post") or {}).get("id")
+                    add_log(username, f"  → [{name}] Queued without image ✓ ID: {pid}", "ok")
+                    success += 1
+                    continue
+                else:
+                    add_log(username, f"  → [{name}] Retry also failed: {create_post2.get('message','unknown')}", "error")
+            else:
+                add_log(username, f"  → [{name}] Buffer error: {err_msg}", "error")
+            continue
 
         pid = (create_post.get("post") or {}).get("id")
         if pid:
@@ -283,7 +346,8 @@ def run_batch(username, triggered_by="scheduler"):
     subjects_file = user_subjects_path(username)
     if not os.path.exists(subjects_file):
         add_log(username, "Queue is empty! Add subjects from dashboard.", "warn")
-        state["running"] = False; state["status"] = "waiting"
+        state["running"] = False
+        state["status"]  = "waiting"
         return
 
     with open(subjects_file, "r", encoding="utf-8") as f:
@@ -291,7 +355,8 @@ def run_batch(username, triggered_by="scheduler"):
 
     if not all_subjects:
         add_log(username, "Queue is empty!", "warn")
-        state["running"] = False; state["status"] = "waiting"
+        state["running"] = False
+        state["status"]  = "waiting"
         return
 
     batch = all_subjects[:BATCH_SIZE]
@@ -317,8 +382,12 @@ def run_batch(username, triggered_by="scheduler"):
 
         image_url = None
         if manual_image_url:
-            image_url = manual_image_url
-            add_log(username, f"[{j+1}/{len(batch)}] Using uploaded image ✓", "ok")
+            # Validate manually uploaded image URL too
+            if validate_image_url(manual_image_url):
+                image_url = manual_image_url
+                add_log(username, f"[{j+1}/{len(batch)}] Using uploaded image ✓", "ok")
+            else:
+                add_log(username, f"[{j+1}/{len(batch)}] Uploaded image URL unreachable — sending without image", "warn")
         elif "(create image)" in base_subject.lower():
             image_url = get_image_url(username, base_subject)
             if image_url:
@@ -373,7 +442,7 @@ def keep_alive_loop():
         time.sleep(600)
 
 # ════════════════════════════════════════════════════════════════════════════════
-#  PAGE ROUTES  (serve separate HTML files)
+#  PAGE ROUTES
 # ════════════════════════════════════════════════════════════════════════════════
 
 @app.route("/")
@@ -501,11 +570,13 @@ def save_config_route(username):
     data = request.get_json()
     cfg  = load_config(username)
 
+    # Only overwrite sensitive keys if a real (non-masked) value was sent
     for field in ["groq_api_key", "buffer_api_key", "serpapi_key"]:
         val = (data.get(field) or "").strip()
         if val and not val.startswith("*") and "*" not in val:
             cfg[field] = val
 
+    # Channel IDs and names — only update if non-masked value provided
     for i in [1, 2, 3, 4]:
         cid  = (data.get(f"buffer_channel_{i}") or "").strip()
         name = (data.get(f"buffer_channel_{i}_name") or "").strip()
@@ -545,9 +616,12 @@ def toggle_channel(username):
     if ch in active:
         if len(active) <= 1:
             return jsonify({"ok": False, "message": "At least one channel must remain active"}), 400
-        active.remove(ch); state = "OFF"
+        active.remove(ch)
+        state = "OFF"
     else:
-        active.append(ch); active.sort(); state = "ON"
+        active.append(ch)
+        active.sort()
+        state = "ON"
 
     cfg["active_channels"] = active
     save_config(username, cfg)
