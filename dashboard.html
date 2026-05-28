@@ -41,6 +41,8 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
 .status-chip{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border2);border-radius:20px;padding:7px 14px;font-size:11px;font-family:var(--mono);white-space:nowrap}
 .live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(0,229,160,.2);animation:livepulse 2s infinite}
 .status-chip.running .live-dot{background:var(--amber);box-shadow:0 0 0 3px rgba(255,179,71,.2)}
+.status-chip.connecting .live-dot{background:var(--muted2);box-shadow:none;animation:none}
+.status-chip.connecting{opacity:.7}
 
 .icon-btn{display:flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:7px 11px;font-size:11px;font-family:var(--mono);color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap;text-decoration:none}
 .icon-btn:hover{border-color:var(--accent);color:var(--text)}
@@ -182,7 +184,7 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
       <p id="headerSub">auto-scheduler active · timezone-aware</p>
     </div>
     <div class="header-right">
-      <div class="status-chip" id="statusChip">
+      <div class="status-chip connecting" id="statusChip">
         <div class="live-dot"></div>
         <span id="statusLabel">Connecting…</span>
       </div>
@@ -213,11 +215,11 @@ body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(r
   <div class="timer-card">
     <div class="tc-label"><i class="ti ti-clock" style="font-size:13px"></i> next auto-run countdown</div>
     <div class="timer-row">
-      <div class="t-block"><span class="t-num" id="th">00</span><div class="t-unit">Hours</div></div>
+      <div class="t-block"><span class="t-num" id="th">--</span><div class="t-unit">Hours</div></div>
       <div class="t-colon">:</div>
-      <div class="t-block"><span class="t-num" id="tm">00</span><div class="t-unit">Mins</div></div>
+      <div class="t-block"><span class="t-num" id="tm">--</span><div class="t-unit">Mins</div></div>
       <div class="t-colon">:</div>
-      <div class="t-block"><span class="t-num" id="ts">00</span><div class="t-unit">Secs</div></div>
+      <div class="t-block"><span class="t-num" id="ts">--</span><div class="t-unit">Secs</div></div>
     </div>
     <div class="target-info">
       <i class="ti ti-player-play" style="font-size:13px"></i>
@@ -390,7 +392,14 @@ function tickNum(el,val){
   if(el.textContent!==val){ el.classList.add('tick'); el.textContent=val; setTimeout(()=>el.classList.remove('tick'),100); }
 }
 function updateCountdown(){
-  if(!nextRunTarget) return;
+  if(!nextRunTarget){
+    /* Still connecting — show dashes until first fetch lands */
+    ['th','tm','ts'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el.textContent==='00') return;
+    });
+    return;
+  }
   const diff=nextRunTarget-new Date();
   if(diff<=0){ ['th','tm','ts'].forEach(id=>tickNum(document.getElementById(id),'00')); return; }
   tickNum(document.getElementById('th'),pad(Math.floor(diff/3600000)));
@@ -505,19 +514,31 @@ async function deleteChannel(num){
 
 /* ── STATUS POLL ── */
 let connected=false;
+let firstLoad=true;
 async function fetchStatus(){
   try{
     const r=await fetch(`${API}/status`,{credentials:'include'});
     if(r.status===401){ doLogout(); return; }
     const d=await r.json();
-    connected=true;
-    document.getElementById('connBanner').classList.remove('show');
-    /* next_run_iso is UTC — ensure parsed as UTC regardless of browser locale */
+
+    if(!connected){
+      connected=true;
+      document.getElementById('connBanner').classList.remove('show');
+      document.getElementById('statusChip').classList.remove('connecting');
+    }
+
+    /* Parse next run time — always UTC */
     const iso=d.next_run_iso.endsWith('Z')?d.next_run_iso:d.next_run_iso+'Z';
-    nextRunTarget=new Date(iso);
+    const newTarget=new Date(iso);
+    /* Only update target if it changed (prevents countdown reset on every poll) */
+    if(!nextRunTarget || Math.abs(newTarget-nextRunTarget)>5000){
+      nextRunTarget=newTarget;
+    }
+
     const chip=document.getElementById('statusChip');
     chip.classList.toggle('running',d.running);
-    document.getElementById('statusLabel').textContent=d.running?'Running':'Waiting';
+    document.getElementById('statusLabel').textContent=d.running?'Running':'Active';
+
     document.getElementById('todayCount').textContent=d.today_count;
     document.getElementById('totalRun').textContent=d.total_run;
     const rb=document.getElementById('runBtn');
@@ -529,8 +550,15 @@ async function fetchStatus(){
     if(d.config){ updateApiBadges(d.config); }
     if(d.channels_info) renderChannels(d);
     updateTzBanner(d.utc_offset);
+    firstLoad=false;
   } catch(e){
-    if(connected){ connected=false; document.getElementById('connBanner').classList.add('show'); document.getElementById('statusLabel').textContent='Offline'; }
+    if(connected){
+      connected=false;
+      document.getElementById('connBanner').classList.add('show');
+      document.getElementById('statusLabel').textContent='Offline';
+    } else if(firstLoad){
+      document.getElementById('statusLabel').textContent='Connecting…';
+    }
   }
 }
 
