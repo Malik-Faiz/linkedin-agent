@@ -89,16 +89,76 @@ def user_subjects_path(username):
 def user_state_path(username):
     return os.path.join(user_dir(username), "state.json")
 
+# ─── ENCRYPTION HELPERS ──────────────────────────────────────────────────────
+# Sensitive config fields are encrypted at rest using AES-256 (via Fernet).
+# ENCRYPTION_KEY must be set as a Railway environment variable.
+# Generate one with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
+SENSITIVE_FIELDS = {
+    "groq_api_key", "buffer_api_key", "serpapi_key",
+    "linkedin_access_token", "linkedin_client_secret",
+}
+
+def _get_fernet():
+    """Return a Fernet cipher using ENCRYPTION_KEY env var, or None if not set."""
+    key = os.environ.get("ENCRYPTION_KEY", "").strip()
+    if not key:
+        return None
+    try:
+        from cryptography.fernet import Fernet
+        return Fernet(key.encode() if isinstance(key, str) else key)
+    except Exception:
+        return None
+
+def _encrypt(value):
+    f = _get_fernet()
+    if not f or not isinstance(value, str):
+        return value
+    return "ENC:" + f.encrypt(value.encode()).decode()
+
+def _decrypt(value):
+    if not isinstance(value, str) or not value.startswith("ENC:"):
+        return value
+    f = _get_fernet()
+    if not f:
+        return value  # no key — return as-is (still encrypted)
+    try:
+        return f.decrypt(value[4:].encode()).decode()
+    except Exception:
+        return value  # decryption failed — return raw
+
+def _encrypt_cfg(cfg):
+    """Return a copy of cfg with sensitive fields encrypted."""
+    out = {}
+    for k, v in cfg.items():
+        if k in SENSITIVE_FIELDS and isinstance(v, str) and v and not v.startswith("ENC:"):
+            out[k] = _encrypt(v)
+        else:
+            out[k] = v
+    return out
+
+def _decrypt_cfg(cfg):
+    """Return a copy of cfg with sensitive fields decrypted."""
+    out = {}
+    for k, v in cfg.items():
+        if k in SENSITIVE_FIELDS and isinstance(v, str) and v.startswith("ENC:"):
+            out[k] = _decrypt(v)
+        else:
+            out[k] = v
+    return out
+
 def load_config(username):
     p = user_config_path(username)
     if not os.path.exists(p):
         return {}
     with open(p, "r", encoding="utf-8") as f:
-        return json.load(f)
+        raw = json.load(f)
+    return _decrypt_cfg(raw)  # always return decrypted values in memory
 
 def save_config(username, cfg):
+    encrypted = _encrypt_cfg(cfg)  # encrypt sensitive fields before writing to disk
     with open(user_config_path(username), "w", encoding="utf-8") as f:
-        json.dump(cfg, f, indent=2)
+        json.dump(encrypted, f, indent=2)
 
 def load_state(username):
     p = user_state_path(username)
@@ -985,11 +1045,14 @@ if __name__ == "__main__":
 
 # ════════════════════════════════════════════════════════════════════════════════
 #  LINKEDIN DIRECT OAUTH + ARTICLE PUBLISHING
+#  Each user connects their OWN LinkedIn/Facebook/Instagram accounts.
+#  LINKEDIN_CLIENT_ID/SECRET = developer app credentials (set once on Railway).
+#  User tokens = stored per user in their own config.json.
 # ════════════════════════════════════════════════════════════════════════════════
 
 LINKEDIN_CLIENT_ID     = os.environ.get("LINKEDIN_CLIENT_ID", "")
 LINKEDIN_CLIENT_SECRET = os.environ.get("LINKEDIN_CLIENT_SECRET", "")
-LINKEDIN_REDIRECT_URI  = os.environ.get("LINKEDIN_REDIRECT_URI", "")  # e.g. https://yourapp.com/api/linkedin/callback
+LINKEDIN_REDIRECT_URI  = os.environ.get("LINKEDIN_REDIRECT_URI", "")
 
 @app.route("/api/linkedin/auth")
 @require_auth
@@ -1061,11 +1124,13 @@ def linkedin_callback():
 
         # Save token + ID to user config
         cfg = load_config(username)
+        li_name = profile_res.get("name") or profile_res.get("given_name", "") + " " + profile_res.get("family_name", "")
         cfg["linkedin_access_token"]  = access_token
         cfg["linkedin_member_id"]     = linkedin_id
+        cfg["linkedin_name"]          = li_name.strip() or linkedin_id
         cfg["linkedin_token_expires"] = (datetime.utcnow() + timedelta(seconds=expires_in)).isoformat()
         save_config(username, cfg)
-        add_log(username, f"LinkedIn OAuth connected ✓ member: {linkedin_id}", "ok")
+        add_log(username, f"LinkedIn OAuth connected ✓ {cfg['linkedin_name']} ({linkedin_id})", "ok")
 
         return "<script>window.close();window.opener.location.reload();</script><p>LinkedIn connected! You can close this window.</p>"
 
@@ -1085,8 +1150,10 @@ def linkedin_disconnect(username):
 
 
 @app.route("/api/linkedin/status")
-@require_auth
-def linkedin_status(username):
+def linkedin_status():
+    username = session.get("username")
+    if not username:
+        return jsonify({"ok": False, "connected": False, "expired": False, "member_id": None, "expires": None, "env_set": bool(LINKEDIN_CLIENT_ID)})
     cfg     = load_config(username)
     token   = cfg.get("linkedin_access_token")
     expires = cfg.get("linkedin_token_expires")
@@ -1094,13 +1161,19 @@ def linkedin_status(username):
     connected = bool(token and member)
     expired   = False
     if expires:
-        expired = datetime.utcnow() > datetime.fromisoformat(expires)
+        try:
+            expired = datetime.utcnow() > datetime.fromisoformat(expires)
+        except Exception:
+            expired = False
+    name = cfg.get("linkedin_name", member)
     return jsonify({
         "ok":        True,
         "connected": connected and not expired,
         "expired":   expired,
         "member_id": member,
+        "name":      name,
         "expires":   expires,
+        "env_set":   bool(LINKEDIN_CLIENT_ID),
     })
 
 
