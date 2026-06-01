@@ -326,17 +326,24 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
       <div class="card-badge bg-li">in</div>
       <div class="card-head-info">
         <h3>LinkedIn Direct Connection</h3>
-        <p>required for article publishing · OAuth · not via Buffer</p>
+        <p>connect your LinkedIn account to publish articles · each user connects their own</p>
       </div>
     </div>
 
-    <!-- Connection status + actions — same pattern as Buffer channel toggles -->
+    <!-- HOW IT WORKS NOTE -->
+    <div class="li-info-note" style="margin-bottom:16px;">
+      🔑 <strong>How it works:</strong> Click Connect → LinkedIn login page opens → you log in with YOUR LinkedIn email &amp; password → your account connects to your agent automatically.<br><br>
+      📄 <strong>Articles</strong> publish directly via LinkedIn API (Buffer does not support articles).<br>
+      📝 <strong>Regular posts</strong> still go through Buffer as normal.
+    </div>
+
+    <!-- CONNECTION STATUS — same style as Buffer channel toggles -->
     <div class="conn-status" id="liConnStatus">
       <div class="conn-left">
         <div class="conn-dot off" id="liDot"></div>
         <div class="conn-info">
           <h4 id="liConnTitle">Not Connected</h4>
-          <p id="liConnSub">Connect to enable LinkedIn article publishing</p>
+          <p id="liConnSub">Click Connect to link your LinkedIn account</p>
         </div>
       </div>
       <div class="conn-actions">
@@ -349,10 +356,13 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
       </div>
     </div>
 
-    <div class="li-info-note">
-      📄 <strong>Articles</strong> are published directly via LinkedIn API — Buffer does not support article publishing.<br>
-      📝 <strong>Regular posts</strong> still go through Buffer as normal (LinkedIn · Facebook · Instagram).<br>
-      🔑 Requires <code>LINKEDIN_CLIENT_ID</code> + <code>LINKEDIN_CLIENT_SECRET</code> + <code>LINKEDIN_REDIRECT_URI</code> in your environment variables.
+    <!-- ENV VARS WARNING — only shown if dev has not set them -->
+    <div id="liEnvWarn" style="display:none;margin-top:12px;padding:11px 14px;border-radius:10px;background:rgba(255,96,96,0.07);border:1px solid rgba(255,96,96,0.2);font-size:11px;color:var(--red);font-family:var(--mono);line-height:1.75;">
+      ⚠ <strong>Developer setup required:</strong> Add these 3 environment variables to Railway:<br>
+      <code style="display:block;margin-top:6px;opacity:0.8;">LINKEDIN_CLIENT_ID = your_app_client_id</code>
+      <code style="display:block;opacity:0.8;">LINKEDIN_CLIENT_SECRET = your_app_client_secret</code>
+      <code style="display:block;opacity:0.8;">LINKEDIN_REDIRECT_URI = https://your-domain/api/linkedin/callback</code>
+      <span style="margin-top:6px;display:block;">Get credentials at <a href="https://linkedin.com/developers/apps" target="_blank" style="color:var(--red);">linkedin.com/developers/apps</a></span>
     </div>
   </div>
 
@@ -396,83 +406,120 @@ updatePlatBadge(4); updatePlatBadge(5);
 
 // ── LINKEDIN OAUTH ──
 async function checkLinkedInStatus() {
+  const dot        = document.getElementById('liDot');
+  const title      = document.getElementById('liConnTitle');
+  const sub        = document.getElementById('liConnSub');
+  const statusBox  = document.getElementById('liConnStatus');
+  const connectBtn = document.getElementById('liConnectBtn');
+  const disconnBtn = document.getElementById('liDisconnectBtn');
+  const envWarn    = document.getElementById('liEnvWarn');
+
   try {
     const res  = await fetch(`${API}/linkedin/status`, { credentials: 'include' });
     const data = await res.json();
-    const dot        = document.getElementById('liDot');
-    const title      = document.getElementById('liConnTitle');
-    const sub        = document.getElementById('liConnSub');
-    const status     = document.getElementById('liConnStatus');
-    const connectBtn = document.getElementById('liConnectBtn');
-    const disconnBtn = document.getElementById('liDisconnectBtn');
+
+    // Dev has not set env vars — show warning, hide connect button
+    if (!data.env_set) {
+      envWarn.style.display = 'block';
+      dot.className='conn-dot warn';
+      title.textContent='⚠ Developer Setup Required';
+      sub.textContent='Set LINKEDIN_CLIENT_ID in Railway environment variables';
+      statusBox.className='conn-status expired';
+      connectBtn.style.display='none';
+      disconnBtn.style.display='none';
+      return;
+    }
+
+    envWarn.style.display = 'none';
 
     if (data.connected) {
-      dot.className = 'conn-dot live';
-      title.textContent = '✓ Connected';
-      sub.className = 'ok';
+      dot.className='conn-dot live';
+      title.textContent='✓ Connected — ' + (data.name || data.member_id);
+      sub.className='ok';
       const exp = data.expires ? new Date(data.expires).toLocaleDateString() : 'unknown';
-      sub.textContent = `Member ID: ${data.member_id} · Token expires: ${exp}`;
-      status.className = 'conn-status connected';
-      connectBtn.style.display = 'none';
-      disconnBtn.style.display = 'flex';
+      sub.textContent='Your LinkedIn account is connected · Token expires: ' + exp;
+      statusBox.className='conn-status connected';
+      connectBtn.style.display='none';
+      disconnBtn.style.display='flex';
     } else if (data.expired) {
-      dot.className = 'conn-dot warn';
-      title.textContent = '⚠ Token Expired';
-      sub.className = 'warn';
-      sub.textContent = 'Reconnect to continue publishing articles';
-      status.className = 'conn-status expired';
-      connectBtn.textContent = '🔄 Reconnect LinkedIn';
-      connectBtn.style.display = 'flex';
-      disconnBtn.style.display = 'none';
+      dot.className='conn-dot warn';
+      title.textContent='⚠ Session Expired';
+      sub.className='warn';
+      sub.textContent='Your LinkedIn session expired — click Reconnect to log in again';
+      statusBox.className='conn-status expired';
+      connectBtn.innerHTML='🔄 Reconnect LinkedIn';
+      connectBtn.style.display='flex';
+      disconnBtn.style.display='none';
     } else {
-      dot.className = 'conn-dot off';
-      title.textContent = 'Not Connected';
-      sub.className = '';
-      sub.textContent = 'Connect to enable LinkedIn article publishing';
-      status.className = 'conn-status';
-      connectBtn.textContent = '🔗 Connect LinkedIn';
-      connectBtn.style.display = 'flex';
-      disconnBtn.style.display = 'none';
+      dot.className='conn-dot off';
+      title.textContent='Not Connected';
+      sub.className='';
+      sub.textContent='Click Connect → LinkedIn login page opens → log in with your email & password';
+      statusBox.className='conn-status';
+      connectBtn.innerHTML='🔗 Connect LinkedIn';
+      connectBtn.style.display='flex';
+      disconnBtn.style.display='none';
     }
-  } catch(e) {}
+  } catch(e) {
+    dot.className='conn-dot warn';
+    title.textContent='Cannot Check Status';
+    sub.textContent=e.message;
+  }
 }
 
 async function connectLinkedIn() {
+  const btn  = document.getElementById('liConnectBtn');
+  const orig = btn.innerHTML;
+  btn.disabled=true; btn.innerHTML='<span class="spin">⟳</span> Opening LinkedIn...';
   try {
-    const res  = await fetch(`${API}/linkedin/auth`, { credentials: 'include' });
+    const res = await fetch(`${API}/linkedin/auth`, { credentials:'include' });
+    if (!res.ok) {
+      const txt = await res.text();
+      alert('Error ' + res.status + ': ' + txt.slice(0,300));
+      btn.disabled=false; btn.innerHTML=orig; return;
+    }
     const data = await res.json();
+    btn.disabled=false; btn.innerHTML=orig;
     if (data.ok) {
-      // Open OAuth popup — same UX as Buffer's OAuth flow
-      const w = 600, h = 700;
-      const left = (screen.width  - w) / 2;
-      const top  = (screen.height - h) / 2;
+      // Open LinkedIn login page in popup — user logs in with their own email & password
+      const w=600, h=700;
+      const left=Math.round((screen.width-w)/2);
+      const top=Math.round((screen.height-h)/2);
       const popup = window.open(
         data.auth_url,
-        'LinkedIn OAuth',
+        'Connect LinkedIn',
         `width=${w},height=${h},left=${left},top=${top},scrollbars=yes,resizable=yes`
       );
-      if (!popup) { alert('Popup blocked — allow popups for this site.'); return; }
-      // Poll until popup closes, then refresh status
+      if (!popup) {
+        alert('Popup blocked!
+Please allow popups for this site then click Connect again.');
+        return;
+      }
+      // When popup closes (after login), refresh status
       const timer = setInterval(() => {
         try {
           if (popup.closed) { clearInterval(timer); checkLinkedInStatus(); }
         } catch(e) { clearInterval(timer); checkLinkedInStatus(); }
       }, 800);
     } else {
-      alert(data.message || 'Cannot start OAuth. Make sure LINKEDIN_CLIENT_ID is set in environment variables.');
+      alert(data.message || 'Could not start LinkedIn login.');
     }
-  } catch(e) { alert('Cannot reach server.'); }
+  } catch(e) {
+    btn.disabled=false; btn.innerHTML=orig;
+    alert('Failed: ' + e.message);
+  }
 }
 
 async function disconnectLinkedIn() {
-  if (!confirm('Disconnect LinkedIn?\nArticles will stop publishing until you reconnect.')) return;
+  if (!confirm('Disconnect your LinkedIn account?
+Articles will stop publishing until you reconnect.')) return;
   try {
-    await fetch(`${API}/linkedin/disconnect`, { method: 'POST', credentials: 'include' });
+    await fetch(`${API}/linkedin/disconnect`, { method:'POST', credentials:'include' });
     checkLinkedInStatus();
-  } catch(e) {}
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
-// Check LinkedIn status on load
+// Check on page load
 checkLinkedInStatus();
 
 // ── SAVE CONFIG ──
