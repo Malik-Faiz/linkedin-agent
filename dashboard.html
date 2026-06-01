@@ -9,29 +9,13 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
-  --bg:#05030f;
-  --bg2:#07041a;
-  --card:rgba(255,255,255,0.028);
-  --card-h:rgba(255,255,255,0.05);
-  --card-b:rgba(255,255,255,0.07);
-  --border:rgba(160,120,255,0.13);
-  --border2:rgba(160,120,255,0.25);
-  --text:#ede8ff;
-  --muted:rgba(200,185,255,0.5);
-  --muted2:rgba(200,185,255,0.22);
-  --p:#b085ff;
-  --p2:#ff80b5;
-  --p3:#7ee8ff;
-  --green:#3dffc0;
-  --red:#ff6060;
-  --amber:#ffcc5c;
-  --font:'Syne',sans-serif;
-  --mono:'DM Mono',monospace;
-  --r:18px;
+  --bg:#05030f;--card:rgba(255,255,255,0.028);--card-h:rgba(255,255,255,0.05);
+  --border:rgba(160,120,255,0.13);--border2:rgba(160,120,255,0.25);
+  --text:#ede8ff;--muted:rgba(200,185,255,0.5);--muted2:rgba(200,185,255,0.22);
+  --p:#b085ff;--p2:#ff80b5;--p3:#7ee8ff;--green:#3dffc0;--red:#ff6060;--amber:#ffcc5c;
+  --font:'Syne',sans-serif;--mono:'DM Mono',monospace;--r:18px;
 }
 html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:var(--font);overflow-x:hidden;}
-
-/* ── BG ── */
 body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;opacity:0.022;background:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");}
 .grid-bg{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(160,120,255,0.035) 1px,transparent 1px),linear-gradient(90deg,rgba(160,120,255,0.035) 1px,transparent 1px);background-size:68px 68px;mask-image:radial-gradient(ellipse 100% 50% at 50% 0%,black 20%,transparent 100%);}
 .orb{position:fixed;border-radius:50%;filter:blur(110px);pointer-events:none;z-index:0;}
@@ -40,10 +24,9 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 @keyframes o1{0%,100%{transform:translate(0,0);}50%{transform:translate(40px,-45px);}}
 @keyframes o2{0%,100%{transform:translate(0,0);}50%{transform:translate(-35px,40px);}}
 
-/* ── PAGE ── */
 .page{position:relative;z-index:10;max-width:1000px;margin:0 auto;padding:28px 24px 80px;}
 
-/* ── TOPBAR ── */
+/* TOPBAR */
 .topbar{display:flex;align-items:center;gap:14px;margin-bottom:28px;flex-wrap:wrap;}
 .brand{display:flex;align-items:center;gap:12px;}
 .brand-icon{width:44px;height:44px;border-radius:13px;flex-shrink:0;background:linear-gradient(135deg,var(--p),var(--p2));display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;box-shadow:0 6px 20px rgba(176,133,255,0.38);position:relative;}
@@ -61,14 +44,14 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .icon-btn:hover{border-color:var(--p);color:var(--text);background:var(--card-h);}
 .icon-btn.danger:hover{border-color:var(--red);color:var(--red);background:rgba(255,96,96,0.06);}
 
-/* ── BANNERS ── */
+/* BANNERS */
 .banner{display:none;align-items:center;gap:10px;border-radius:14px;padding:12px 16px;font-size:13px;margin-bottom:14px;}
 .banner.show{display:flex;}
 .banner.warn{background:rgba(255,204,92,0.07);border:1px solid rgba(255,204,92,0.2);color:var(--amber);}
 .banner.err{background:rgba(255,96,96,0.07);border:1px solid rgba(255,96,96,0.2);color:var(--red);}
 .banner.info{background:rgba(176,133,255,0.06);border:1px solid rgba(176,133,255,0.18);color:var(--p);font-family:var(--mono);font-size:12px;}
 
-/* ── TIMER CARD ── */
+/* TIMER */
 .timer-card{background:var(--card);border:1px solid var(--border2);border-radius:24px;padding:32px 28px;margin-bottom:16px;position:relative;overflow:hidden;}
 .timer-card::before{content:'';position:absolute;top:-80px;right:-80px;width:300px;height:300px;background:radial-gradient(circle,rgba(176,133,255,0.1),transparent 65%);pointer-events:none;}
 .timer-card::after{content:'';position:absolute;bottom:-60px;left:-60px;width:200px;height:200px;background:radial-gradient(circle,rgba(255,128,181,0.07),transparent 65%);pointer-events:none;}
@@ -90,24 +73,23 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
 .dok{background:var(--green);}.dwarn{background:var(--amber);}.derr{background:var(--red);}
 
-/* ── STATS ROW ── */
+/* STATS */
 .stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px;}
 .stat-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:22px 20px;position:relative;overflow:hidden;transition:border-color 0.2s,transform 0.2s;}
 .stat-card:hover{border-color:rgba(176,133,255,0.3);transform:translateY(-2px);}
-.stat-card::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.018),transparent);border-radius:var(--r);}
 .sc-label{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;font-family:var(--mono);margin-bottom:12px;}
 .sc-val{font-size:38px;font-weight:800;line-height:1;letter-spacing:-1.5px;}
 .sc-sub{font-size:11px;color:var(--muted);margin-top:8px;font-family:var(--mono);}
 .cg{color:var(--green);}.cp{color:var(--p);}.cb{color:var(--p3);}
 
-/* ── CHANNEL CARD ── */
+/* CHANNELS */
 .ch-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:22px 24px;margin-bottom:16px;}
 .ch-card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
-.ch-card-title{font-size:15px;font-weight:700;letter-spacing:-0.3px;display:flex;align-items:center;gap:8px;}
+.ch-card-title{font-size:15px;font-weight:700;letter-spacing:-0.3px;}
 .ch-chip{font-size:11px;font-family:var(--mono);background:var(--card);border:1px solid var(--border2);border-radius:7px;padding:3px 10px;color:var(--muted);}
 .ch-sub{font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:16px;}
 .ch-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px;}
-.ch-toggle{border:1.5px solid var(--border2);border-radius:14px;padding:14px 16px;cursor:pointer;transition:all 0.22s;background:rgba(255,255,255,0.02);position:relative;display:flex;flex-direction:column;gap:8px;}
+.ch-toggle{border:1.5px solid var(--border2);border-radius:14px;padding:14px 16px;cursor:pointer;transition:all 0.22s;background:rgba(255,255,255,0.02);position:relative;display:flex;flex-direction:column;gap:6px;}
 .ch-toggle:hover:not(.disabled){border-color:rgba(176,133,255,0.4);background:var(--card-h);}
 .ch-toggle.active{border-color:var(--green);background:rgba(61,255,192,0.05);}
 .ch-toggle.disabled{opacity:0.35;cursor:not-allowed;}
@@ -119,6 +101,10 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .ch-toggle.active .ch-sw .knob{left:17px;background:#fff;}
 .ch-st{font-size:10px;font-family:var(--mono);color:var(--muted2);}
 .ch-toggle.active .ch-st{color:var(--green);}
+.ch-platform{font-size:9px;font-family:var(--mono);color:var(--muted2);letter-spacing:1px;text-transform:uppercase;}
+.ch-platform.li{color:rgba(100,150,255,0.7);}
+.ch-platform.fb{color:rgba(100,120,255,0.7);}
+.ch-platform.ig{color:rgba(255,100,180,0.7);}
 .ch-del{display:none;position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:7px;border:none;background:rgba(255,96,96,0.1);color:var(--red);cursor:pointer;font-size:13px;align-items:center;justify-content:center;transition:background 0.15s;line-height:1;}
 .ch-toggle:hover .ch-del{display:flex;}
 .ch-del:hover{background:rgba(255,96,96,0.24);}
@@ -126,42 +112,54 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .ch-add{border-style:dashed;justify-content:center;align-items:center;flex-direction:row;gap:8px;opacity:0.5;}
 .ch-add:hover{opacity:0.8!important;border-color:var(--p)!important;}
 
-/* ── TWO COL ── */
+/* TWO COL */
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
-
-/* ── CARD ── */
 .card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:22px;}
 .card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
 .card-hdr h2{font-size:15px;font-weight:700;letter-spacing:-0.3px;}
 .chip{font-size:11px;font-family:var(--mono);background:var(--card);border:1px solid var(--border2);border-radius:7px;padding:3px 10px;color:var(--muted);}
 
-/* Queue */
+/* QUEUE — with delete button */
 .next-badge{display:flex;align-items:center;gap:8px;background:rgba(255,204,92,0.07);border:1px solid rgba(255,204,92,0.18);border-radius:10px;padding:9px 12px;font-size:12px;color:var(--amber);margin-bottom:14px;font-family:var(--mono);}
-.qi{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;font-size:13px;transition:background 0.15s;}
+.qi{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;font-size:13px;transition:background 0.15s;position:relative;}
 .qi:hover{background:var(--card-h);}
 .qi.next{background:rgba(176,133,255,0.06);border:1px solid rgba(176,133,255,0.12);}
-.qi-n{font-family:var(--mono);font-size:11px;color:var(--muted2);min-width:22px;}
-.qi-t{flex:1;line-height:1.3;}
-.qi-tag{font-size:10px;font-family:var(--mono);border-radius:5px;padding:3px 8px;white-space:nowrap;}
+.qi-n{font-family:var(--mono);font-size:11px;color:var(--muted2);min-width:22px;flex-shrink:0;}
+.qi-t{flex:1;line-height:1.3;font-size:12.5px;}
+.qi-tag{font-size:9px;font-family:var(--mono);border-radius:5px;padding:2px 7px;white-space:nowrap;flex-shrink:0;}
 .tag-img{background:rgba(176,133,255,0.15);color:var(--p);}
 .tag-auto{background:rgba(126,232,255,0.12);color:var(--p3);}
 .tag-txt{background:rgba(61,255,192,0.1);color:var(--green);}
+.tag-art{background:rgba(255,204,92,0.12);color:var(--amber);}
+.qi-del{flex-shrink:0;width:22px;height:22px;border-radius:6px;border:none;background:transparent;color:var(--muted2);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all 0.15s;opacity:0;}
+.qi:hover .qi-del{opacity:1;}
+.qi-del:hover{background:rgba(255,96,96,0.15);color:var(--red);}
 .empty-q{text-align:center;padding:28px;color:var(--muted);font-size:13px;}
 
-/* Add subjects */
+/* ADD SUBJECTS */
+/* Content type toggle */
+.content-type-row{display:flex;gap:8px;margin-bottom:12px;}
+.ct-btn{flex:1;padding:9px 8px;border-radius:10px;border:1.5px solid var(--border2);background:rgba(255,255,255,0.02);color:var(--muted);font-family:var(--mono);font-size:11px;cursor:pointer;transition:all 0.22s;text-align:center;}
+.ct-btn:hover{border-color:var(--p);color:var(--text);}
+.ct-btn.sel-post{border-color:var(--green);background:rgba(61,255,192,0.06);color:var(--green);}
+.ct-btn.sel-art{border-color:var(--amber);background:rgba(255,204,92,0.07);color:var(--amber);}
+
 .mode-sel{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;}
-.mode-opt{padding:11px 6px;border-radius:11px;border:1.5px solid var(--border2);background:rgba(255,255,255,0.02);color:var(--muted);font-family:var(--mono);font-size:10px;cursor:pointer;transition:all 0.22s;text-align:center;line-height:1.6;}
-.mode-opt .mi{display:block;font-size:19px;margin-bottom:4px;}
+.mode-opt{padding:10px 6px;border-radius:11px;border:1.5px solid var(--border2);background:rgba(255,255,255,0.02);color:var(--muted);font-family:var(--mono);font-size:10px;cursor:pointer;transition:all 0.22s;text-align:center;line-height:1.6;}
+.mode-opt .mi{display:block;font-size:17px;margin-bottom:4px;}
 .mode-opt:hover{border-color:var(--p);color:var(--text);}
 .mode-opt.sel-t{border-color:var(--green);background:rgba(61,255,192,0.06);color:var(--green);}
 .mode-opt.sel-a{border-color:var(--p3);background:rgba(126,232,255,0.06);color:var(--p3);}
 .mode-opt.sel-m{border-color:var(--p);background:rgba(176,133,255,0.08);color:var(--p);}
+.mode-sel.hidden{display:none;}
+
 .subj-ta{width:100%;background:rgba(0,0,0,0.3);border:1.5px solid var(--border2);border-radius:12px;padding:12px 14px;color:var(--text);font-family:var(--mono);font-size:12px;resize:vertical;min-height:88px;outline:none;transition:all 0.2s;}
 .subj-ta:focus{border-color:rgba(176,133,255,0.4);background:rgba(176,133,255,0.04);box-shadow:0 0 0 3px rgba(176,133,255,0.08);}
 .subj-ta::placeholder{color:var(--muted2);}
 .mode-panel{display:none;}
 .mode-panel.show{display:block;margin-top:12px;}
 .auto-note{background:rgba(126,232,255,0.06);border:1px solid rgba(126,232,255,0.18);border-radius:11px;padding:12px 14px;font-size:11px;color:var(--p3);font-family:var(--mono);line-height:1.7;}
+.art-note{background:rgba(255,204,92,0.06);border:1px solid rgba(255,204,92,0.2);border-radius:11px;padding:12px 14px;font-size:11px;color:var(--amber);font-family:var(--mono);line-height:1.7;}
 .serp-warn{display:none;margin-top:10px;background:rgba(255,204,92,0.07);border:1px solid rgba(255,204,92,0.2);border-radius:10px;padding:10px 12px;font-size:11px;color:var(--amber);font-family:var(--mono);line-height:1.6;}
 .upload-zone{margin-top:12px;border:2px dashed var(--border2);border-radius:12px;padding:20px;text-align:center;cursor:pointer;transition:all 0.2s;}
 .upload-zone:hover{border-color:var(--p);background:rgba(176,133,255,0.04);}
@@ -172,14 +170,13 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .add-btn:hover:not(:disabled){opacity:0.9;transform:translateY(-1px);}
 .add-btn:disabled{opacity:0.4;cursor:not-allowed;}
 
-/* ── RUN BUTTON ── */
+/* RUN BUTTON */
 .run-btn{width:100%;padding:18px;border-radius:16px;background:linear-gradient(135deg,var(--p),#d060f0,var(--p2));border:none;color:#fff;font-family:var(--font);font-size:16px;font-weight:800;cursor:pointer;letter-spacing:-0.5px;display:flex;align-items:center;justify-content:center;gap:10px;position:relative;overflow:hidden;box-shadow:0 12px 40px rgba(176,133,255,0.35);transition:opacity 0.2s,transform 0.15s,box-shadow 0.2s;margin-bottom:16px;}
 .run-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,0.15),transparent);}
 .run-btn:hover:not(:disabled){opacity:0.9;transform:translateY(-1.5px);box-shadow:0 18px 50px rgba(176,133,255,0.44);}
-.run-btn:active:not(:disabled){transform:scale(0.98);}
 .run-btn:disabled{opacity:0.4;cursor:not-allowed;}
 
-/* ── LOG ── */
+/* LOG */
 .log-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:20px 22px;}
 .log-eye{font-size:10px;font-family:var(--mono);letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
 .log-eye::after{content:'';flex:1;height:1px;background:var(--border);}
@@ -190,7 +187,6 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .lt{color:var(--muted2);flex-shrink:0;}
 .lok{color:var(--green);}.linfo{color:var(--p3);}.lwarn{color:var(--amber);}.lerr{color:var(--red);}
 
-/* ── MISC ── */
 .spin{animation:sp 0.8s linear infinite;display:inline-block;}
 @keyframes sp{to{transform:rotate(360deg);}}
 
@@ -204,25 +200,17 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 </head>
 <body>
 <div class="grid-bg"></div>
-<div class="orb o1"></div>
-<div class="orb o2"></div>
+<div class="orb o1"></div><div class="orb o2"></div>
 
 <div class="page">
-
   <!-- TOPBAR -->
   <div class="topbar">
     <div class="brand">
       <div class="brand-icon">Li</div>
-      <div class="brand-info">
-        <h1>LinkedIn Agent</h1>
-        <p id="headerSub">auto-scheduler active · timezone-aware</p>
-      </div>
+      <div class="brand-info"><h1>LinkedIn Agent</h1><p id="headerSub">auto-scheduler · timezone-aware</p></div>
     </div>
     <div class="topbar-right">
-      <div class="status-pill">
-        <div class="pdot" id="statusDot"></div>
-        <span id="statusLabel">Connecting...</span>
-      </div>
+      <div class="status-pill"><div class="pdot" id="statusDot"></div><span id="statusLabel">Connecting...</span></div>
       <button class="icon-btn" onclick="window.location.href='/setup'">⚙ APIs</button>
       <button class="icon-btn danger" onclick="doLogout()">↩ Logout</button>
     </div>
@@ -230,7 +218,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 
   <!-- BANNERS -->
   <div class="banner warn" id="expiryBanner">⏰ Session expires in <strong id="expiryCountdown" style="margin-left:4px;">—</strong>. Please re-login.</div>
-  <div class="banner err" id="connBanner">⚠ Cannot reach Flask server — make sure <code style="font-family:var(--mono);opacity:0.8">python app.py</code> is running.</div>
+  <div class="banner err"  id="connBanner">⚠ Cannot reach Flask server — make sure <code style="font-family:var(--mono)">python app.py</code> is running.</div>
   <div class="banner info" id="tzBanner"><span id="tzText">Detecting timezone...</span></div>
 
   <!-- TIMER -->
@@ -254,21 +242,9 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 
   <!-- STATS -->
   <div class="stats-row">
-    <div class="stat-card">
-      <div class="sc-label">Posts Today</div>
-      <div class="sc-val cg" id="todayCount">0</div>
-      <div class="sc-sub">of 2 batch limit</div>
-    </div>
-    <div class="stat-card">
-      <div class="sc-label">Subjects Left</div>
-      <div class="sc-val cp" id="subjLeft">—</div>
-      <div class="sc-sub">in queue</div>
-    </div>
-    <div class="stat-card">
-      <div class="sc-label">All-Time Posts</div>
-      <div class="sc-val cb" id="totalRun">0</div>
-      <div class="sc-sub">sent to Buffer</div>
-    </div>
+    <div class="stat-card"><div class="sc-label">Posts Today</div><div class="sc-val cg" id="todayCount">0</div><div class="sc-sub">of 2 batch limit</div></div>
+    <div class="stat-card"><div class="sc-label">Subjects Left</div><div class="sc-val cp" id="subjLeft">—</div><div class="sc-sub">in queue</div></div>
+    <div class="stat-card"><div class="sc-label">All-Time Posts</div><div class="sc-val cb" id="totalRun">0</div><div class="sc-sub">sent to Buffer</div></div>
   </div>
 
   <!-- CHANNELS -->
@@ -277,7 +253,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
       <div class="ch-card-title">⇄ Buffer Channels</div>
       <span class="ch-chip" id="activeChip">Loading...</span>
     </div>
-    <div class="ch-sub">Toggle channels ON — posts publish to all active channels simultaneously</div>
+    <div class="ch-sub">Toggle channels ON/OFF — posts publish to all active channels. LinkedIn channels also receive articles.</div>
     <div class="ch-grid" id="channelGrid"></div>
   </div>
 
@@ -285,38 +261,46 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
   <div class="two-col">
     <!-- QUEUE -->
     <div class="card">
-      <div class="card-hdr">
-        <h2>Subject Queue</h2>
-        <span class="chip" id="queueChip">0 subjects</span>
-      </div>
+      <div class="card-hdr"><h2>Subject Queue</h2><span class="chip" id="queueChip">0 subjects</span></div>
       <div class="next-badge">⏰ Next 2 subjects fire at 08:00 AM your time</div>
       <div id="subjectList"></div>
     </div>
 
-    <!-- ADD -->
+    <!-- ADD SUBJECTS -->
     <div class="card">
-      <div class="card-hdr">
-        <h2>Add Subjects</h2>
-        <span class="chip">one per line</span>
+      <div class="card-hdr"><h2>Add Subjects</h2><span class="chip">one per line</span></div>
+
+      <!-- Content type: Post or Article -->
+      <div class="content-type-row">
+        <button class="ct-btn sel-post" id="ctPost" onclick="setContentType('post')">📝 LinkedIn Post</button>
+        <button class="ct-btn" id="ctArt" onclick="setContentType('article')">📄 LinkedIn Article</button>
       </div>
-      <div class="mode-sel">
+
+      <!-- Image mode (only for posts) -->
+      <div class="mode-sel" id="modeSel">
         <button class="mode-opt sel-t" id="modeText" onclick="setMode('no_image')"><span class="mi">Aa</span>Text Only</button>
         <button class="mode-opt" id="modeAuto" onclick="setMode('auto_image')"><span class="mi">✨</span>Auto Image</button>
         <button class="mode-opt" id="modeManual" onclick="setMode('manual_image')"><span class="mi">↑</span>Upload Img</button>
       </div>
+
       <textarea class="subj-ta" id="newSubjects" placeholder="AI tools for marketers&#10;Remote leadership tips&#10;Personal branding in 2025"></textarea>
+
       <div class="mode-panel" id="panelAuto">
         <div class="auto-note">✨ SerpAPI auto-fetches a relevant image for each subject.</div>
         <div class="serp-warn" id="serpWarn">⚠ <strong>SerpAPI key not set.</strong> Posts sent without images.<br><span style="cursor:pointer;text-decoration:underline" onclick="window.location.href='/setup'">Add key in API Settings →</span></div>
       </div>
       <div class="mode-panel" id="panelManual">
         <div class="upload-zone" id="dropzone" onclick="document.getElementById('imgFile').click()">
-          <div style="font-size:28px;color:var(--muted)">↑</div>
+          <div style="font-size:26px;color:var(--muted)">↑</div>
           <p>Click to select an image</p>
           <div class="upload-fname" id="fileName"></div>
         </div>
         <input type="file" id="imgFile" accept="image/*" style="display:none" onchange="onFileChange()">
       </div>
+      <div class="mode-panel show" id="panelArticle" style="display:none">
+        <div class="art-note">📄 Article mode: AI generates a full long-form LinkedIn article (600+ words) with sections and headings. Articles only publish to LinkedIn channels — not Facebook or Instagram.</div>
+      </div>
+
       <button class="add-btn" id="addBtn" onclick="addSubjects()">
         <span id="addLabel">+ Add to Queue</span>
       </button>
@@ -336,7 +320,6 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
       <div class="ll"><span class="lt">[--:--:--]</span>&nbsp;<span class="linfo">Connecting to agent...</span></div>
     </div>
   </div>
-
 </div>
 
 <script>
@@ -365,7 +348,28 @@ function updateCountdown(){
   document.getElementById('progFill').style.width=Math.min(100,((86400000-diff)/86400000*100)).toFixed(2)+'%';
 }
 
-let currentMode='no_image';
+// ── CONTENT TYPE ──
+let currentMode='no_image', currentContentType='post';
+
+function setContentType(ct){
+  currentContentType=ct;
+  document.getElementById('ctPost').className='ct-btn'+(ct==='post'?' sel-post':'');
+  document.getElementById('ctArt').className='ct-btn'+(ct==='article'?' sel-art':'');
+  // Show/hide image mode selector
+  document.getElementById('modeSel').classList.toggle('hidden', ct==='article');
+  document.getElementById('panelArticle').style.display=ct==='article'?'block':'none';
+  if(ct==='article'){
+    // hide image panels
+    document.getElementById('panelAuto').classList.remove('show');
+    document.getElementById('panelManual').classList.remove('show');
+    document.getElementById('newSubjects').placeholder='The future of AI in marketing\nHow to lead remote teams\nPersonal branding strategy for 2025';
+    document.getElementById('addLabel').textContent='+ Add Articles to Queue';
+  } else {
+    document.getElementById('newSubjects').placeholder='AI tools for marketers\nRemote leadership tips\nPersonal branding in 2025';
+    setMode(currentMode);
+  }
+}
+
 function setMode(m){
   currentMode=m;
   document.getElementById('modeText').className='mode-opt'+(m==='no_image'?' sel-t':'');
@@ -381,19 +385,50 @@ function setMode(m){
 function checkSerpKey(){const dot=document.querySelector('#badgeSerp .dot');document.getElementById('serpWarn').style.display=(dot&&dot.classList.contains('dwarn'))?'block':'none';}
 function onFileChange(){const f=document.getElementById('imgFile').files[0];document.getElementById('fileName').textContent=f?f.name:'';document.getElementById('dropzone').classList.toggle('has-file',!!f);}
 
+// ── RENDER SUBJECTS with delete button ──
 function renderSubjects(subjects){
   document.getElementById('subjLeft').textContent=subjects.length;
   document.getElementById('queueChip').textContent=subjects.length+' subject'+(subjects.length!==1?'s':'');
   const box=document.getElementById('subjectList');
-  if(!subjects.length){box.innerHTML='<div class="empty-q" style="font-size:28px;display:block;margin-bottom:8px;">📭</div><div class="empty-q">Queue empty — add subjects above</div>';return;}
-  box.innerHTML=subjects.slice(0,8).map((s,i)=>{
-    const isN=i<2,hasM=s.includes('| IMG:'),hasA=s.toLowerCase().includes('(create image)');
-    const clean=s.split('| IMG:')[0].replace('(create image)','').trim();
-    const tag=hasM?`<span class="qi-tag tag-img">img</span>`:hasA?`<span class="qi-tag tag-auto">auto</span>`:`<span class="qi-tag tag-txt">text</span>`;
-    return`<div class="qi${isN?' next':''}"><span class="qi-n">${pad(i+1)}</span><span class="qi-t" style="color:${isN?'var(--text)':'var(--muted)'}">${clean}</span>${tag}</div>`;
-  }).join('')+(subjects.length>8?`<div style="text-align:center;padding:8px;font-size:12px;color:var(--muted)">+${subjects.length-8} more</div>`:'');
+  if(!subjects.length){
+    box.innerHTML='<div class="empty-q">📭<br>Queue empty — add subjects above</div>';
+    return;
+  }
+  box.innerHTML=subjects.map((s,i)=>{
+    const isN=i<2;
+    const hasM=s.includes('| IMG:');
+    const hasA=s.toLowerCase().includes('(create image)');
+    const isArt=s.toLowerCase().includes('(article)');
+    const clean=s.split('| IMG:')[0].replace('(create image)','').replace('(article)','').trim();
+    const tag=isArt
+      ?`<span class="qi-tag tag-art">article</span>`
+      :hasM?`<span class="qi-tag tag-img">img</span>`
+      :hasA?`<span class="qi-tag tag-auto">auto</span>`
+      :`<span class="qi-tag tag-txt">post</span>`;
+    return`<div class="qi${isN?' next':''}">
+      <span class="qi-n">${pad(i+1)}</span>
+      <span class="qi-t" style="color:${isN?'var(--text)':'var(--muted)'}">${clean}</span>
+      ${tag}
+      <button class="qi-del" onclick="deleteSubject(${i})" title="Delete">✕</button>
+    </div>`;
+  }).join('')+(subjects.length>10?`<div style="text-align:center;padding:8px;font-size:12px;color:var(--muted)">Showing all ${subjects.length} subjects</div>`:'');
 }
 
+// ── DELETE SUBJECT ──
+async function deleteSubject(index){
+  try{
+    const res=await fetch(`${API}/subjects/delete`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({index})});
+    const data=await res.json();
+    if(data.ok)fetchStatus();
+    else alert(data.message||'Failed to delete.');
+  }catch(e){alert('Cannot reach server.');}
+}
+
+// ── PLATFORM ICON ──
+function platformIcon(p){return p==='instagram'?'📸':p==='facebook'?'📘':'💼';}
+function platformClass(p){return p==='instagram'?'ig':p==='facebook'?'fb':'li';}
+
+// ── RENDER CHANNELS ──
 function renderChannels(data){
   const channels=data.channels_info||[];
   const grid=document.getElementById('channelGrid');
@@ -401,14 +436,15 @@ function renderChannels(data){
   const visible=channels.filter(c=>c.slot===1||c.exists);
   let html='';
   visible.forEach(ch=>{
-    const isOn=ch.active&&ch.exists,canDel=ch.slot>1;
-    html+=`<div class="ch-toggle${isOn?' active':''}${!ch.exists?' disabled':''}" onclick="toggleCh(${ch.slot})" title="${ch.exists?(isOn?'Click to turn OFF':'Click to turn ON'):'Not configured'}">
+    const isOn=ch.active&&ch.exists,canDel=ch.slot>1,plat=ch.platform||'linkedin';
+    html+=`<div class="ch-toggle${isOn?' active':''}${!ch.exists?' disabled':''}" onclick="toggleCh(${ch.slot})">
       ${canDel?`<button class="ch-del" onclick="event.stopPropagation();deleteCh(${ch.slot})">✕</button>`:''}
-      <div class="ch-tog-hdr"><span class="ch-name">${ch.name}</span><div class="ch-sw"><div class="knob"></div></div></div>
+      <div class="ch-tog-hdr"><span class="ch-name">${platformIcon(plat)} ${ch.name}</span><div class="ch-sw"><div class="knob"></div></div></div>
+      <span class="ch-platform ${platformClass(plat)}">${plat.toUpperCase()}</span>
       <span class="ch-st">${ch.exists?(isOn?'● ACTIVE':'○ off'):'not configured'}</span>
     </div>`;
   });
-  const missing=[2,3,4].filter(s=>!channels.find(c=>c.slot===s&&c.exists));
+  const missing=[2,3,4,5].filter(s=>!channels.find(c=>c.slot===s&&c.exists));
   if(missing.length>0)html+=`<div class="ch-toggle ch-add" onclick="window.location.href='/setup'"><span style="font-size:18px;color:var(--muted)">+</span><span style="font-size:11px;color:var(--muted);font-family:var(--mono)">Add Channel</span></div>`;
   grid.innerHTML=html;
   const ac=channels.filter(c=>c.active&&c.exists).length;
@@ -445,7 +481,7 @@ async function fetchStatus(){
     const runBtn=document.getElementById('runBtn');
     runBtn.disabled=data.running;
     document.getElementById('runIcon').textContent=data.running?'⟳':'▶';
-    if(data.running)document.getElementById('runIcon').className='spin';else document.getElementById('runIcon').className='';
+    document.getElementById('runIcon').className=data.running?'spin':'';
     document.getElementById('runLabel').textContent=data.running?'Batch Running...':'Run Batch Now — Manual Trigger';
     renderSubjects(data.subjects||[]);
     renderLogs(data.logs||[]);
@@ -461,10 +497,10 @@ async function addSubjects(){
   const ta=document.getElementById('newSubjects'),btn=document.getElementById('addBtn');
   const lines=ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
   if(!lines.length)return;
-  if(currentMode==='manual_image'&&!document.getElementById('imgFile').files.length){alert('Please select an image first.');return;}
+  if(currentContentType==='post'&&currentMode==='manual_image'&&!document.getElementById('imgFile').files.length){alert('Please select an image first.');return;}
   const orig=btn.innerHTML;btn.disabled=true;btn.innerHTML='<span class="spin">⟳</span> Processing...';
-  let payload={subjects:lines,mode:currentMode};
-  if(currentMode==='manual_image'){
+  let payload={subjects:lines,mode:currentContentType==='article'?'no_image':currentMode,content_type:currentContentType};
+  if(currentContentType==='post'&&currentMode==='manual_image'){
     const file=document.getElementById('imgFile').files[0];
     payload.filename=file.name;
     payload.image_base64=await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(file);});
@@ -487,7 +523,6 @@ async function toggleCh(num){
   try{const res=await fetch(`${API}/channel/toggle`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({channel:num})});const data=await res.json();if(data.ok)fetchStatus();else alert(data.message);}
   catch(e){alert('Cannot reach server.');}
 }
-
 async function deleteCh(num){
   if(!confirm(`Delete Channel ${num}?`))return;
   try{const res=await fetch(`${API}/channel/delete`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({channel:num})});const data=await res.json();if(data.ok)fetchStatus();else alert(data.message);}
