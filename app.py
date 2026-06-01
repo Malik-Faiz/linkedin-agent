@@ -5,6 +5,7 @@ import warnings
 import os
 import threading
 import json
+import base64
 import hashlib
 import secrets
 from datetime import datetime, timedelta
@@ -306,10 +307,6 @@ def get_active_channels(cfg):
 
 # ─── BUFFER PUBLISHING ────────────────────────────────────────────────────────
 def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None, platform="linkedin"):
-    # ── Instagram with image → use Buffer REST API v1 (GraphQL does not support image posts) ──
-    if platform == "instagram" and image_url:
-        return send_instagram_image_rest(buffer_key, channel_id, post_text, image_url)
-
     input_data = {
         "text": post_text,
         "channelId": channel_id,
@@ -332,38 +329,6 @@ def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None, platf
             }""", "variables": {"input": input_data}}, timeout=20
         )
         return response.status_code, response.json()
-    except Exception as e:
-        return 500, {"error": str(e)}
-
-
-def send_instagram_image_rest(buffer_key, channel_id, post_text, image_url):
-    """
-    Use Buffer REST API v1 to post an image to Instagram.
-    GraphQL only supports Reels (video) for Instagram — images must use the REST API.
-    """
-    try:
-        data = {
-            "profile_ids[]": channel_id,
-            "text": post_text,
-            "media[photo]": image_url,
-            "media[thumbnail]": image_url,
-            "now": "true",
-        }
-        response = requests.post(
-            "https://api.bufferapp.com/1/updates/create.json",
-            headers={"Authorization": f"Bearer {buffer_key}"},
-            data=data,
-            timeout=20
-        )
-        result = response.json()
-        # Normalize to same shape as GraphQL response so caller works unchanged
-        if response.status_code == 200 and result.get("success"):
-            updates = result.get("updates", [])
-            post_id = updates[0].get("id", "n/a") if updates else "n/a"
-            return 200, {"data": {"createPost": {"post": {"id": post_id}}}}
-        else:
-            msg = result.get("message", str(result))
-            return 200, {"data": {"createPost": {"message": f"REST error: {msg}"}}}
     except Exception as e:
         return 500, {"error": str(e)}
 
@@ -392,6 +357,72 @@ def send_article_to_linkedin(buffer_key, channel_id, title, body):
     except Exception as e:
         return 500, {"error": str(e)}
 
+def upload_image_to_buffer(buffer_key, channel_id, image_url):
+    """
+    Download image from URL and upload it to Buffer media library.
+    Returns media_id string on success, None on failure.
+    Instagram requires images to be uploaded directly — external URLs are rejected.
+    """
+    try:
+        # Download the image
+        r = requests.get(image_url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code != 200:
+            return None
+        image_data = r.content
+        content_type = r.headers.get("content-type", "image/jpeg").split(";")[0].strip()
+        # Encode as base64
+        b64 = base64.b64encode(image_data).decode("utf-8")
+        # Upload to Buffer media endpoint
+        response = requests.post(
+            "https://api.buffer.com/1/graphql",
+            headers={"Authorization": f"Bearer {buffer_key}", "Content-Type": "application/json"},
+            json={"query": """mutation UploadMedia($input: UploadMediaInput!) {
+                uploadMedia(input: $input) {
+                    ... on UploadedMedia { mediaId url }
+                    ... on MutationError { message }
+                }
+            }""", "variables": {"input": {
+                "channelId": channel_id,
+                "mediaType": "image",
+                "base64": f"data:{content_type};base64,{b64}"
+            }}},
+            timeout=30
+        )
+        result = response.json()
+        upload = (result.get("data") or {}).get("uploadMedia") or {}
+        if "mediaId" in upload:
+            return upload["mediaId"]
+        return None
+    except Exception:
+        return None
+
+
+def send_instagram_with_media(buffer_key, channel_id, post_text, media_id):
+    """Send Instagram post using a pre-uploaded Buffer media ID."""
+    input_data = {
+        "text": post_text,
+        "channelId": channel_id,
+        "schedulingType": "automatic",
+        "mode": "addToQueue",
+        "mediaIds": [media_id]
+    }
+    try:
+        response = requests.post(
+            "https://api.buffer.com/1/graphql",
+            headers={"Authorization": f"Bearer {buffer_key}", "Content-Type": "application/json"},
+            json={"query": """mutation CreatePost($input: CreatePostInput!) {
+                createPost(input: $input) {
+                    ... on PostActionSuccess { post { id } }
+                    ... on MutationError { message }
+                }
+            }""", "variables": {"input": input_data}},
+            timeout=20
+        )
+        return response.status_code, response.json()
+    except Exception as e:
+        return 500, {"error": str(e)}
+
+
 def send_to_buffer(username, post_text, image_url=None, is_article=False, article_title=None):
     cfg      = load_config(username)
     buf_key  = cfg.get("buffer_api_key", "")
@@ -409,9 +440,29 @@ def send_to_buffer(username, post_text, image_url=None, is_article=False, articl
             add_log(username, f"  → [{name}] Skipped — articles only go to LinkedIn", "info")
             continue
 
-        # Instagram requires an image or video — skip text-only posts silently
-        if platform == "instagram" and not image_url and not is_article:
-            add_log(username, f"  → [{name}] Skipped — Instagram requires an image (add one via Upload Img or Auto Image)", "warn")
+        # Instagram requires the image uploaded directly to Buffer (not a URL link)
+        if platform == "instagram" and not is_article:
+            if not image_url:
+                add_log(username, f"  → [{name}] Skipped — Instagram needs an image. Use Auto Image or Upload Img mode.", "warn")
+                continue
+            # Upload image to Buffer media library first, then use the returned media ID
+            add_log(username, f"  → [{name}] Uploading image to Buffer for Instagram...", "info")
+            media_id = upload_image_to_buffer(buf_key, cid, image_url)
+            if not media_id:
+                add_log(username, f"  → [{name}] Image upload to Buffer failed — skipping Instagram.", "error")
+                continue
+            # Post using the uploaded media ID
+            status, result = send_instagram_with_media(buf_key, cid, post_text, media_id)
+            if status != 200:
+                add_log(username, f"  → [{name}] HTTP {status}: {result}", "error")
+                continue
+            create_post = (result.get("data") or {}).get("createPost") or {}
+            if "message" in create_post:
+                add_log(username, f"  → [{name}] Buffer error: {create_post['message']}", "error")
+                continue
+            pid = (create_post.get("post") or {}).get("id")
+            add_log(username, f"  → [{name}] Queued post ✓ ID: {pid or 'n/a'}", "ok")
+            success += 1
             continue
 
         if is_article:
