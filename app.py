@@ -306,6 +306,10 @@ def get_active_channels(cfg):
 
 # ─── BUFFER PUBLISHING ────────────────────────────────────────────────────────
 def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None, platform="linkedin"):
+    # ── Instagram with image → use Buffer REST API v1 (GraphQL does not support image posts) ──
+    if platform == "instagram" and image_url:
+        return send_instagram_image_rest(buffer_key, channel_id, post_text, image_url)
+
     input_data = {
         "text": post_text,
         "channelId": channel_id,
@@ -314,8 +318,6 @@ def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None, platf
     }
     if platform == "facebook":
         input_data["metadata"] = {"facebook": {"type": "post"}}
-    elif platform == "instagram":
-        pass  # No metadata — Buffer auto-handles image posts without requiring PostType
     if image_url:
         input_data["assets"] = [{"image": {"url": image_url}}]
     try:
@@ -330,6 +332,38 @@ def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None, platf
             }""", "variables": {"input": input_data}}, timeout=20
         )
         return response.status_code, response.json()
+    except Exception as e:
+        return 500, {"error": str(e)}
+
+
+def send_instagram_image_rest(buffer_key, channel_id, post_text, image_url):
+    """
+    Use Buffer REST API v1 to post an image to Instagram.
+    GraphQL only supports Reels (video) for Instagram — images must use the REST API.
+    """
+    try:
+        data = {
+            "profile_ids[]": channel_id,
+            "text": post_text,
+            "media[photo]": image_url,
+            "media[thumbnail]": image_url,
+            "now": "true",
+        }
+        response = requests.post(
+            "https://api.bufferapp.com/1/updates/create.json",
+            headers={"Authorization": f"Bearer {buffer_key}"},
+            data=data,
+            timeout=20
+        )
+        result = response.json()
+        # Normalize to same shape as GraphQL response so caller works unchanged
+        if response.status_code == 200 and result.get("success"):
+            updates = result.get("updates", [])
+            post_id = updates[0].get("id", "n/a") if updates else "n/a"
+            return 200, {"data": {"createPost": {"post": {"id": post_id}}}}
+        else:
+            msg = result.get("message", str(result))
+            return 200, {"data": {"createPost": {"message": f"REST error: {msg}"}}}
     except Exception as e:
         return 500, {"error": str(e)}
 
