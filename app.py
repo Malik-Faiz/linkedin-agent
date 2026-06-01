@@ -359,41 +359,50 @@ def send_article_to_linkedin(buffer_key, channel_id, title, body):
 
 def upload_image_to_buffer(buffer_key, channel_id, image_url):
     """
-    Download image from URL and upload it to Buffer media library.
-    Returns media_id string on success, None on failure.
-    Instagram requires images to be uploaded directly — external URLs are rejected.
+    Download image from URL and upload to Buffer via multipart form upload.
+    Buffer requires direct file upload for Instagram — external URLs are rejected.
+    Returns media_id on success, None on failure.
     """
     try:
-        # Download the image
+        # Step 1 — download the image bytes
         r = requests.get(image_url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
         if r.status_code != 200:
+            print(f"[BUFFER-IG] Image download failed: HTTP {r.status_code}")
             return None
         image_data = r.content
         content_type = r.headers.get("content-type", "image/jpeg").split(";")[0].strip()
-        # Encode as base64
-        b64 = base64.b64encode(image_data).decode("utf-8")
-        # Upload to Buffer media endpoint
-        response = requests.post(
-            "https://api.buffer.com/1/graphql",
-            headers={"Authorization": f"Bearer {buffer_key}", "Content-Type": "application/json"},
-            json={"query": """mutation UploadMedia($input: UploadMediaInput!) {
-                uploadMedia(input: $input) {
-                    ... on UploadedMedia { mediaId url }
-                    ... on MutationError { message }
-                }
-            }""", "variables": {"input": {
-                "channelId": channel_id,
-                "mediaType": "image",
-                "base64": f"data:{content_type};base64,{b64}"
-            }}},
+        ext = content_type.split("/")[-1] if "/" in content_type else "jpg"
+
+        # Step 2 — upload via Buffer media upload endpoint (multipart)
+        upload_response = requests.post(
+            "https://api.buffer.com/1/media/upload.json",
+            headers={"Authorization": f"Bearer {buffer_key}"},
+            files={"file": (f"image.{ext}", image_data, content_type)},
+            data={"profile_id": channel_id},
             timeout=30
         )
-        result = response.json()
-        upload = (result.get("data") or {}).get("uploadMedia") or {}
-        if "mediaId" in upload:
-            return upload["mediaId"]
+        print(f"[BUFFER-IG] Upload status: {upload_response.status_code}")
+        print(f"[BUFFER-IG] Upload response: {upload_response.text[:500]}")
+
+        result = upload_response.json()
+
+        # Try different response formats Buffer might return
+        media_id = (
+            result.get("media_id") or
+            result.get("id") or
+            result.get("mediaId") or
+            (result.get("media") or {}).get("id") or
+            (result.get("media") or {}).get("media_id")
+        )
+        if media_id:
+            print(f"[BUFFER-IG] Got media_id: {media_id}")
+            return str(media_id)
+
+        print(f"[BUFFER-IG] No media_id found in response: {result}")
         return None
-    except Exception:
+
+    except Exception as e:
+        print(f"[BUFFER-IG] Upload exception: {e}")
         return None
 
 
@@ -449,7 +458,7 @@ def send_to_buffer(username, post_text, image_url=None, is_article=False, articl
             add_log(username, f"  → [{name}] Uploading image to Buffer for Instagram...", "info")
             media_id = upload_image_to_buffer(buf_key, cid, image_url)
             if not media_id:
-                add_log(username, f"  → [{name}] Image upload to Buffer failed — skipping Instagram.", "error")
+                add_log(username, f"  → [{name}] Image upload to Buffer failed — check server logs for details.", "error")
                 continue
             # Post using the uploaded media ID
             status, result = send_instagram_with_media(buf_key, cid, post_text, media_id)
