@@ -32,6 +32,11 @@ FB_APP_ID        = os.environ.get("FACEBOOK_APP_ID", "")
 FB_APP_SECRET    = os.environ.get("FACEBOOK_APP_SECRET", "")
 FB_REDIRECT_URI  = os.environ.get("FACEBOOK_REDIRECT_URI", "")
 
+# Standalone Instagram Graph API app (independent of Facebook)
+IG_APP_ID        = os.environ.get("INSTAGRAM_APP_ID", "")
+IG_APP_SECRET    = os.environ.get("INSTAGRAM_APP_SECRET", "")
+IG_REDIRECT_URI  = os.environ.get("INSTAGRAM_REDIRECT_URI", "")
+
 # ─── AI PROMPTS ───────────────────────────────────────────────────────────────
 SYSTEM_PROMPT_POST = """You are an expert LinkedIn ghostwriter.
 Write a highly engaging, professional LinkedIn post based on the user's subject.
@@ -67,7 +72,10 @@ def load_html(name):
 # ─── ENCRYPTION ───────────────────────────────────────────────────────────────
 SENSITIVE_FIELDS = {
     "groq_api_key", "serpapi_key",
-    "linkedin_access_token", "facebook_access_token", "instagram_access_token",
+    # LinkedIn slots 1-3
+    "linkedin_1_access_token", "linkedin_2_access_token", "linkedin_3_access_token",
+    # Facebook / Instagram
+    "facebook_access_token", "instagram_access_token",
 }
 
 def _get_fernet():
@@ -325,16 +333,18 @@ def get_image_url(username, subject):
         return None
 
 # ════════════════════════════════════════════════════════════════════════════════
-#  DIRECT PUBLISHING — LinkedIn, Facebook, Instagram
+#  DIRECT PUBLISHING — LinkedIn (multi-slot), Facebook, Instagram
 # ════════════════════════════════════════════════════════════════════════════════
 
-def publish_to_linkedin(username, text, image_url=None, is_article=False, article_title=None):
-    """Publish post or article directly to LinkedIn API."""
+def publish_to_linkedin_slot(username, slot, text, image_url=None, is_article=False):
+    """Publish to a specific LinkedIn account slot (1, 2, or 3)."""
     cfg   = load_config(username)
-    token = cfg.get("linkedin_access_token", "")
-    urn   = cfg.get("linkedin_urn", "")
+    token = cfg.get(f"linkedin_{slot}_access_token", "")
+    urn   = cfg.get(f"linkedin_{slot}_urn", "")
+    name  = cfg.get(f"linkedin_{slot}_name", f"Slot {slot}")
+
     if not token or not urn:
-        add_log(username, "  → [LinkedIn] Not connected — go to Setup to connect.", "warn")
+        add_log(username, f"  → [LinkedIn #{slot}] Not connected — skipping.", "warn")
         return False
 
     headers = {
@@ -363,14 +373,18 @@ def publish_to_linkedin(username, text, image_url=None, is_article=False, articl
             json={"registerUploadRequest": {
                 "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
                 "owner": urn,
-                "serviceRelationships": [{"relationshipType": "OWNER", "identifier": "urn:li:userGeneratedContent"}]
+                "serviceRelationships": [{
+                    "relationshipType": "OWNER",
+                    "identifier": "urn:li:userGeneratedContent"
+                }]
             }}, timeout=15
         ).json()
         upload_url = reg.get("value", {}).get("uploadMechanism", {}).get(
             "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest", {}).get("uploadUrl")
         asset = reg.get("value", {}).get("asset")
         if upload_url and asset:
-            img_data = requests.get(image_url, timeout=15, headers={"User-Agent": "Mozilla/5.0"}).content
+            img_data = requests.get(image_url, timeout=15,
+                                    headers={"User-Agent": "Mozilla/5.0"}).content
             requests.put(upload_url, data=img_data,
                          headers={"Authorization": f"Bearer {token}"}, timeout=30)
             payload = {
@@ -383,7 +397,6 @@ def publish_to_linkedin(username, text, image_url=None, is_article=False, articl
                 "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
             }
         else:
-            # fallback to text-only
             payload = {
                 "author": urn, "lifecycleState": "PUBLISHED",
                 "specificContent": {"com.linkedin.ugc.ShareContent": {
@@ -404,15 +417,15 @@ def publish_to_linkedin(username, text, image_url=None, is_article=False, articl
         res = requests.post("https://api.linkedin.com/v2/ugcPosts",
                             headers=headers, json=payload, timeout=20)
         if res.status_code in (200, 201):
-            pid = res.headers.get("x-restli-id", "n/a")
+            pid   = res.headers.get("x-restli-id", "n/a")
             label = "article" if is_article else "post"
-            add_log(username, f"  → [LinkedIn] Published {label} ✓ ID: {pid}", "ok")
+            add_log(username, f"  → [LinkedIn #{slot} — {name}] Published {label} ✓ ID: {pid}", "ok")
             return True
         else:
-            add_log(username, f"  → [LinkedIn] Failed {res.status_code}: {res.text[:200]}", "error")
+            add_log(username, f"  → [LinkedIn #{slot}] Failed {res.status_code}: {res.text[:200]}", "error")
             return False
     except Exception as e:
-        add_log(username, f"  → [LinkedIn] Exception: {e}", "error")
+        add_log(username, f"  → [LinkedIn #{slot}] Exception: {e}", "error")
         return False
 
 
@@ -422,7 +435,7 @@ def publish_to_facebook(username, text, image_url=None):
     token    = cfg.get("facebook_access_token", "")
     page_id  = cfg.get("facebook_page_id", "")
     if not token or not page_id:
-        add_log(username, "  → [Facebook] Not connected — go to Setup to connect.", "warn")
+        add_log(username, "  → [Facebook] Not connected — skipping.", "warn")
         return False
     try:
         if image_url:
@@ -457,13 +470,12 @@ def publish_to_instagram(username, text, image_url=None):
     token   = cfg.get("instagram_access_token", "")
     ig_id   = cfg.get("instagram_account_id", "")
     if not token or not ig_id:
-        add_log(username, "  → [Instagram] Not connected — go to Setup to connect.", "warn")
+        add_log(username, "  → [Instagram] Not connected — skipping.", "warn")
         return False
     if not image_url:
         add_log(username, "  → [Instagram] Skipped — Instagram requires an image.", "warn")
         return False
     try:
-        # Step 1: create media container
         container = requests.post(
             f"https://graph.facebook.com/v19.0/{ig_id}/media",
             params={"access_token": token},
@@ -474,7 +486,6 @@ def publish_to_instagram(username, text, image_url=None):
         if not container_id:
             add_log(username, f"  → [Instagram] Container failed: {container.get('error', {}).get('message', str(container))}", "error")
             return False
-        # Step 2: publish container
         pub = requests.post(
             f"https://graph.facebook.com/v19.0/{ig_id}/media_publish",
             params={"access_token": token},
@@ -493,17 +504,25 @@ def publish_to_instagram(username, text, image_url=None):
 
 
 def publish_to_all(username, text, image_url=None, is_article=False, article_title=None):
-    """Publish to all connected accounts. Returns count of successful publishes."""
+    """
+    Publish to ALL connected channels:
+      - LinkedIn slots 1, 2, 3 (each is a separate account)
+      - Facebook page
+      - Instagram business
+    Returns count of successful publishes.
+    """
     cfg     = load_config(username)
     success = 0
 
-    # LinkedIn
-    if cfg.get("linkedin_access_token"):
-        ok = publish_to_linkedin(username, text, image_url, is_article, article_title)
-        if ok:
-            success += 1
+    # LinkedIn — up to 3 slots
+    for slot in [1, 2, 3]:
+        token = cfg.get(f"linkedin_{slot}_access_token", "")
+        if token:
+            ok = publish_to_linkedin_slot(username, slot, text, image_url, is_article)
+            if ok:
+                success += 1
 
-    # Facebook — articles not supported, skip
+    # Facebook — articles not supported
     if cfg.get("facebook_access_token") and not is_article:
         ok = publish_to_facebook(username, text, image_url)
         if ok:
@@ -515,12 +534,15 @@ def publish_to_all(username, text, image_url=None, is_article=False, article_tit
         if ok:
             success += 1
 
-    if success == 0 and not any([
-        cfg.get("linkedin_access_token"),
+    any_connected = any([
+        cfg.get("linkedin_1_access_token"),
+        cfg.get("linkedin_2_access_token"),
+        cfg.get("linkedin_3_access_token"),
         cfg.get("facebook_access_token"),
-        cfg.get("instagram_access_token")
-    ]):
-        add_log(username, "No accounts connected — go to Setup to connect LinkedIn/Facebook/Instagram.", "error")
+        cfg.get("instagram_access_token"),
+    ])
+    if success == 0 and not any_connected:
+        add_log(username, "No channels connected — go to Setup to connect accounts.", "error")
 
     return success
 
@@ -593,11 +615,11 @@ def run_batch(username, triggered_by="scheduler"):
             sent = publish_to_all(username, post_text, image_url)
 
         if sent > 0:
-            add_log(username, f"[{j+1}/{len(batch)}] Sent to {sent} account(s) ✓", "ok")
+            add_log(username, f"[{j+1}/{len(batch)}] Sent to {sent} channel(s) ✓", "ok")
             state["today_count"] += 1
             state["total_run"]   += sent
         else:
-            add_log(username, f"[{j+1}/{len(batch)}] All accounts failed.", "error")
+            add_log(username, f"[{j+1}/{len(batch)}] All channels failed.", "error")
         time.sleep(10)
 
     state["last_run"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -642,16 +664,17 @@ def keep_alive_loop():
 #  PAGE ROUTES
 # ════════════════════════════════════════════════════════════════════════════════
 @app.route("/")
-def page_login():    return load_html("login.html")
+def page_login():     return load_html("login.html")
 @app.route("/setup")
-def page_setup():    return load_html("setup.html")
+def page_setup():     return load_html("setup.html")
 @app.route("/dashboard")
 def page_dashboard(): return load_html("dashboard.html")
 
 @app.route("/ping")
 def ping():
     utc_now = datetime.utcnow()
-    return jsonify({"status": "alive", "utc_time": utc_now.strftime("%H:%M:%S"), "utc_iso": utc_now.isoformat() + "Z"})
+    return jsonify({"status": "alive", "utc_time": utc_now.strftime("%H:%M:%S"),
+                    "utc_iso": utc_now.isoformat() + "Z"})
 
 # ════════════════════════════════════════════════════════════════════════════════
 #  AUTH ROUTES
@@ -684,11 +707,7 @@ def register():
     session["username"] = username
     session.permanent   = True
     cfg = load_config(username)
-    has_config = bool(cfg.get("groq_api_key") and any([
-        cfg.get("linkedin_access_token"),
-        cfg.get("facebook_access_token"),
-        cfg.get("instagram_access_token")
-    ]))
+    has_config = bool(cfg.get("groq_api_key"))
     return jsonify({"ok": True, "username": username, "has_config": has_config, "message": "Account created!"})
 
 @app.route("/api/login", methods=["POST"])
@@ -735,9 +754,12 @@ def me():
 def get_config(username):
     cfg = load_config(username)
     masked = {}
-    skip_keys = {"linkedin_access_token", "facebook_access_token", "instagram_access_token"}
+    token_keys = {
+        "linkedin_1_access_token", "linkedin_2_access_token", "linkedin_3_access_token",
+        "facebook_access_token", "instagram_access_token",
+    }
     for k, v in cfg.items():
-        if k in skip_keys:
+        if k in token_keys:
             masked[k] = "connected" if v else ""
         elif isinstance(v, str) and v and len(v) > 8 and k in SENSITIVE_FIELDS:
             masked[k] = "*" * (len(v) - 4) + v[-4:]
@@ -759,13 +781,13 @@ def save_config_route(username):
     return jsonify({"ok": True, "message": "Configuration saved!"})
 
 # ════════════════════════════════════════════════════════════════════════════════
-#  ACCOUNTS STATUS
+#  CHANNELS STATUS  — GET /api/channels
 # ════════════════════════════════════════════════════════════════════════════════
-@app.route("/api/accounts")
-def get_accounts():
+@app.route("/api/channels")
+def get_channels():
     username = session.get("username")
     if not username:
-        return jsonify({"ok": False, "authenticated": False})
+        return jsonify({"ok": False, "authenticated": False}), 401
     cfg = load_config(username)
 
     def token_expired(exp_key):
@@ -777,57 +799,166 @@ def get_accounts():
         except Exception:
             return False
 
-    return jsonify({
-        "ok": True,
-        "linkedin": {
-            "connected": bool(cfg.get("linkedin_access_token")),
-            "expired":   token_expired("linkedin_token_expires"),
-            "name":      cfg.get("linkedin_name", ""),
-            "expires":   cfg.get("linkedin_token_expires", ""),
+    # Build LinkedIn slots 1-3
+    linkedin = {}
+    for slot in [1, 2, 3]:
+        t_key  = f"linkedin_{slot}_access_token"
+        e_key  = f"linkedin_{slot}_token_expires"
+        n_key  = f"linkedin_{slot}_name"
+        linkedin[slot] = {
+            "connected": bool(cfg.get(t_key)),
+            "expired":   token_expired(e_key),
+            "name":      cfg.get(n_key, ""),
+            "expires":   cfg.get(e_key, ""),
             "env_set":   bool(LI_CLIENT_ID and LI_CLIENT_SECRET),
-        },
-        "facebook": {
+        }
+
+    facebook = {
+        1: {
             "connected": bool(cfg.get("facebook_access_token")),
-            "name":      cfg.get("facebook_page_name", ""),
+            "page_name": cfg.get("facebook_page_name", ""),
             "page_id":   cfg.get("facebook_page_id", ""),
             "env_set":   bool(FB_APP_ID and FB_APP_SECRET),
-        },
-        "instagram": {
-            "connected": bool(cfg.get("instagram_access_token")),
-            "name":      cfg.get("instagram_username", ""),
-            "env_set":   bool(FB_APP_ID and FB_APP_SECRET),
-        },
+        }
+    }
+
+    instagram = {
+        1: {
+            "connected":      bool(cfg.get("instagram_access_token")),
+            "username":       cfg.get("instagram_username", ""),
+            "via_facebook":   cfg.get("instagram_via_facebook", False),
+            "env_set":        bool(FB_APP_ID and FB_APP_SECRET),
+            "direct_env_set": bool(IG_APP_ID and IG_APP_SECRET),
+        }
+    }
+
+    return jsonify({
+        "ok":        True,
+        "linkedin":  linkedin,
+        "facebook":  facebook,
+        "instagram": instagram,
     })
 
 # ════════════════════════════════════════════════════════════════════════════════
-#  LINKEDIN OAUTH
+#  OAUTH CALLBACK HELPERS
+# ════════════════════════════════════════════════════════════════════════════════
+
+def _callback_page(success, message="", msg_key="", platform="linkedin", slot=1):
+    """
+    Returns an HTML page that:
+     - On success: posts a message to the opener and closes the popup
+     - On failure: shows the error message in the popup window
+    Uses a self-contained page so it works even when the session cookie
+    is not available in the popup (common cross-origin scenario on Railway).
+    """
+    if success:
+        event = msg_key or f"channel_connected:{platform}:{slot}"
+        return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+  body{{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;
+       background:#05030f;color:#3dffc0;font-family:'Segoe UI',sans-serif;text-align:center;}}
+  .box{{padding:40px;border:1px solid rgba(61,255,192,0.3);border-radius:20px;background:rgba(61,255,192,0.05);}}
+  .ico{{font-size:48px;margin-bottom:16px;}}
+  h2{{font-size:20px;margin-bottom:8px;}}
+  p{{font-size:13px;color:rgba(200,185,255,0.6);}}
+</style></head>
+<body><div class="box">
+  <div class="ico">✓</div>
+  <h2>{message or 'Connected!'}</h2>
+  <p>This window will close automatically...</p>
+</div>
+<script>
+  try {{ window.opener && window.opener.postMessage('{event}', '*'); }} catch(e) {{}}
+  setTimeout(function(){{ window.close(); }}, 1200);
+</script>
+</body></html>"""
+    else:
+        return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+  body{{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;
+       background:#05030f;color:#ff6060;font-family:'Segoe UI',sans-serif;text-align:center;}}
+  .box{{padding:40px;border:1px solid rgba(255,96,96,0.3);border-radius:20px;background:rgba(255,96,96,0.05);max-width:420px;}}
+  .ico{{font-size:48px;margin-bottom:16px;}}
+  h2{{font-size:18px;margin-bottom:8px;}}
+  p{{font-size:12px;color:rgba(200,185,255,0.5);margin-top:16px;}}
+  button{{margin-top:20px;padding:10px 24px;background:rgba(255,96,96,0.15);border:1px solid rgba(255,96,96,0.3);
+          color:#ff6060;border-radius:10px;cursor:pointer;font-size:13px;}}
+</style></head>
+<body><div class="box">
+  <div class="ico">✕</div>
+  <h2>Connection Failed</h2>
+  <div style="font-size:12px;color:rgba(255,150,150,0.8);margin-top:8px;">{message}</div>
+  <p>You can close this window and try again.</p>
+  <button onclick="window.close()">Close</button>
+</div>
+</body></html>""", 400
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+#  LINKEDIN OAUTH — supports slot param (1, 2, 3)
 # ════════════════════════════════════════════════════════════════════════════════
 @app.route("/api/auth/linkedin")
 @require_auth
 def linkedin_auth(username):
     if not LI_CLIENT_ID:
         return jsonify({"ok": False, "message": "LINKEDIN_CLIENT_ID not set in environment"}), 400
-    state = secrets.token_hex(16)
-    session["li_state"] = state
+
+    slot = request.args.get("slot", "1")
+    try:
+        slot = int(slot)
+    except ValueError:
+        slot = 1
+    slot = max(1, min(3, slot))  # clamp 1-3
+
+    state_token = secrets.token_hex(16)
+    # Encode username + slot into state so callback works even if session cookie
+    # is not forwarded by the popup (common on Railway / cross-origin redirects)
+    state_payload = f"{username}:{slot}:{state_token}"
+    session[f"li_state_{slot}"] = state_token  # still store for double-check
+    session["li_active_slot"]   = slot
+
     params = {
         "response_type": "code",
         "client_id":     LI_CLIENT_ID,
         "redirect_uri":  LI_REDIRECT_URI,
-        "state":         state,
+        "state":         state_payload,
         "scope":         "openid profile w_member_social"
     }
     url = "https://www.linkedin.com/oauth/v2/authorization?" + urllib.parse.urlencode(params)
     return jsonify({"ok": True, "auth_url": url})
 
+
 @app.route("/api/auth/linkedin/callback")
 def linkedin_callback():
-    username = session.get("username")
+    code      = request.args.get("code", "")
+    state_raw = request.args.get("state", "")
+    error     = request.args.get("error", "")
+
+    if error:
+        desc = request.args.get("error_description", error)
+        return _callback_page(False, f"LinkedIn denied access: {desc}")
+
+    # State format: "username:slot:token"
+    # Username and slot are encoded so we don't rely on the popup session cookie
+    try:
+        username, slot_str, state_token = state_raw.split(":", 2)
+        slot = int(slot_str)
+    except Exception:
+        # Fallback to session (local dev)
+        username   = session.get("username", "")
+        slot       = session.get("li_active_slot", 1)
+        state_token = state_raw
+
     if not username:
-        return "<script>window.close();</script>Not authenticated", 401
-    code  = request.args.get("code", "")
-    state = request.args.get("state", "")
-    if state != session.get("li_state"):
-        return "<script>window.close();</script>Invalid state", 400
+        return _callback_page(False, "Session lost — please log in again and retry.")
+
+    # Verify user exists
+    users = load_users()
+    if username not in users:
+        return _callback_page(False, "Unknown user.")
+
     try:
         token_res = requests.post(
             "https://www.linkedin.com/oauth/v2/accessToken",
@@ -840,31 +971,51 @@ def linkedin_callback():
         expires_in   = token_res.get("expires_in", 5184000)
         if not access_token:
             return f"<script>window.close();</script>Token error: {token_res}", 400
+
         profile = requests.get(
             "https://api.linkedin.com/v2/userinfo",
             headers={"Authorization": f"Bearer {access_token}"}, timeout=10
         ).json()
         li_id   = profile.get("sub", "")
         li_name = profile.get("name") or f"{profile.get('given_name','')} {profile.get('family_name','')}".strip()
+
         cfg = load_config(username)
-        cfg["linkedin_access_token"]  = access_token
-        cfg["linkedin_urn"]           = f"urn:li:person:{li_id}"
-        cfg["linkedin_name"]          = li_name or li_id
-        cfg["linkedin_token_expires"] = (datetime.utcnow() + timedelta(seconds=expires_in)).isoformat()
+        cfg[f"linkedin_{slot}_access_token"]  = access_token
+        cfg[f"linkedin_{slot}_urn"]           = f"urn:li:person:{li_id}"
+        cfg[f"linkedin_{slot}_name"]          = li_name or li_id
+        cfg[f"linkedin_{slot}_token_expires"] = (
+            datetime.utcnow() + timedelta(seconds=expires_in)
+        ).isoformat()
         save_config(username, cfg)
-        add_log(username, f"LinkedIn connected ✓ — {cfg['linkedin_name']}", "ok")
-        return "<html><body><script>window.opener && window.opener.postMessage('li_connected','*');window.close();</script><p>LinkedIn connected! Closing...</p></body></html>"
+        add_log(username, f"LinkedIn slot {slot} connected ✓ — {cfg[f'linkedin_{slot}_name']}", "ok")
+
+        return _callback_page(
+            True,
+            message=f"LinkedIn account {slot} connected!",
+            platform="linkedin",
+            slot=slot
+        )
     except Exception as e:
-        return f"<script>window.close();</script>Error: {e}", 500
+        add_log(username, f"LinkedIn slot {slot} OAuth error: {e}", "error")
+        return _callback_page(False, f"Error: {e}")
+
 
 @app.route("/api/auth/linkedin/disconnect", methods=["POST"])
 @require_auth
 def linkedin_disconnect(username):
+    slot = request.args.get("slot", "1")
+    try:
+        slot = int(slot)
+    except ValueError:
+        slot = 1
+    slot = max(1, min(3, slot))
+
     cfg = load_config(username)
-    for k in ["linkedin_access_token", "linkedin_urn", "linkedin_name", "linkedin_token_expires"]:
+    for k in [f"linkedin_{slot}_access_token", f"linkedin_{slot}_urn",
+              f"linkedin_{slot}_name", f"linkedin_{slot}_token_expires"]:
         cfg.pop(k, None)
     save_config(username, cfg)
-    add_log(username, "LinkedIn disconnected", "warn")
+    add_log(username, f"LinkedIn slot {slot} disconnected", "warn")
     return jsonify({"ok": True})
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -875,28 +1026,45 @@ def linkedin_disconnect(username):
 def facebook_auth(username):
     if not FB_APP_ID:
         return jsonify({"ok": False, "message": "FACEBOOK_APP_ID not set in environment"}), 400
-    state = secrets.token_hex(16)
-    session["fb_state"] = state
+    state_token = secrets.token_hex(16)
+    session["fb_state"] = state_token
+    # Encode username in state for session-less callback
+    state = f"{username}:{state_token}"
     params = {
-        "client_id":     FB_APP_ID,
-        "redirect_uri":  FB_REDIRECT_URI,
-        "state":         state,
-        "scope":         "pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish"
+        "client_id":    FB_APP_ID,
+        "redirect_uri": FB_REDIRECT_URI,
+        "state":        state,
+        "scope":        "pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish"
     }
     url = "https://www.facebook.com/v19.0/dialog/oauth?" + urllib.parse.urlencode(params)
     return jsonify({"ok": True, "auth_url": url})
 
+
 @app.route("/api/auth/facebook/callback")
 def facebook_callback():
-    username = session.get("username")
-    if not username:
-        return "<script>window.close();</script>Not authenticated", 401
     code  = request.args.get("code", "")
     state = request.args.get("state", "")
-    if state != session.get("fb_state"):
-        return "<script>window.close();</script>Invalid state", 400
+    error = request.args.get("error", "")
+
+    if error:
+        desc = request.args.get("error_description", error)
+        return _callback_page(False, f"Facebook denied access: {desc}")
+
+    # Decode state: "username:token"
     try:
-        # Exchange code for token
+        username, state_token = state.split(":", 1)
+    except Exception:
+        username    = session.get("username", "")
+        state_token = state
+
+    if not username:
+        return _callback_page(False, "Session lost — please log in again and retry.")
+
+    users = load_users()
+    if username not in users:
+        return _callback_page(False, "Unknown user.")
+
+    try:
         token_res = requests.get(
             "https://graph.facebook.com/v19.0/oauth/access_token",
             params={"client_id": FB_APP_ID, "client_secret": FB_APP_SECRET,
@@ -906,57 +1074,62 @@ def facebook_callback():
         if not user_token:
             return f"<script>window.close();</script>Token error: {token_res}", 400
 
-        # Get user's pages
         pages_res = requests.get(
             "https://graph.facebook.com/v19.0/me/accounts",
             params={"access_token": user_token}, timeout=10
         ).json()
         pages = pages_res.get("data", [])
         cfg   = load_config(username)
+        msg   = ""
 
         if pages:
-            # Use first page by default
-            page        = pages[0]
-            page_token  = page.get("access_token")
-            page_id     = page.get("id")
-            page_name   = page.get("name", "Facebook Page")
+            page       = pages[0]
+            page_token = page.get("access_token")
+            page_id    = page.get("id")
+            page_name  = page.get("name", "Facebook Page")
             cfg["facebook_access_token"] = page_token
             cfg["facebook_page_id"]      = page_id
             cfg["facebook_page_name"]    = page_name
 
-            # Also check for Instagram business account linked to this page
+            # Check for linked Instagram Business account
             ig_res = requests.get(
                 f"https://graph.facebook.com/v19.0/{page_id}",
-                params={"fields": "instagram_business_account", "access_token": page_token}, timeout=10
+                params={"fields": "instagram_business_account", "access_token": page_token},
+                timeout=10
             ).json()
             ig_account = ig_res.get("instagram_business_account", {})
             ig_id = ig_account.get("id")
             if ig_id:
-                # Get Instagram username
                 ig_info = requests.get(
                     f"https://graph.facebook.com/v19.0/{ig_id}",
                     params={"fields": "username", "access_token": page_token}, timeout=10
                 ).json()
-                cfg["instagram_access_token"]  = page_token  # same token works for IG
-                cfg["instagram_account_id"]    = ig_id
-                cfg["instagram_username"]      = ig_info.get("username", ig_id)
+                cfg["instagram_access_token"] = page_token
+                cfg["instagram_account_id"]   = ig_id
+                cfg["instagram_username"]     = ig_info.get("username", ig_id)
+                cfg["instagram_via_facebook"]  = True
                 add_log(username, f"Instagram connected ✓ — @{cfg['instagram_username']}", "ok")
+                msg = f"Facebook '{page_name}' + Instagram @{cfg['instagram_username']} connected!"
+            else:
+                msg = f"Facebook page '{page_name}' connected! (No Instagram Business account found)"
 
             save_config(username, cfg)
             add_log(username, f"Facebook connected ✓ — {page_name}", "ok")
-            msg = f"Facebook page '{page_name}' connected!"
-            if ig_id:
-                msg += f" Instagram @{cfg.get('instagram_username','')} also connected!"
         else:
-            # No pages — just save user token
             cfg["facebook_access_token"] = user_token
             save_config(username, cfg)
-            msg = "Facebook connected (no pages found — make sure you have a Facebook Page)"
+            msg = "Facebook connected (no pages found)"
             add_log(username, "Facebook connected (no pages found)", "warn")
 
-        return f"<html><body><script>window.opener && window.opener.postMessage('fb_connected','*');window.close();</script><p>{msg} Closing...</p></body></html>"
+        return (
+            f"<html><body><script>"
+            f"window.opener && window.opener.postMessage('channel_connected:facebook:1','*');"
+            f"window.close();"
+            f"</script><p>{msg} Closing...</p></body></html>"
+        )
     except Exception as e:
         return f"<script>window.close();</script>Error: {e}", 500
+
 
 @app.route("/api/auth/facebook/disconnect", methods=["POST"])
 @require_auth
@@ -968,15 +1141,212 @@ def facebook_disconnect(username):
     add_log(username, "Facebook disconnected", "warn")
     return jsonify({"ok": True})
 
+
 @app.route("/api/auth/instagram/disconnect", methods=["POST"])
 @require_auth
 def instagram_disconnect(username):
+    """Disconnect Instagram (works for both via-Facebook and direct connections)."""
     cfg = load_config(username)
-    for k in ["instagram_access_token", "instagram_account_id", "instagram_username"]:
+    for k in ["instagram_access_token", "instagram_account_id",
+              "instagram_username", "instagram_via_facebook", "instagram_token_expires"]:
         cfg.pop(k, None)
     save_config(username, cfg)
     add_log(username, "Instagram disconnected", "warn")
     return jsonify({"ok": True})
+
+# ════════════════════════════════════════════════════════════════════════════════
+#  INSTAGRAM DIRECT OAUTH (independent of Facebook)
+#  Uses Instagram Graph API with its own app credentials:
+#    INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET, INSTAGRAM_REDIRECT_URI
+#
+#  Flow:
+#   1. GET  /api/auth/instagram_direct  → returns Instagram OAuth URL
+#   2. User logs in on Instagram dialog
+#   3. Instagram redirects to /api/auth/instagram_direct/callback
+#   4. We exchange code → short-lived token → long-lived token
+#   5. Fetch Instagram Business/Creator account ID + username
+#   6. Store token + account_id + username in user config
+# ════════════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/auth/instagram_direct")
+@require_auth
+def instagram_direct_auth(username):
+    """Start standalone Instagram OAuth (Graph API, no Facebook required)."""
+    if not IG_APP_ID:
+        return jsonify({
+            "ok":      False,
+            "message": "INSTAGRAM_APP_ID not set in environment. "
+                       "Add INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET, and "
+                       "INSTAGRAM_REDIRECT_URI to your Railway env vars."
+        }), 400
+
+    state_token = secrets.token_hex(16)
+    session["ig_direct_state"] = state_token
+
+    # Instagram Graph API OAuth dialog
+    # Scopes needed for business publishing:
+    #   instagram_basic, instagram_content_publish, pages_show_list (if using FB-linked),
+    #   instagram_manage_insights (optional)
+    params = {
+        "client_id":     IG_APP_ID,
+        "redirect_uri":  IG_REDIRECT_URI,
+        "scope":         "instagram_basic,instagram_content_publish,instagram_manage_insights",
+        "response_type": "code",
+        "state":         state_token,
+    }
+    # Instagram uses the Facebook OAuth dialog even for standalone IG apps
+    url = "https://www.facebook.com/v19.0/dialog/oauth?" + urllib.parse.urlencode(params)
+    return jsonify({"ok": True, "auth_url": url})
+
+
+@app.route("/api/auth/instagram_direct/callback")
+def instagram_direct_callback():
+    """Handle callback from standalone Instagram OAuth."""
+    username = session.get("username")
+    if not username:
+        return "<script>window.close();</script>Not authenticated", 401
+
+    code  = request.args.get("code", "")
+    state = request.args.get("state", "")
+    error = request.args.get("error", "")
+
+    if error:
+        err_reason = request.args.get("error_reason", "")
+        err_desc   = request.args.get("error_description", "Unknown error")
+        return (
+            f"<html><body><script>window.close();</script>"
+            f"<p>Instagram auth error: {err_desc}</p></body></html>"
+        ), 400
+
+    if state != session.get("ig_direct_state"):
+        return "<script>window.close();</script>Invalid state — please try again", 400
+
+    try:
+        # Step 1: Exchange code for short-lived user access token
+        token_res = requests.get(
+            "https://graph.facebook.com/v19.0/oauth/access_token",
+            params={
+                "client_id":     IG_APP_ID,
+                "client_secret": IG_APP_SECRET,
+                "redirect_uri":  IG_REDIRECT_URI,
+                "code":          code,
+            },
+            timeout=15
+        ).json()
+
+        short_token = token_res.get("access_token")
+        if not short_token:
+            err = token_res.get("error", {})
+            return (
+                f"<script>window.close();</script>"
+                f"Token exchange failed: {err.get('message', str(token_res))}"
+            ), 400
+
+        # Step 2: Exchange short-lived token for long-lived token (60 days)
+        long_res = requests.get(
+            "https://graph.facebook.com/v19.0/oauth/access_token",
+            params={
+                "grant_type":        "fb_exchange_token",
+                "client_id":         IG_APP_ID,
+                "client_secret":     IG_APP_SECRET,
+                "fb_exchange_token": short_token,
+            },
+            timeout=15
+        ).json()
+        long_token  = long_res.get("access_token", short_token)
+        expires_in  = long_res.get("expires_in", 5184000)  # ~60 days
+
+        # Step 3: Find the user's Instagram Business/Creator account
+        # First, get their Facebook Pages (needed even for "direct" IG app)
+        pages_res = requests.get(
+            "https://graph.facebook.com/v19.0/me/accounts",
+            params={"access_token": long_token, "fields": "id,name,instagram_business_account"},
+            timeout=10
+        ).json()
+        pages = pages_res.get("data", [])
+
+        ig_id       = None
+        ig_username = None
+        ig_token    = long_token
+
+        for page in pages:
+            ig_acct = page.get("instagram_business_account", {})
+            if ig_acct.get("id"):
+                ig_id = ig_acct["id"]
+                # Get the page token (needed to publish via this IG account)
+                page_tok_res = requests.get(
+                    f"https://graph.facebook.com/v19.0/{page['id']}",
+                    params={"fields": "access_token", "access_token": long_token},
+                    timeout=10
+                ).json()
+                ig_token = page_tok_res.get("access_token", long_token)
+                break
+
+        if not ig_id:
+            # Try fetching IG account directly via /me for Instagram-native app
+            me_res = requests.get(
+                "https://graph.facebook.com/v19.0/me",
+                params={"fields": "id,name", "access_token": long_token},
+                timeout=10
+            ).json()
+            # If still no IG account found, surface a helpful error
+            return (
+                "<html><body><script>window.close();</script>"
+                "<p style='font-family:sans-serif;padding:20px'>"
+                "⚠ No Instagram Business or Creator account found linked to this Facebook login.<br><br>"
+                "Make sure:<br>"
+                "• Your Instagram account is set to Business or Creator<br>"
+                "• It is linked to a Facebook Page<br>"
+                "• You granted all requested permissions"
+                "</p></body></html>"
+            ), 400
+
+        # Step 4: Get Instagram username
+        ig_info = requests.get(
+            f"https://graph.facebook.com/v19.0/{ig_id}",
+            params={"fields": "username,name", "access_token": ig_token},
+            timeout=10
+        ).json()
+        ig_username = ig_info.get("username") or ig_info.get("name") or ig_id
+
+        # Step 5: Save to config (marks as direct connection)
+        cfg = load_config(username)
+        cfg["instagram_access_token"] = ig_token
+        cfg["instagram_account_id"]   = ig_id
+        cfg["instagram_username"]     = ig_username
+        cfg["instagram_via_facebook"] = False  # ← direct connection flag
+        cfg["instagram_token_expires"] = (
+            datetime.utcnow() + timedelta(seconds=expires_in)
+        ).isoformat()
+        save_config(username, cfg)
+        add_log(username, f"Instagram (direct) connected ✓ — @{ig_username}", "ok")
+
+        return (
+            "<html><body><script>"
+            "window.opener && window.opener.postMessage('channel_connected:instagram:1','*');"
+            "window.close();"
+            "</script>"
+            f"<p>Instagram @{ig_username} connected directly! Closing...</p>"
+            "</body></html>"
+        )
+
+    except Exception as e:
+        add_log(username, f"Instagram direct OAuth error: {e}", "error")
+        return f"<script>window.close();</script>Error: {e}", 500
+
+
+@app.route("/api/auth/instagram_direct/disconnect", methods=["POST"])
+@require_auth
+def instagram_direct_disconnect(username):
+    """Disconnect standalone Instagram account."""
+    cfg = load_config(username)
+    for k in ["instagram_access_token", "instagram_account_id",
+              "instagram_username", "instagram_via_facebook", "instagram_token_expires"]:
+        cfg.pop(k, None)
+    save_config(username, cfg)
+    add_log(username, "Instagram (direct) disconnected", "warn")
+    return jsonify({"ok": True})
+
 
 # ════════════════════════════════════════════════════════════════════════════════
 #  STATUS / RUN / SUBJECTS
@@ -993,22 +1363,58 @@ def get_status(username):
             subjects = [l.strip() for l in f if l.strip()]
     cfg    = load_config(username)
     offset = cfg.get("utc_offset_hours", None)
+
+    # Build channels_info for dashboard
+    channels_info = []
+    for slot in [1, 2, 3]:
+        tok  = cfg.get(f"linkedin_{slot}_access_token", "")
+        name = cfg.get(f"linkedin_{slot}_name", f"LinkedIn #{slot}")
+        channels_info.append({
+            "slot":     slot,
+            "platform": "linkedin",
+            "name":     name if tok else f"LinkedIn #{slot}",
+            "exists":   bool(tok),
+            "active":   bool(tok),
+        })
+    # Facebook
+    fb_tok = cfg.get("facebook_access_token", "")
+    channels_info.append({
+        "slot":     4,
+        "platform": "facebook",
+        "name":     cfg.get("facebook_page_name", "Facebook Page"),
+        "exists":   bool(fb_tok),
+        "active":   bool(fb_tok),
+    })
+    # Instagram
+    ig_tok = cfg.get("instagram_access_token", "")
+    channels_info.append({
+        "slot":         5,
+        "platform":     "instagram",
+        "name":         f"@{cfg.get('instagram_username', 'instagram')}" if ig_tok else "Instagram",
+        "exists":       bool(ig_tok),
+        "active":       bool(ig_tok),
+        "via_facebook": cfg.get("instagram_via_facebook", False),
+    })
+
     return jsonify({
-        "status":       state["status"],
-        "running":      state["running"],
-        "today_count":  state["today_count"],
-        "total_run":    state["total_run"],
-        "last_run":     state["last_run"],
-        "next_run_iso": next_run.isoformat() + "Z",
-        "seconds_left": max(0, int((next_run - datetime.utcnow()).total_seconds())),
-        "subjects":     subjects,
-        "logs":         state["logs"][-30:],
-        "utc_offset":   offset,
-        "config":       cfg,
+        "status":        state["status"],
+        "running":       state["running"],
+        "today_count":   state["today_count"],
+        "total_run":     state["total_run"],
+        "last_run":      state["last_run"],
+        "next_run_iso":  next_run.isoformat() + "Z",
+        "seconds_left":  max(0, int((next_run - datetime.utcnow()).total_seconds())),
+        "subjects":      subjects,
+        "logs":          state["logs"][-30:],
+        "utc_offset":    offset,
+        "config":        cfg,
+        "channels_info": channels_info,
         "accounts": {
-            "linkedin":  bool(cfg.get("linkedin_access_token")),
-            "facebook":  bool(cfg.get("facebook_access_token")),
-            "instagram": bool(cfg.get("instagram_access_token")),
+            "linkedin_1":  bool(cfg.get("linkedin_1_access_token")),
+            "linkedin_2":  bool(cfg.get("linkedin_2_access_token")),
+            "linkedin_3":  bool(cfg.get("linkedin_3_access_token")),
+            "facebook":    bool(cfg.get("facebook_access_token")),
+            "instagram":   bool(cfg.get("instagram_access_token")),
         }
     })
 
@@ -1104,4 +1510,5 @@ if __name__ == "__main__":
     print(f"[STARTUP] Data:  {USER_DATA_DIR}/")
     print(f"[STARTUP] LinkedIn OAuth: {'✓ configured' if LI_CLIENT_ID else '✗ LINKEDIN_CLIENT_ID not set'}")
     print(f"[STARTUP] Facebook OAuth: {'✓ configured' if FB_APP_ID else '✗ FACEBOOK_APP_ID not set'}")
+    print(f"[STARTUP] Instagram OAuth: {'✓ configured' if IG_APP_ID else '✗ INSTAGRAM_APP_ID not set (optional — only needed for direct IG connect)'}")
     app.run(host="0.0.0.0", port=port, debug=False)
