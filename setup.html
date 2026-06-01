@@ -80,6 +80,20 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .field input:focus{border-color:rgba(176,133,255,0.4);background:rgba(176,133,255,0.04);box-shadow:0 0 0 3px rgba(176,133,255,0.08);}
 .field input::placeholder{color:var(--muted2);}
 
+/* ── PLATFORM SELECT ── */
+.platform-sel{
+  width:100%;background:rgba(0,0,0,0.35);
+  border:1px solid rgba(176,133,255,0.15);border-radius:12px;
+  padding:12px 14px;color:var(--text);font-family:var(--mono);font-size:12px;
+  outline:none;cursor:pointer;transition:all 0.2s;
+  appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(200,185,255,0.4)' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center;
+  padding-right:36px;
+}
+.platform-sel:focus{border-color:rgba(176,133,255,0.4);background-color:rgba(176,133,255,0.04);box-shadow:0 0 0 3px rgba(176,133,255,0.08);}
+.platform-sel option{background:#0d0a1a;color:var(--text);}
+
 /* ── CHANNELS ── */
 .ch-label{font-size:10px;font-family:var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
 .ch-label::after{content:'';flex:1;height:1px;background:var(--border);}
@@ -92,7 +106,14 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .ch-slot .o{color:var(--muted2);}
 .del-btn{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:7px;background:rgba(255,96,96,0.08);border:1px solid rgba(255,96,96,0.2);color:var(--red);font-size:11px;font-family:var(--mono);cursor:pointer;transition:all 0.2s;}
 .del-btn:hover{background:rgba(255,96,96,0.18);}
-.ch-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.ch-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+
+/* platform badge shown in header */
+.plat-badge{
+  font-size:10px;font-family:var(--mono);letter-spacing:1px;
+  padding:3px 10px;border-radius:20px;
+  background:rgba(176,133,255,0.1);color:var(--p);border:1px solid rgba(176,133,255,0.2);
+}
 
 /* ── SUBMIT ── */
 .submit-area{margin-top:26px;display:flex;flex-direction:column;gap:10px;}
@@ -154,7 +175,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 
   <!-- ALERTS -->
   <div class="alert err" id="errBox"><span style="font-size:15px;flex-shrink:0">⚠</span><span id="errMsg"></span></div>
-  <div class="alert ok" id="okBox"><span style="font-size:15px;flex-shrink:0">✓</span><span id="okMsg"></span></div>
+  <div class="alert ok"  id="okBox"><span style="font-size:15px;flex-shrink:0">✓</span><span id="okMsg"></span></div>
 
   <!-- GROQ -->
   <div class="card">
@@ -193,46 +214,69 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 
     <div class="ch-label">Channel Slots</div>
 
-    <!-- Ch1 -->
+    <!-- Ch1 — required -->
     <div class="ch-row req" id="chRow1">
       <div class="ch-row-hdr">
         <span class="ch-slot">Channel 1 <span class="r">(required)</span></span>
+        <span class="plat-badge" id="platBadge1">💼 LinkedIn</span>
       </div>
       <div class="ch-grid">
         <div class="field" style="margin-bottom:0">
           <label>Name</label>
-          <div class="inp-w"><span class="inp-ico">🏷</span><input type="text" id="cfgChName1" placeholder="e.g. Personal"></div>
+          <div class="inp-w"><span class="inp-ico">🏷</span><input type="text" id="cfgChName1" placeholder="e.g. Personal LinkedIn"></div>
         </div>
         <div class="field" style="margin-bottom:0">
           <label>Channel ID</label>
           <div class="inp-w"><span class="inp-ico">#</span><input type="text" id="cfgCh1" placeholder="670d••••••••"></div>
         </div>
       </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Platform</label>
+        <select class="platform-sel" id="cfgChPlatform1" onchange="updatePlatBadge(1)">
+          <option value="linkedin">💼 LinkedIn</option>
+          <option value="facebook">📘 Facebook</option>
+          <option value="instagram">📸 Instagram</option>
+        </select>
+      </div>
     </div>
 
-    <!-- Ch2 -->
+    <!-- Ch2 — optional -->
     <div class="ch-row" id="chRow2">
       <div class="ch-row-hdr">
         <span class="ch-slot">Channel 2 <span class="o">(optional)</span></span>
-        <button class="del-btn" onclick="clearChannel(2)">✕ Delete</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="plat-badge" id="platBadge2">💼 LinkedIn</span>
+          <button class="del-btn" onclick="clearChannel(2)">✕ Delete</button>
+        </div>
       </div>
       <div class="ch-grid">
         <div class="field" style="margin-bottom:0">
           <label>Name</label>
-          <div class="inp-w"><span class="inp-ico">🏷</span><input type="text" id="cfgChName2" placeholder="e.g. Company"></div>
+          <div class="inp-w"><span class="inp-ico">🏷</span><input type="text" id="cfgChName2" placeholder="e.g. Company Page"></div>
         </div>
         <div class="field" style="margin-bottom:0">
           <label>Channel ID</label>
           <div class="inp-w"><span class="inp-ico">#</span><input type="text" id="cfgCh2" placeholder="670d••••••••"></div>
         </div>
       </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Platform</label>
+        <select class="platform-sel" id="cfgChPlatform2" onchange="updatePlatBadge(2)">
+          <option value="linkedin">💼 LinkedIn</option>
+          <option value="facebook">📘 Facebook</option>
+          <option value="instagram">📸 Instagram</option>
+        </select>
+      </div>
     </div>
 
-    <!-- Ch3 -->
+    <!-- Ch3 — optional -->
     <div class="ch-row" id="chRow3">
       <div class="ch-row-hdr">
         <span class="ch-slot">Channel 3 <span class="o">(optional)</span></span>
-        <button class="del-btn" onclick="clearChannel(3)">✕ Delete</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="plat-badge" id="platBadge3">💼 LinkedIn</span>
+          <button class="del-btn" onclick="clearChannel(3)">✕ Delete</button>
+        </div>
       </div>
       <div class="ch-grid">
         <div class="field" style="margin-bottom:0">
@@ -244,13 +288,24 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
           <div class="inp-w"><span class="inp-ico">#</span><input type="text" id="cfgCh3" placeholder="670d••••••••"></div>
         </div>
       </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Platform</label>
+        <select class="platform-sel" id="cfgChPlatform3" onchange="updatePlatBadge(3)">
+          <option value="linkedin">💼 LinkedIn</option>
+          <option value="facebook">📘 Facebook</option>
+          <option value="instagram">📸 Instagram</option>
+        </select>
+      </div>
     </div>
 
-    <!-- Ch4 Facebook -->
+    <!-- Ch4 — optional -->
     <div class="ch-row" id="chRow4">
       <div class="ch-row-hdr">
-        <span class="ch-slot">Channel 4 — Facebook <span class="o">(optional)</span></span>
-        <button class="del-btn" onclick="clearChannel(4)">✕ Delete</button>
+        <span class="ch-slot">Channel 4 <span class="o">(optional)</span></span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="plat-badge" id="platBadge4">📘 Facebook</span>
+          <button class="del-btn" onclick="clearChannel(4)">✕ Delete</button>
+        </div>
       </div>
       <div class="ch-grid">
         <div class="field" style="margin-bottom:0">
@@ -262,8 +317,46 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
           <div class="inp-w"><span class="inp-ico">#</span><input type="text" id="cfgCh4" placeholder="670d••••••••"></div>
         </div>
       </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Platform</label>
+        <select class="platform-sel" id="cfgChPlatform4" onchange="updatePlatBadge(4)">
+          <option value="linkedin">💼 LinkedIn</option>
+          <option value="facebook" selected>📘 Facebook</option>
+          <option value="instagram">📸 Instagram</option>
+        </select>
+      </div>
     </div>
-  </div>
+
+    <!-- Ch5 — Instagram (new) -->
+    <div class="ch-row" id="chRow5">
+      <div class="ch-row-hdr">
+        <span class="ch-slot">Channel 5 <span class="o">(optional)</span></span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="plat-badge" id="platBadge5">📸 Instagram</span>
+          <button class="del-btn" onclick="clearChannel(5)">✕ Delete</button>
+        </div>
+      </div>
+      <div class="ch-grid">
+        <div class="field" style="margin-bottom:0">
+          <label>Name</label>
+          <div class="inp-w"><span class="inp-ico">🏷</span><input type="text" id="cfgChName5" placeholder="e.g. Instagram Business"></div>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <label>Channel ID</label>
+          <div class="inp-w"><span class="inp-ico">#</span><input type="text" id="cfgCh5" placeholder="670d••••••••"></div>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Platform</label>
+        <select class="platform-sel" id="cfgChPlatform5" onchange="updatePlatBadge(5)">
+          <option value="instagram" selected>📸 Instagram</option>
+          <option value="linkedin">💼 LinkedIn</option>
+          <option value="facebook">📘 Facebook</option>
+        </select>
+      </div>
+    </div>
+
+  </div><!-- /buffer card -->
 
   <!-- SERPAPI -->
   <div class="card">
@@ -295,155 +388,193 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 </div>
 
 <script>
-const API=window.location.origin+'/api';
+const API = window.location.origin + '/api';
 
 // Track which keys are already saved on the server
-let savedKeys={groq:false,buffer:false,ch1:false};
+let savedKeys = { groq: false, buffer: false, ch1: false };
 
-async function saveConfig(){
-  const btn=document.getElementById('saveBtn'),lbl=document.getElementById('saveBtnLabel');
+// ── PLATFORM BADGE UPDATE ──
+const platLabels = { linkedin: '💼 LinkedIn', facebook: '📘 Facebook', instagram: '📸 Instagram' };
+function updatePlatBadge(slot) {
+  const sel = document.getElementById(`cfgChPlatform${slot}`);
+  const badge = document.getElementById(`platBadge${slot}`);
+  if (sel && badge) badge.textContent = platLabels[sel.value] || sel.value;
+}
+
+// ── SAVE CONFIG ──
+async function saveConfig() {
+  const btn = document.getElementById('saveBtn');
+  const lbl = document.getElementById('saveBtnLabel');
   document.getElementById('errBox').classList.remove('show');
   document.getElementById('okBox').classList.remove('show');
 
-  const groq=document.getElementById('cfgGroq').value.trim();
-  const buffer=document.getElementById('cfgBuffer').value.trim();
-  const serp=document.getElementById('cfgSerp').value.trim();
-  const ch1=document.getElementById('cfgCh1').value.trim();
-  const ch2=document.getElementById('cfgCh2').value.trim();
-  const ch3=document.getElementById('cfgCh3').value.trim();
-  const ch4=document.getElementById('cfgCh4').value.trim();
-  const n1=document.getElementById('cfgChName1').value.trim();
-  const n2=document.getElementById('cfgChName2').value.trim();
-  const n3=document.getElementById('cfgChName3').value.trim();
-  const n4=document.getElementById('cfgChName4').value.trim();
+  const groq   = document.getElementById('cfgGroq').value.trim();
+  const buffer = document.getElementById('cfgBuffer').value.trim();
+  const serp   = document.getElementById('cfgSerp').value.trim();
 
-  // Only require groq/buffer if NOT already saved on server
-  const groqOk = groq || savedKeys.groq;
+  const groqOk   = groq   || savedKeys.groq;
   const bufferOk = buffer || savedKeys.buffer;
-  const ch1Ok = ch1 || savedKeys.ch1;
+  const ch1Val   = document.getElementById('cfgCh1').value.trim();
+  const ch1Ok    = ch1Val || savedKeys.ch1;
 
-  if(!groqOk||!bufferOk){
-    document.getElementById('errMsg').textContent='Groq and Buffer API keys are required. '+(savedKeys.groq?'':'Enter your Groq key. ')+(savedKeys.buffer?'':'Enter your Buffer key.');
-    document.getElementById('errBox').classList.add('show');return;
-  }
-  if(!ch1Ok){
-    document.getElementById('errMsg').textContent='Channel 1 ID is required.';
-    document.getElementById('errBox').classList.add('show');return;
-  }
-
-  btn.disabled=true;lbl.innerHTML='<span class="spin">⟳</span> Saving...';
-  try{
-    // Only send fields that have new values — backend merges with existing
-    const payload={};
-    if(groq) payload.groq_api_key=groq;
-    if(buffer) payload.buffer_api_key=buffer;
-    if(serp) payload.serpapi_key=serp;
-    // Always send channel fields so names update
-    if(ch1){payload.buffer_channel_1=ch1;payload.buffer_channel_1_name=n1||'Channel 1';}
-    else if(n1&&savedKeys.ch1){payload.buffer_channel_1_name=n1;}
-    if(ch2){payload.buffer_channel_2=ch2;payload.buffer_channel_2_name=n2||'Channel 2';}
-    if(ch3){payload.buffer_channel_3=ch3;payload.buffer_channel_3_name=n3||'Channel 3';}
-    if(ch4){payload.buffer_channel_4=ch4;payload.buffer_channel_4_name=n4||'Facebook Page';}
-
-    const res=await fetch(`${API}/config`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    const data=await res.json();
-    if(data.ok){
-      document.getElementById('okMsg').textContent='Saved! Redirecting to dashboard...';
-      document.getElementById('okBox').classList.add('show');
-      setTimeout(goToDash,900);
-    }else{
-      document.getElementById('errMsg').textContent=data.message||'Save failed.';
-      document.getElementById('errBox').classList.add('show');
-      btn.disabled=false;lbl.textContent='Save Configuration & Continue →';
-    }
-  }catch(e){
-    document.getElementById('errMsg').textContent='Cannot reach server.';
+  if (!groqOk || !bufferOk) {
+    document.getElementById('errMsg').textContent =
+      'Groq and Buffer API keys are required. ' +
+      (savedKeys.groq   ? '' : 'Enter your Groq key. ') +
+      (savedKeys.buffer ? '' : 'Enter your Buffer key.');
     document.getElementById('errBox').classList.add('show');
-    btn.disabled=false;lbl.textContent='Save Configuration & Continue →';
+    return;
+  }
+  if (!ch1Ok) {
+    document.getElementById('errMsg').textContent = 'Channel 1 ID is required.';
+    document.getElementById('errBox').classList.add('show');
+    return;
+  }
+
+  btn.disabled = true;
+  lbl.innerHTML = '<span class="spin">⟳</span> Saving...';
+
+  try {
+    // Only send fields that have new non-masked values — backend merges
+    const payload = {};
+    if (groq)   payload.groq_api_key   = groq;
+    if (buffer) payload.buffer_api_key = buffer;
+    if (serp)   payload.serpapi_key    = serp;
+
+    for (let i = 1; i <= 5; i++) {
+      const cid  = document.getElementById(`cfgCh${i}`)?.value.trim();
+      const name = document.getElementById(`cfgChName${i}`)?.value.trim();
+      const plat = document.getElementById(`cfgChPlatform${i}`)?.value;
+
+      if (cid)  payload[`buffer_channel_${i}`]          = cid;
+      if (name) payload[`buffer_channel_${i}_name`]     = name || `Channel ${i}`;
+      if (plat) payload[`buffer_channel_${i}_platform`] = plat;
+    }
+
+    const res  = await fetch(`${API}/config`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (data.ok) {
+      document.getElementById('okMsg').textContent = 'Saved! Redirecting to dashboard...';
+      document.getElementById('okBox').classList.add('show');
+      setTimeout(goToDash, 900);
+    } else {
+      document.getElementById('errMsg').textContent = data.message || 'Save failed.';
+      document.getElementById('errBox').classList.add('show');
+      btn.disabled = false;
+      lbl.textContent = 'Save Configuration & Continue →';
+    }
+  } catch(e) {
+    document.getElementById('errMsg').textContent = 'Cannot reach server.';
+    document.getElementById('errBox').classList.add('show');
+    btn.disabled = false;
+    lbl.textContent = 'Save Configuration & Continue →';
   }
 }
 
-async function clearChannel(slot){
-  if(!confirm(`Delete Channel ${slot}?`))return;
-  document.getElementById(`cfgCh${slot}`).value='';
-  document.getElementById(`cfgChName${slot}`).value='';
-  // Remove saved badge if present
-  const badge=document.getElementById(`savedBadge${slot}`);
-  if(badge)badge.remove();
-  try{
-    const res=await fetch(`${API}/channel/delete`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({channel:slot})});
-    const data=await res.json();
-    if(data.ok){
-      const row=document.getElementById(`chRow${slot}`);
-      if(row){row.style.borderColor='rgba(61,255,192,0.3)';setTimeout(()=>row.style.borderColor='',1500);}
+// ── CLEAR CHANNEL ──
+async function clearChannel(slot) {
+  if (!confirm(`Delete Channel ${slot}? This removes it from your config.`)) return;
+  document.getElementById(`cfgCh${slot}`).value     = '';
+  document.getElementById(`cfgChName${slot}`).value = '';
+  const badge = document.getElementById(`savedBadgecfgCh${slot}`);
+  if (badge) badge.remove();
+  try {
+    const res  = await fetch(`${API}/channel/delete`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel: slot })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      const row = document.getElementById(`chRow${slot}`);
+      if (row) { row.style.borderColor = 'rgba(61,255,192,0.3)'; setTimeout(() => row.style.borderColor = '', 1500); }
     }
-  }catch(e){}
+  } catch(e) {}
 }
 
-function goToDash(){window.location.href='/dashboard';}
+function goToDash() { window.location.href = '/dashboard'; }
 
-// Show a "saved ✓" badge next to a field label
-function showSavedBadge(inputId,label){
-  const inp=document.getElementById(inputId);
-  if(!inp)return;
-  const existing=document.getElementById('savedBadge'+inputId);
-  if(existing)return;
-  const badge=document.createElement('span');
-  badge.id='savedBadge'+inputId;
-  badge.style.cssText='margin-left:8px;font-family:var(--mono);font-size:10px;color:var(--green);background:rgba(61,255,192,0.1);border:1px solid rgba(61,255,192,0.25);border-radius:6px;padding:2px 8px;';
-  badge.textContent='✓ saved';
-  inp.closest('.field').querySelector('label').appendChild(badge);
+// ── SAVED BADGE ──
+function showSavedBadge(inputId) {
+  const inp = document.getElementById(inputId);
+  if (!inp) return;
+  if (document.getElementById('savedBadge' + inputId)) return;
+  const badge = document.createElement('span');
+  badge.id = 'savedBadge' + inputId;
+  badge.style.cssText = 'margin-left:8px;font-family:var(--mono);font-size:10px;color:var(--green);background:rgba(61,255,192,0.1);border:1px solid rgba(61,255,192,0.25);border-radius:6px;padding:2px 8px;';
+  badge.textContent = '✓ saved';
+  const label = inp.closest('.field')?.querySelector('label');
+  if (label) label.appendChild(badge);
 }
 
-(async function prefill(){
-  try{
-    const res=await fetch(`${API}/config`,{credentials:'include'});
-    const data=await res.json();
-    if(!data.ok)return;
-    const c=data.config;
+// ── PREFILL ──
+(async function prefill() {
+  try {
+    const res  = await fetch(`${API}/config`, { credentials: 'include' });
+    const data = await res.json();
+    if (!data.ok) return;
+    const c = data.config;
 
-    // Check which sensitive keys exist (they come back masked with ***)
-    const hasMask=(v)=>v&&v.includes('*');
+    const hasMask = v => v && v.includes('*');
 
-    if(hasMask(c.groq_api_key)||c.groq_api_key){
-      savedKeys.groq=true;
-      // Show placeholder indicating key is saved, don't fill actual value
-      const el=document.getElementById('cfgGroq');
-      if(el){el.placeholder='already saved — leave blank to keep';}
+    if (hasMask(c.groq_api_key) || c.groq_api_key) {
+      savedKeys.groq = true;
+      const el = document.getElementById('cfgGroq');
+      if (el) el.placeholder = 'already saved — leave blank to keep';
       showSavedBadge('cfgGroq');
     }
-    if(hasMask(c.buffer_api_key)||c.buffer_api_key){
-      savedKeys.buffer=true;
-      const el=document.getElementById('cfgBuffer');
-      if(el){el.placeholder='already saved — leave blank to keep';}
+    if (hasMask(c.buffer_api_key) || c.buffer_api_key) {
+      savedKeys.buffer = true;
+      const el = document.getElementById('cfgBuffer');
+      if (el) el.placeholder = 'already saved — leave blank to keep';
       showSavedBadge('cfgBuffer');
     }
-    if(hasMask(c.serpapi_key)||c.serpapi_key){
-      const el=document.getElementById('cfgSerp');
-      if(el){el.placeholder='already saved — leave blank to keep';}
+    if (hasMask(c.serpapi_key) || c.serpapi_key) {
+      const el = document.getElementById('cfgSerp');
+      if (el) el.placeholder = 'already saved — leave blank to keep';
       showSavedBadge('cfgSerp');
     }
 
-    // Channel IDs & names — fill non-masked values directly
-    const setVal=(id,val)=>{const el=document.getElementById(id);if(el&&val){if(!val.includes('*'))el.value=val;else{el.placeholder='already saved — leave blank to keep';}}};
-    setVal('cfgCh1',c.buffer_channel_1);
-    if(c.buffer_channel_1){savedKeys.ch1=true;showSavedBadge('cfgCh1');}
-    const setName=(id,val)=>{const el=document.getElementById(id);if(el&&val&&!val.includes('*'))el.value=val;};
-    setName('cfgChName1',c.buffer_channel_1_name);
-    setVal('cfgCh2',c.buffer_channel_2);setName('cfgChName2',c.buffer_channel_2_name);
-    setVal('cfgCh3',c.buffer_channel_3);setName('cfgChName3',c.buffer_channel_3_name);
-    setVal('cfgCh4',c.buffer_channel_4);setName('cfgChName4',c.buffer_channel_4_name);
+    for (let i = 1; i <= 5; i++) {
+      const cid  = c[`buffer_channel_${i}`];
+      const name = c[`buffer_channel_${i}_name`];
+      const plat = c[`buffer_channel_${i}_platform`] || 'linkedin';
 
-    // Update button text if already configured
-    if(savedKeys.groq&&savedKeys.buffer){
-      document.getElementById('saveBtnLabel').textContent='Update Configuration →';
+      if (cid) {
+        if (i === 1) { savedKeys.ch1 = true; }
+        const el = document.getElementById(`cfgCh${i}`);
+        if (el) {
+          if (!hasMask(cid)) el.value = cid;
+          else el.placeholder = 'already saved — leave blank to keep';
+        }
+        showSavedBadge(`cfgCh${i}`);
+      }
+
+      const nel = document.getElementById(`cfgChName${i}`);
+      if (nel && name && !hasMask(name)) nel.value = name;
+
+      const pel = document.getElementById(`cfgChPlatform${i}`);
+      if (pel) { pel.value = plat; updatePlatBadge(i); }
     }
-  }catch(e){}
+
+    if (savedKeys.groq && savedKeys.buffer) {
+      document.getElementById('saveBtnLabel').textContent = 'Update Configuration →';
+    }
+  } catch(e) {}
 })();
 
-(async function authCheck(){
-  try{const res=await fetch(`${API}/me`,{credentials:'include'});const data=await res.json();if(!data.authenticated)window.location.href='/';}
-  catch(e){}
+// ── AUTH CHECK ──
+(async function authCheck() {
+  try {
+    const res  = await fetch(`${API}/me`, { credentials: 'include' });
+    const data = await res.json();
+    if (!data.authenticated) window.location.href = '/';
+  } catch(e) {}
 })();
 </script>
 </body>
