@@ -518,12 +518,13 @@ def run_batch(username, triggered_by="scheduler"):
         add_log(username, f"[{j+1}/{len(batch)}] {'[ARTICLE] ' if is_article else ''}{base_subject[:50]}", "info")
 
         if is_article:
-            # ── ARTICLE FLOW ──
+            # ── ARTICLE FLOW — publish directly via LinkedIn API ──
             title, body = generate_article(username, base_subject)
             if not title or not body:
                 continue
             add_log(username, f"[{j+1}/{len(batch)}] Article generated ✓ — {title[:40]}", "ok")
-            sent = send_to_buffer(username, body, is_article=True, article_title=title)
+            ok = publish_linkedin_article(username, title, body)
+            sent = 1 if ok else 0
 
         else:
             # ── POST FLOW ──
@@ -981,3 +982,186 @@ if __name__ == "__main__":
     print(f"[STARTUP] Scheduler fires at {TARGET_HOUR:02d}:00 per user's local timezone")
     print(f"[STARTUP] Pages: / → login.html | /setup → setup.html | /dashboard → dashboard.html")
     app.run(host="0.0.0.0", port=port, debug=False)
+
+# ════════════════════════════════════════════════════════════════════════════════
+#  LINKEDIN DIRECT OAUTH + ARTICLE PUBLISHING
+# ════════════════════════════════════════════════════════════════════════════════
+
+LINKEDIN_CLIENT_ID     = os.environ.get("LINKEDIN_CLIENT_ID", "")
+LINKEDIN_CLIENT_SECRET = os.environ.get("LINKEDIN_CLIENT_SECRET", "")
+LINKEDIN_REDIRECT_URI  = os.environ.get("LINKEDIN_REDIRECT_URI", "")  # e.g. https://yourapp.com/api/linkedin/callback
+
+@app.route("/api/linkedin/auth")
+@require_auth
+def linkedin_auth(username):
+    """Start LinkedIn OAuth flow — redirect user to LinkedIn login."""
+    if not LINKEDIN_CLIENT_ID:
+        return jsonify({"ok": False, "message": "LINKEDIN_CLIENT_ID not set in environment"}), 400
+
+    import urllib.parse
+    state = secrets.token_hex(16)
+    # Store state in session to verify callback
+    session["linkedin_oauth_state"] = state
+
+    params = {
+        "response_type": "code",
+        "client_id":     LINKEDIN_CLIENT_ID,
+        "redirect_uri":  LINKEDIN_REDIRECT_URI,
+        "state":         state,
+        "scope":         "openid profile w_member_social"
+    }
+    url = "https://www.linkedin.com/oauth/v2/authorization?" + urllib.parse.urlencode(params)
+    return jsonify({"ok": True, "auth_url": url})
+
+
+@app.route("/api/linkedin/callback")
+def linkedin_callback():
+    """LinkedIn OAuth callback — exchange code for access token."""
+    username = session.get("username")
+    if not username:
+        return "Not authenticated", 401
+
+    code  = request.args.get("code")
+    state = request.args.get("state")
+
+    if state != session.get("linkedin_oauth_state"):
+        return "Invalid state", 400
+
+    # Exchange code for token
+    try:
+        token_res = requests.post(
+            "https://www.linkedin.com/oauth/v2/accessToken",
+            data={
+                "grant_type":    "authorization_code",
+                "code":          code,
+                "redirect_uri":  LINKEDIN_REDIRECT_URI,
+                "client_id":     LINKEDIN_CLIENT_ID,
+                "client_secret": LINKEDIN_CLIENT_SECRET,
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            timeout=15
+        ).json()
+
+        access_token = token_res.get("access_token")
+        expires_in   = token_res.get("expires_in", 5184000)  # default 60 days
+
+        if not access_token:
+            return f"Token error: {token_res}", 400
+
+        # Get LinkedIn member ID
+        profile_res = requests.get(
+            "https://api.linkedin.com/v2/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10
+        ).json()
+
+        linkedin_id = profile_res.get("sub")  # OpenID sub = LinkedIn URN ID
+        if not linkedin_id:
+            return f"Profile error: {profile_res}", 400
+
+        # Save token + ID to user config
+        cfg = load_config(username)
+        cfg["linkedin_access_token"]  = access_token
+        cfg["linkedin_member_id"]     = linkedin_id
+        cfg["linkedin_token_expires"] = (datetime.utcnow() + timedelta(seconds=expires_in)).isoformat()
+        save_config(username, cfg)
+        add_log(username, f"LinkedIn OAuth connected ✓ member: {linkedin_id}", "ok")
+
+        return "<script>window.close();window.opener.location.reload();</script><p>LinkedIn connected! You can close this window.</p>"
+
+    except Exception as e:
+        return f"OAuth error: {e}", 500
+
+
+@app.route("/api/linkedin/disconnect", methods=["POST"])
+@require_auth
+def linkedin_disconnect(username):
+    cfg = load_config(username)
+    for key in ["linkedin_access_token", "linkedin_member_id", "linkedin_token_expires"]:
+        cfg.pop(key, None)
+    save_config(username, cfg)
+    add_log(username, "LinkedIn OAuth disconnected", "warn")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/linkedin/status")
+@require_auth
+def linkedin_status(username):
+    cfg     = load_config(username)
+    token   = cfg.get("linkedin_access_token")
+    expires = cfg.get("linkedin_token_expires")
+    member  = cfg.get("linkedin_member_id")
+    connected = bool(token and member)
+    expired   = False
+    if expires:
+        expired = datetime.utcnow() > datetime.fromisoformat(expires)
+    return jsonify({
+        "ok":        True,
+        "connected": connected and not expired,
+        "expired":   expired,
+        "member_id": member,
+        "expires":   expires,
+    })
+
+
+def publish_linkedin_article(username, title, body):
+    """
+    Publish a long-form article directly to LinkedIn using OAuth token.
+    Uses LinkedIn UGC Posts API.
+    """
+    cfg    = load_config(username)
+    token  = cfg.get("linkedin_access_token")
+    member = cfg.get("linkedin_member_id")
+
+    if not token or not member:
+        add_log(username, "LinkedIn OAuth not connected — cannot publish article. Go to Setup to connect.", "error")
+        return False
+
+    # Check token expiry
+    expires = cfg.get("linkedin_token_expires")
+    if expires and datetime.utcnow() > datetime.fromisoformat(expires):
+        add_log(username, "LinkedIn OAuth token expired — reconnect in Setup.", "error")
+        return False
+
+    author_urn = f"urn:li:person:{member}"
+
+    payload = {
+        "author":          author_urn,
+        "lifecycleState":  "PUBLISHED",
+        "specificContent": {
+            "com.linkedin.ugc.ShareContent": {
+                "shareCommentary": {
+                    "text": body
+                },
+                "shareMediaCategory": "NONE"
+            }
+        },
+        "visibility": {
+            "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
+        }
+    }
+
+    try:
+        res = requests.post(
+            "https://api.linkedin.com/v2/ugcPosts",
+            headers={
+                "Authorization":   f"Bearer {token}",
+                "Content-Type":    "application/json",
+                "X-Restli-Protocol-Version": "2.0.0"
+            },
+            json=payload,
+            timeout=20
+        )
+        print(f"[LI-ARTICLE] Status: {res.status_code}")
+        print(f"[LI-ARTICLE] Response: {res.text[:400]}")
+
+        if res.status_code in (200, 201):
+            post_id = res.headers.get("x-restli-id", "n/a")
+            add_log(username, f"LinkedIn article published ✓ ID: {post_id}", "ok")
+            return True
+        else:
+            add_log(username, f"LinkedIn article failed: {res.status_code} — {res.text[:200]}", "error")
+            return False
+    except Exception as e:
+        add_log(username, f"LinkedIn article exception: {e}", "error")
+        return False
