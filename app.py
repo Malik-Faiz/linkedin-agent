@@ -5,11 +5,12 @@ import warnings
 import os
 import threading
 import json
-import base64
 import hashlib
 import secrets
+import base64
+import urllib.parse
 from datetime import datetime, timedelta
-from flask import Flask, jsonify, request, session, send_from_directory
+from flask import Flask, jsonify, request, session, redirect
 from flask_cors import CORS
 
 warnings.filterwarnings('ignore', category=DeprecationWarning)
@@ -22,6 +23,16 @@ USER_DATA_DIR = os.path.join(_DATA_ROOT, "user_data")
 BATCH_SIZE  = 2
 TARGET_HOUR = 8
 
+# ─── OAUTH APP CREDENTIALS (set in Railway env vars) ─────────────────────────
+LI_CLIENT_ID     = os.environ.get("LINKEDIN_CLIENT_ID", "")
+LI_CLIENT_SECRET = os.environ.get("LINKEDIN_CLIENT_SECRET", "")
+LI_REDIRECT_URI  = os.environ.get("LINKEDIN_REDIRECT_URI", "")
+
+FB_APP_ID        = os.environ.get("FACEBOOK_APP_ID", "")
+FB_APP_SECRET    = os.environ.get("FACEBOOK_APP_SECRET", "")
+FB_REDIRECT_URI  = os.environ.get("FACEBOOK_REDIRECT_URI", "")
+
+# ─── AI PROMPTS ───────────────────────────────────────────────────────────────
 SYSTEM_PROMPT_POST = """You are an expert LinkedIn ghostwriter.
 Write a highly engaging, professional LinkedIn post based on the user's subject.
 1. Hook on the first line wrapped in **asterisks**.
@@ -44,15 +55,65 @@ Write in a professional yet conversational tone. Minimum 600 words."""
 app = Flask(__name__, static_folder="static")
 app.secret_key = secrets.token_hex(32)
 CORS(app, supports_credentials=True)
-
 os.makedirs(USER_DATA_DIR, exist_ok=True)
 
-# ─── HTML FILE LOADER ─────────────────────────────────────────────────────────
+# ─── HTML LOADER ──────────────────────────────────────────────────────────────
 def load_html(name):
     path = os.path.join(os.path.dirname(__file__), name)
     if os.path.exists(path):
         return open(path, encoding="utf-8").read()
     return f"<h1>{name} not found</h1>"
+
+# ─── ENCRYPTION ───────────────────────────────────────────────────────────────
+SENSITIVE_FIELDS = {
+    "groq_api_key", "serpapi_key",
+    "linkedin_access_token", "facebook_access_token", "instagram_access_token",
+}
+
+def _get_fernet():
+    key = os.environ.get("ENCRYPTION_KEY", "").strip()
+    if not key:
+        return None
+    try:
+        from cryptography.fernet import Fernet
+        return Fernet(key.encode())
+    except Exception:
+        return None
+
+def _encrypt(value):
+    f = _get_fernet()
+    if not f or not isinstance(value, str):
+        return value
+    return "ENC:" + f.encrypt(value.encode()).decode()
+
+def _decrypt(value):
+    if not isinstance(value, str) or not value.startswith("ENC:"):
+        return value
+    f = _get_fernet()
+    if not f:
+        return value
+    try:
+        return f.decrypt(value[4:].encode()).decode()
+    except Exception:
+        return value
+
+def _encrypt_cfg(cfg):
+    out = {}
+    for k, v in cfg.items():
+        if k in SENSITIVE_FIELDS and isinstance(v, str) and v and not v.startswith("ENC:"):
+            out[k] = _encrypt(v)
+        else:
+            out[k] = v
+    return out
+
+def _decrypt_cfg(cfg):
+    out = {}
+    for k, v in cfg.items():
+        if k in SENSITIVE_FIELDS and isinstance(v, str) and v.startswith("ENC:"):
+            out[k] = _decrypt(v)
+        else:
+            out[k] = v
+    return out
 
 # ─── USER HELPERS ─────────────────────────────────────────────────────────────
 def load_users():
@@ -89,74 +150,16 @@ def user_subjects_path(username):
 def user_state_path(username):
     return os.path.join(user_dir(username), "state.json")
 
-# ─── ENCRYPTION HELPERS ──────────────────────────────────────────────────────
-# Sensitive config fields are encrypted at rest using AES-256 (via Fernet).
-# ENCRYPTION_KEY must be set as a Railway environment variable.
-# Generate one with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-
-SENSITIVE_FIELDS = {
-    "groq_api_key", "buffer_api_key", "serpapi_key",
-    "linkedin_access_token", "linkedin_client_secret",
-}
-
-def _get_fernet():
-    """Return a Fernet cipher using ENCRYPTION_KEY env var, or None if not set."""
-    key = os.environ.get("ENCRYPTION_KEY", "").strip()
-    if not key:
-        return None
-    try:
-        from cryptography.fernet import Fernet
-        return Fernet(key.encode() if isinstance(key, str) else key)
-    except Exception:
-        return None
-
-def _encrypt(value):
-    f = _get_fernet()
-    if not f or not isinstance(value, str):
-        return value
-    return "ENC:" + f.encrypt(value.encode()).decode()
-
-def _decrypt(value):
-    if not isinstance(value, str) or not value.startswith("ENC:"):
-        return value
-    f = _get_fernet()
-    if not f:
-        return value  # no key — return as-is (still encrypted)
-    try:
-        return f.decrypt(value[4:].encode()).decode()
-    except Exception:
-        return value  # decryption failed — return raw
-
-def _encrypt_cfg(cfg):
-    """Return a copy of cfg with sensitive fields encrypted."""
-    out = {}
-    for k, v in cfg.items():
-        if k in SENSITIVE_FIELDS and isinstance(v, str) and v and not v.startswith("ENC:"):
-            out[k] = _encrypt(v)
-        else:
-            out[k] = v
-    return out
-
-def _decrypt_cfg(cfg):
-    """Return a copy of cfg with sensitive fields decrypted."""
-    out = {}
-    for k, v in cfg.items():
-        if k in SENSITIVE_FIELDS and isinstance(v, str) and v.startswith("ENC:"):
-            out[k] = _decrypt(v)
-        else:
-            out[k] = v
-    return out
-
 def load_config(username):
     p = user_config_path(username)
     if not os.path.exists(p):
         return {}
     with open(p, "r", encoding="utf-8") as f:
         raw = json.load(f)
-    return _decrypt_cfg(raw)  # always return decrypted values in memory
+    return _decrypt_cfg(raw)
 
 def save_config(username, cfg):
-    encrypted = _encrypt_cfg(cfg)  # encrypt sensitive fields before writing to disk
+    encrypted = _encrypt_cfg(cfg)
     with open(user_config_path(username), "w", encoding="utf-8") as f:
         json.dump(encrypted, f, indent=2)
 
@@ -175,7 +178,6 @@ def save_state(username, state):
     with open(user_state_path(username), "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2)
 
-# In-memory state per user
 _states = {}
 _state_lock = threading.Lock()
 
@@ -207,7 +209,7 @@ def require_auth(f):
         return f(*args, username=username, **kwargs)
     return decorated
 
-# ─── CORE HELPERS ─────────────────────────────────────────────────────────────
+# ─── HELPERS ──────────────────────────────────────────────────────────────────
 def to_unicode_bold(text):
     normal  = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
     b_chars = "𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭𝗮𝗯𝗰𝗱𝗲𝗳𝗴𝗵𝗶𝗷𝗸𝗹𝗺𝗻𝗼𝗽𝗾𝗿𝘀𝘁𝘂𝘃𝘄𝘅𝘆𝘇𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵"
@@ -217,7 +219,6 @@ def format_linkedin_bold(text):
     return re.sub(r'\*\*(.*?)\*\*', lambda m: to_unicode_bold(m.group(1)), text)
 
 def get_next_run_time_for_user(username):
-    """Return the next 08:00 in user's local timezone as a UTC datetime."""
     cfg    = load_config(username)
     offset = cfg.get("utc_offset_hours", 0)
     now_utc  = datetime.utcnow()
@@ -227,21 +228,12 @@ def get_next_run_time_for_user(username):
         target_local += timedelta(days=1)
     return target_local - timedelta(hours=offset)
 
-# ─── IMAGE VALIDATION ─────────────────────────────────────────────────────────
 def validate_image_url(url, timeout=8):
-    """
-    Check that a URL returns a reachable image.
-    Returns True only if HTTP 200 and content-type is image/*.
-    Falls back to streaming GET if server rejects HEAD.
-    """
     try:
         r = requests.head(url, timeout=timeout, allow_redirects=True,
                           headers={"User-Agent": "Mozilla/5.0"})
-        if r.status_code == 200:
-            ct = r.headers.get("content-type", "")
-            if "image" in ct:
-                return True
-        # Some servers reject HEAD — fall back to a tiny streaming GET
+        if r.status_code == 200 and "image" in r.headers.get("content-type", ""):
+            return True
         if r.status_code in (405, 403, 0):
             r2 = requests.get(url, timeout=timeout, stream=True,
                               headers={"User-Agent": "Mozilla/5.0"})
@@ -254,7 +246,6 @@ def validate_image_url(url, timeout=8):
 
 # ─── AI FUNCTIONS ─────────────────────────────────────────────────────────────
 def generate_post(username, subject):
-    """Generate a short LinkedIn post."""
     cfg      = load_config(username)
     groq_key = cfg.get("groq_api_key", "")
     clean    = subject.replace("(create image)", "").replace("(article)", "").strip()
@@ -276,7 +267,6 @@ def generate_post(username, subject):
         return None
 
 def generate_article(username, subject):
-    """Generate a long-form LinkedIn article."""
     cfg      = load_config(username)
     groq_key = cfg.get("groq_api_key", "")
     clean    = subject.replace("(article)", "").strip()
@@ -284,19 +274,17 @@ def generate_article(username, subject):
         response = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
-            json={"model": "llama-3.1-8b-instant",
-                  "max_tokens": 2000,
-                  "messages": [
-                      {"role": "system", "content": SYSTEM_PROMPT_ARTICLE},
-                      {"role": "user",   "content": f"Write a LinkedIn article about: {clean}"}
-                  ]}, timeout=60
+            json={"model": "llama-3.1-8b-instant", "max_tokens": 2000, "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT_ARTICLE},
+                {"role": "user",   "content": f"Write a LinkedIn article about: {clean}"}
+            ]}, timeout=60
         ).json()
         if "error" in response:
             add_log(username, f"Groq Article Error: {response['error']['message']}", "error")
             return None, None
         raw   = response["choices"][0]["message"]["content"]
         lines = raw.strip().split("\n")
-        title = clean   # default title
+        title = clean
         body  = raw
         if lines[0].startswith("TITLE:"):
             title = lines[0].replace("TITLE:", "").strip()
@@ -312,21 +300,15 @@ def get_image_url(username, subject):
     if not serp_key:
         add_log(username, "SerpAPI key not set — post sent without image.", "warn")
         return None
-
     clean = subject.replace("(create image)", "").replace("(article)", "").strip()
     try:
         response = requests.get("https://serpapi.com/search.json", params={
-            "engine": "google_images",
-            "q": f"{clean} infographic",
-            "api_key": serp_key
+            "engine": "google_images", "q": f"{clean} infographic", "api_key": serp_key
         }, timeout=20).json()
-
         results = response.get("images_results", [])
         if not results:
             add_log(username, "SerpAPI returned no images.", "warn")
             return None
-
-        # Try up to 5 candidates — skip any that are unreachable or expired
         for i, img in enumerate(results[:5]):
             url = img.get("original", "")
             if not url:
@@ -335,199 +317,210 @@ def get_image_url(username, subject):
             if validate_image_url(url):
                 add_log(username, f"Image {i+1} reachable ✓", "ok")
                 return url
-            else:
-                add_log(username, f"Image {i+1} unreachable — trying next", "warn")
-
+            add_log(username, f"Image {i+1} unreachable — trying next", "warn")
         add_log(username, "All candidate images unreachable — post sent without image.", "warn")
         return None
-
     except Exception as e:
         add_log(username, f"SerpAPI Error: {e}", "error")
         return None
 
-# ─── CHANNEL HELPERS ──────────────────────────────────────────────────────────
-# Channel platform defaults:
-#   slot 4 → facebook (locked in UI)
-#   slot 5 → instagram (locked in UI)
-#   slots 1-3 → user-selectable (default: linkedin)
-CHANNEL_PLATFORM_DEFAULTS = {4: "facebook", 5: "instagram"}
+# ════════════════════════════════════════════════════════════════════════════════
+#  DIRECT PUBLISHING — LinkedIn, Facebook, Instagram
+# ════════════════════════════════════════════════════════════════════════════════
 
-def get_active_channels(cfg):
-    """Return list of (slot, channel_id, channel_name, platform) for all active channels."""
-    active_list = cfg.get("active_channels", [1])
-    result = []
-    for slot in active_list:
-        cid      = cfg.get(f"buffer_channel_{slot}", "").strip()
-        name     = cfg.get(f"buffer_channel_{slot}_name", f"Channel {slot}")
-        platform = cfg.get(f"buffer_channel_{slot}_platform",
-                           CHANNEL_PLATFORM_DEFAULTS.get(slot, "linkedin"))
-        if cid:
-            result.append((slot, cid, name, platform))
-    return result
+def publish_to_linkedin(username, text, image_url=None, is_article=False, article_title=None):
+    """Publish post or article directly to LinkedIn API."""
+    cfg   = load_config(username)
+    token = cfg.get("linkedin_access_token", "")
+    urn   = cfg.get("linkedin_urn", "")
+    if not token or not urn:
+        add_log(username, "  → [LinkedIn] Not connected — go to Setup to connect.", "warn")
+        return False
 
-# ─── BUFFER PUBLISHING ────────────────────────────────────────────────────────
-def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None, platform="linkedin"):
-    input_data = {
-        "text": post_text,
-        "channelId": channel_id,
-        "schedulingType": "automatic",
-        "mode": "addToQueue"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type":  "application/json",
+        "X-Restli-Protocol-Version": "2.0.0"
     }
-    if platform == "facebook":
-        input_data["metadata"] = {"facebook": {"type": "post"}}
-    if image_url:
-        input_data["assets"] = [{"image": {"url": image_url}}]
-    try:
-        response = requests.post(
-            "https://api.buffer.com/1/graphql",
-            headers={"Authorization": f"Bearer {buffer_key}", "Content-Type": "application/json"},
-            json={"query": """mutation CreatePost($input: CreatePostInput!) {
-                createPost(input: $input) {
-                    ... on PostActionSuccess { post { id } }
-                    ... on MutationError { message }
+
+    if is_article:
+        payload = {
+            "author":         urn,
+            "lifecycleState": "PUBLISHED",
+            "specificContent": {
+                "com.linkedin.ugc.ShareContent": {
+                    "shareCommentary":    {"text": text},
+                    "shareMediaCategory": "NONE"
                 }
-            }""", "variables": {"input": input_data}}, timeout=20
-        )
-        return response.status_code, response.json()
-    except Exception as e:
-        return 500, {"error": str(e)}
-
-def send_article_to_linkedin(buffer_key, channel_id, title, body):
-    """Send a long-form article to a LinkedIn channel via Buffer."""
-    input_data = {
-        "text": body,
-        "title": title,
-        "channelId": channel_id,
-        "schedulingType": "automatic",
-        "mode": "addToQueue",
-        "metadata": {"linkedin": {"type": "article"}}
-    }
-    try:
-        response = requests.post(
-            "https://api.buffer.com/1/graphql",
-            headers={"Authorization": f"Bearer {buffer_key}", "Content-Type": "application/json"},
-            json={"query": """mutation CreatePost($input: CreatePostInput!) {
-                createPost(input: $input) {
-                    ... on PostActionSuccess { post { id } }
-                    ... on MutationError { message }
-                }
-            }""", "variables": {"input": input_data}}, timeout=30
-        )
-        return response.status_code, response.json()
-    except Exception as e:
-        return 500, {"error": str(e)}
-
-def send_instagram_with_image_url(buffer_key, channel_id, post_text, image_url):
-    """
-    Post image to Instagram via Buffer GraphQL.
-    Uses type=post with shouldShareToFeed=True and image in assets.
-    Valid Instagram types confirmed by Buffer: post, story, reel.
-    """
-    input_data = {
-        "text": post_text,
-        "channelId": channel_id,
-        "schedulingType": "automatic",
-        "mode": "addToQueue",
-        "metadata": {"instagram": {"type": "post", "shouldShareToFeed": True}},
-        "assets": [{"image": {"url": image_url}}],
-    }
-    try:
-        response = requests.post(
-            "https://api.buffer.com/1/graphql",
-            headers={"Authorization": f"Bearer {buffer_key}", "Content-Type": "application/json"},
-            json={"query": """mutation CreatePost($input: CreatePostInput!) {
-                createPost(input: $input) {
-                    ... on PostActionSuccess { post { id } }
-                    ... on MutationError { message }
-                }
-            }""", "variables": {"input": input_data}},
-            timeout=20
-        )
-        print(f"[BUFFER-IG] status: {response.status_code}")
-        print(f"[BUFFER-IG] response: {str(response.json())[:400]}")
-        return response.status_code, response.json()
-    except Exception as e:
-        return 500, {"error": str(e)}
-
-
-def send_to_buffer(username, post_text, image_url=None, is_article=False, article_title=None):
-    cfg      = load_config(username)
-    buf_key  = cfg.get("buffer_api_key", "")
-    channels = get_active_channels(cfg)
-
-    if not channels:
-        add_log(username, "No active Buffer channels — toggle at least one ON.", "error")
-        return 0
-
-    success = 0
-    for slot, cid, name, platform in channels:
-
-        # Articles only publish to LinkedIn channels
-        if is_article and platform != "linkedin":
-            add_log(username, f"  → [{name}] Skipped — articles only go to LinkedIn", "info")
-            continue
-
-        # Instagram — must have an image
-        if platform == "instagram" and not is_article:
-            if not image_url:
-                add_log(username, f"  → [{name}] Skipped — Instagram needs an image. Use Auto Image or Upload Img mode.", "warn")
-                continue
-            add_log(username, f"  → [{name}] Sending image to Instagram via Buffer...", "info")
-            status, result = send_instagram_with_image_url(buf_key, cid, post_text, image_url)
-            if status != 200:
-                add_log(username, f"  → [{name}] HTTP {status}: {result}", "error")
-                continue
-            create_post = (result.get("data") or {}).get("createPost") or {}
-            if "message" in create_post:
-                add_log(username, f"  → [{name}] Buffer error: {create_post['message']}", "error")
-                continue
-            pid = (create_post.get("post") or {}).get("id")
-            add_log(username, f"  → [{name}] Queued post ✓ ID: {pid or 'n/a'}", "ok")
-            success += 1
-            continue
-
-        if is_article:
-            status, result = send_article_to_linkedin(buf_key, cid, article_title, post_text)
+            },
+            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
+        }
+    elif image_url:
+        # Step 1: register image upload
+        reg = requests.post(
+            "https://api.linkedin.com/v2/assets?action=registerUpload",
+            headers=headers,
+            json={"registerUploadRequest": {
+                "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
+                "owner": urn,
+                "serviceRelationships": [{"relationshipType": "OWNER", "identifier": "urn:li:userGeneratedContent"}]
+            }}, timeout=15
+        ).json()
+        upload_url = reg.get("value", {}).get("uploadMechanism", {}).get(
+            "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest", {}).get("uploadUrl")
+        asset = reg.get("value", {}).get("asset")
+        if upload_url and asset:
+            img_data = requests.get(image_url, timeout=15, headers={"User-Agent": "Mozilla/5.0"}).content
+            requests.put(upload_url, data=img_data,
+                         headers={"Authorization": f"Bearer {token}"}, timeout=30)
+            payload = {
+                "author": urn, "lifecycleState": "PUBLISHED",
+                "specificContent": {"com.linkedin.ugc.ShareContent": {
+                    "shareCommentary": {"text": text},
+                    "shareMediaCategory": "IMAGE",
+                    "media": [{"status": "READY", "media": asset}]
+                }},
+                "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
+            }
         else:
-            status, result = send_to_one_channel(buf_key, cid, post_text, image_url, platform=platform)
+            # fallback to text-only
+            payload = {
+                "author": urn, "lifecycleState": "PUBLISHED",
+                "specificContent": {"com.linkedin.ugc.ShareContent": {
+                    "shareCommentary": {"text": text}, "shareMediaCategory": "NONE"
+                }},
+                "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
+            }
+    else:
+        payload = {
+            "author": urn, "lifecycleState": "PUBLISHED",
+            "specificContent": {"com.linkedin.ugc.ShareContent": {
+                "shareCommentary": {"text": text}, "shareMediaCategory": "NONE"
+            }},
+            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
+        }
 
-        if status != 200:
-            add_log(username, f"  → [{name}] HTTP {status}: {result}", "error")
-            continue
+    try:
+        res = requests.post("https://api.linkedin.com/v2/ugcPosts",
+                            headers=headers, json=payload, timeout=20)
+        if res.status_code in (200, 201):
+            pid = res.headers.get("x-restli-id", "n/a")
+            label = "article" if is_article else "post"
+            add_log(username, f"  → [LinkedIn] Published {label} ✓ ID: {pid}", "ok")
+            return True
+        else:
+            add_log(username, f"  → [LinkedIn] Failed {res.status_code}: {res.text[:200]}", "error")
+            return False
+    except Exception as e:
+        add_log(username, f"  → [LinkedIn] Exception: {e}", "error")
+        return False
 
-        if "errors" in result:
-            errs = "; ".join(e.get("message", str(e)) for e in result["errors"])
-            add_log(username, f"  → [{name}] GraphQL error: {errs}", "error")
-            continue
 
-        create_post = (result.get("data") or {}).get("createPost") or {}
+def publish_to_facebook(username, text, image_url=None):
+    """Publish post directly to Facebook Page."""
+    cfg      = load_config(username)
+    token    = cfg.get("facebook_access_token", "")
+    page_id  = cfg.get("facebook_page_id", "")
+    if not token or not page_id:
+        add_log(username, "  → [Facebook] Not connected — go to Setup to connect.", "warn")
+        return False
+    try:
+        if image_url:
+            res = requests.post(
+                f"https://graph.facebook.com/v19.0/{page_id}/photos",
+                params={"access_token": token},
+                data={"url": image_url, "caption": text},
+                timeout=20
+            )
+        else:
+            res = requests.post(
+                f"https://graph.facebook.com/v19.0/{page_id}/feed",
+                params={"access_token": token},
+                data={"message": text},
+                timeout=20
+            )
+        result = res.json()
+        if "id" in result:
+            add_log(username, f"  → [Facebook] Published ✓ ID: {result['id']}", "ok")
+            return True
+        else:
+            add_log(username, f"  → [Facebook] Failed: {result.get('error', {}).get('message', str(result))}", "error")
+            return False
+    except Exception as e:
+        add_log(username, f"  → [Facebook] Exception: {e}", "error")
+        return False
 
-        if "message" in create_post:
-            err_msg = create_post["message"]
-            # Image fallback — retry without image if Buffer rejects it
-            if image_url and not is_article and (
-                "image" in err_msg.lower() or
-                "dimensions" in err_msg.lower() or
-                "fetch" in err_msg.lower()
-            ):
-                add_log(username, f"  → [{name}] Image rejected — retrying without image", "warn")
-                status2, result2 = send_to_one_channel(buf_key, cid, post_text, None, platform=platform)
-                cp2 = (result2.get("data") or {}).get("createPost") or {}
-                if status2 == 200 and "post" in cp2:
-                    pid = (cp2.get("post") or {}).get("id")
-                    add_log(username, f"  → [{name}] Queued without image ✓ ID: {pid}", "ok")
-                    success += 1
-                    continue
-                else:
-                    add_log(username, f"  → [{name}] Retry also failed: {cp2.get('message','unknown')}", "error")
-            else:
-                add_log(username, f"  → [{name}] Buffer error: {err_msg}", "error")
-            continue
 
-        pid   = (create_post.get("post") or {}).get("id")
-        label = "article" if is_article else "post"
-        add_log(username, f"  → [{name}] Queued {label} ✓ ID: {pid or 'n/a'}", "ok")
-        success += 1
+def publish_to_instagram(username, text, image_url=None):
+    """Publish image post to Instagram Business account."""
+    cfg     = load_config(username)
+    token   = cfg.get("instagram_access_token", "")
+    ig_id   = cfg.get("instagram_account_id", "")
+    if not token or not ig_id:
+        add_log(username, "  → [Instagram] Not connected — go to Setup to connect.", "warn")
+        return False
+    if not image_url:
+        add_log(username, "  → [Instagram] Skipped — Instagram requires an image.", "warn")
+        return False
+    try:
+        # Step 1: create media container
+        container = requests.post(
+            f"https://graph.facebook.com/v19.0/{ig_id}/media",
+            params={"access_token": token},
+            data={"image_url": image_url, "caption": text},
+            timeout=20
+        ).json()
+        container_id = container.get("id")
+        if not container_id:
+            add_log(username, f"  → [Instagram] Container failed: {container.get('error', {}).get('message', str(container))}", "error")
+            return False
+        # Step 2: publish container
+        pub = requests.post(
+            f"https://graph.facebook.com/v19.0/{ig_id}/media_publish",
+            params={"access_token": token},
+            data={"creation_id": container_id},
+            timeout=20
+        ).json()
+        if "id" in pub:
+            add_log(username, f"  → [Instagram] Published ✓ ID: {pub['id']}", "ok")
+            return True
+        else:
+            add_log(username, f"  → [Instagram] Publish failed: {pub.get('error', {}).get('message', str(pub))}", "error")
+            return False
+    except Exception as e:
+        add_log(username, f"  → [Instagram] Exception: {e}", "error")
+        return False
+
+
+def publish_to_all(username, text, image_url=None, is_article=False, article_title=None):
+    """Publish to all connected accounts. Returns count of successful publishes."""
+    cfg     = load_config(username)
+    success = 0
+
+    # LinkedIn
+    if cfg.get("linkedin_access_token"):
+        ok = publish_to_linkedin(username, text, image_url, is_article, article_title)
+        if ok:
+            success += 1
+
+    # Facebook — articles not supported, skip
+    if cfg.get("facebook_access_token") and not is_article:
+        ok = publish_to_facebook(username, text, image_url)
+        if ok:
+            success += 1
+
+    # Instagram — articles not supported, image required
+    if cfg.get("instagram_access_token") and not is_article:
+        ok = publish_to_instagram(username, text, image_url)
+        if ok:
+            success += 1
+
+    if success == 0 and not any([
+        cfg.get("linkedin_access_token"),
+        cfg.get("facebook_access_token"),
+        cfg.get("instagram_access_token")
+    ]):
+        add_log(username, "No accounts connected — go to Setup to connect LinkedIn/Facebook/Instagram.", "error")
 
     return success
 
@@ -546,18 +539,14 @@ def run_batch(username, triggered_by="scheduler"):
     subjects_file = user_subjects_path(username)
     if not os.path.exists(subjects_file):
         add_log(username, "Queue is empty! Add subjects from dashboard.", "warn")
-        state["running"] = False
-        state["status"]  = "waiting"
-        return
+        state["running"] = False; state["status"] = "waiting"; return
 
     with open(subjects_file, "r", encoding="utf-8") as f:
         all_subjects = [l.strip() for l in f if l.strip()]
 
     if not all_subjects:
         add_log(username, "Queue is empty!", "warn")
-        state["running"] = False
-        state["status"]  = "waiting"
-        return
+        state["running"] = False; state["status"] = "waiting"; return
 
     batch = all_subjects[:BATCH_SIZE]
     with open(subjects_file, "w", encoding="utf-8") as f:
@@ -578,16 +567,12 @@ def run_batch(username, triggered_by="scheduler"):
         add_log(username, f"[{j+1}/{len(batch)}] {'[ARTICLE] ' if is_article else ''}{base_subject[:50]}", "info")
 
         if is_article:
-            # ── ARTICLE FLOW — publish directly via LinkedIn API ──
             title, body = generate_article(username, base_subject)
             if not title or not body:
                 continue
             add_log(username, f"[{j+1}/{len(batch)}] Article generated ✓ — {title[:40]}", "ok")
-            ok = publish_linkedin_article(username, title, body)
-            sent = 1 if ok else 0
-
+            sent = publish_to_all(username, body, is_article=True, article_title=title)
         else:
-            # ── POST FLOW ──
             post_text = generate_post(username, base_subject)
             if not post_text:
                 continue
@@ -605,15 +590,14 @@ def run_batch(username, triggered_by="scheduler"):
                 if image_url:
                     add_log(username, f"[{j+1}/{len(batch)}] Image fetched ✓", "ok")
 
-            sent = send_to_buffer(username, post_text, image_url)
+            sent = publish_to_all(username, post_text, image_url)
 
         if sent > 0:
-            add_log(username, f"[{j+1}/{len(batch)}] Sent to {sent} channel(s) ✓", "ok")
+            add_log(username, f"[{j+1}/{len(batch)}] Sent to {sent} account(s) ✓", "ok")
             state["today_count"] += 1
             state["total_run"]   += sent
         else:
-            add_log(username, f"[{j+1}/{len(batch)}] All channels failed.", "error")
-
+            add_log(username, f"[{j+1}/{len(batch)}] All accounts failed.", "error")
         time.sleep(10)
 
     state["last_run"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -641,7 +625,6 @@ def scheduler_loop():
         fired_today = {k for k in fired_today if k[1] >= now_utc.date()}
         time.sleep(1)
 
-# ─── KEEP ALIVE ───────────────────────────────────────────────────────────────
 def keep_alive_loop():
     time.sleep(30)
     while True:
@@ -659,26 +642,16 @@ def keep_alive_loop():
 #  PAGE ROUTES
 # ════════════════════════════════════════════════════════════════════════════════
 @app.route("/")
-def page_login():
-    return load_html("login.html")
-
+def page_login():    return load_html("login.html")
 @app.route("/setup")
-def page_setup():
-    return load_html("setup.html")
-
+def page_setup():    return load_html("setup.html")
 @app.route("/dashboard")
-def page_dashboard():
-    return load_html("dashboard.html")
+def page_dashboard(): return load_html("dashboard.html")
 
 @app.route("/ping")
 def ping():
-    # Always UTC — frontend converts to user local time
     utc_now = datetime.utcnow()
-    return jsonify({
-        "status":   "alive",
-        "utc_time": utc_now.strftime("%H:%M:%S"),
-        "utc_iso":  utc_now.isoformat() + "Z"
-    })
+    return jsonify({"status": "alive", "utc_time": utc_now.strftime("%H:%M:%S"), "utc_iso": utc_now.isoformat() + "Z"})
 
 # ════════════════════════════════════════════════════════════════════════════════
 #  AUTH ROUTES
@@ -688,7 +661,6 @@ def register():
     data     = request.get_json()
     username = (data.get("username") or "").strip().lower()
     password = data.get("password") or ""
-
     if not username or not password:
         return jsonify({"ok": False, "message": "Username and password required."}), 400
     if len(username) < 3:
@@ -697,25 +669,26 @@ def register():
         return jsonify({"ok": False, "message": "Password must be at least 6 characters."}), 400
     if not re.match(r'^[a-z0-9_]+$', username):
         return jsonify({"ok": False, "message": "Username: letters, numbers, underscores only."}), 400
-
     users = load_users()
     if username in users:
         return jsonify({"ok": False, "message": "Username already taken."}), 409
-
     h, salt = hash_password(password)
     users[username] = {"password_hash": h, "salt": salt, "created_at": datetime.now().isoformat()}
     save_users(users)
     os.makedirs(user_dir(username), exist_ok=True)
-
     utc_offset = data.get("utc_offset_hours")
     if utc_offset is not None:
         cfg = load_config(username)
         cfg["utc_offset_hours"] = float(utc_offset)
         save_config(username, cfg)
-
     session["username"] = username
     session.permanent   = True
-    has_config = bool(load_config(username).get("groq_api_key") and load_config(username).get("buffer_api_key"))
+    cfg = load_config(username)
+    has_config = bool(cfg.get("groq_api_key") and any([
+        cfg.get("linkedin_access_token"),
+        cfg.get("facebook_access_token"),
+        cfg.get("instagram_access_token")
+    ]))
     return jsonify({"ok": True, "username": username, "has_config": has_config, "message": "Account created!"})
 
 @app.route("/api/login", methods=["POST"])
@@ -723,25 +696,21 @@ def login():
     data     = request.get_json()
     username = (data.get("username") or "").strip().lower()
     password = data.get("password") or ""
-
     users = load_users()
     if username not in users:
         return jsonify({"ok": False, "message": "Invalid username or password."}), 401
-
     u = users[username]
     if not verify_password(password, u["password_hash"], u["salt"]):
         return jsonify({"ok": False, "message": "Invalid username or password."}), 401
-
     utc_offset = data.get("utc_offset_hours")
     if utc_offset is not None:
         cfg = load_config(username)
         cfg["utc_offset_hours"] = float(utc_offset)
         save_config(username, cfg)
-
     session["username"] = username
     session.permanent   = True
     cfg = load_config(username)
-    has_config = bool(cfg.get("groq_api_key") and cfg.get("buffer_api_key"))
+    has_config = bool(cfg.get("groq_api_key"))
     return jsonify({"ok": True, "username": username, "has_config": has_config})
 
 @app.route("/api/logout", methods=["POST"])
@@ -755,7 +724,7 @@ def me():
     if not username:
         return jsonify({"ok": False, "authenticated": False})
     cfg = load_config(username)
-    has_config = bool(cfg.get("groq_api_key") and cfg.get("buffer_api_key"))
+    has_config = bool(cfg.get("groq_api_key"))
     return jsonify({"ok": True, "authenticated": True, "username": username, "has_config": has_config})
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -765,20 +734,12 @@ def me():
 @require_auth
 def get_config(username):
     cfg = load_config(username)
-    no_mask = {
-        "active_channel", "utc_offset_hours", "active_channels",
-        "buffer_channel_1",          "buffer_channel_2",          "buffer_channel_3",
-        "buffer_channel_4",          "buffer_channel_5",
-        "buffer_channel_1_name",     "buffer_channel_2_name",     "buffer_channel_3_name",
-        "buffer_channel_4_name",     "buffer_channel_5_name",
-        "buffer_channel_1_platform", "buffer_channel_2_platform", "buffer_channel_3_platform",
-        "buffer_channel_4_platform", "buffer_channel_5_platform",
-    }
     masked = {}
+    skip_keys = {"linkedin_access_token", "facebook_access_token", "instagram_access_token"}
     for k, v in cfg.items():
-        if k in no_mask:
-            masked[k] = v
-        elif isinstance(v, str) and v and len(v) > 8:
+        if k in skip_keys:
+            masked[k] = "connected" if v else ""
+        elif isinstance(v, str) and v and len(v) > 8 and k in SENSITIVE_FIELDS:
             masked[k] = "*" * (len(v) - 4) + v[-4:]
         else:
             masked[k] = v
@@ -789,157 +750,268 @@ def get_config(username):
 def save_config_route(username):
     data = request.get_json()
     cfg  = load_config(username)
-
-    # Only overwrite sensitive keys when a real non-masked value is sent
-    for field in ["groq_api_key", "buffer_api_key", "serpapi_key"]:
+    for field in ["groq_api_key", "serpapi_key"]:
         val = (data.get(field) or "").strip()
         if val and "*" not in val:
             cfg[field] = val
-
-    # Channels 1–5: ID, name, platform
-    for i in [1, 2, 3, 4, 5]:
-        cid      = (data.get(f"buffer_channel_{i}") or "").strip()
-        name     = (data.get(f"buffer_channel_{i}_name") or "").strip()
-        # Enforce locked platforms for slots 4 & 5 regardless of what frontend sends
-        if i == 4:
-            platform = "facebook"
-        elif i == 5:
-            platform = "instagram"
-        else:
-            platform = (data.get(f"buffer_channel_{i}_platform") or "").strip() or "linkedin"
-
-        if cid and "*" not in cid:
-            cfg[f"buffer_channel_{i}"] = cid
-        if name and "*" not in name:
-            cfg[f"buffer_channel_{i}_name"] = name
-        # Always save the platform (even if no new ID — keeps it consistent)
-        if cid or cfg.get(f"buffer_channel_{i}"):
-            cfg[f"buffer_channel_{i}_platform"] = platform
-
-    if "active_channels" not in cfg:
-        cfg["active_channels"] = [1]
-
     save_config(username, cfg)
-    active_list = cfg.get("active_channels", [1])
-    names = [cfg.get(f"buffer_channel_{i}_name", f"Channel {i}") for i in active_list]
-    add_log(username, f"Config updated ✓ — Active: {', '.join(names)}", "ok")
-    return jsonify({"ok": True, "message": "Configuration saved!", "active_channels": active_list})
+    add_log(username, "Config updated ✓", "ok")
+    return jsonify({"ok": True, "message": "Configuration saved!"})
 
 # ════════════════════════════════════════════════════════════════════════════════
-#  CHANNEL ROUTES
+#  ACCOUNTS STATUS
 # ════════════════════════════════════════════════════════════════════════════════
-@app.route("/api/channel/toggle", methods=["POST"])
-@require_auth
-def toggle_channel(username):
-    data = request.get_json()
-    ch   = data.get("channel")
-    if ch not in [1, 2, 3, 4, 5]:
-        return jsonify({"ok": False, "message": "Channel must be 1–5"}), 400
+@app.route("/api/accounts")
+def get_accounts():
+    username = session.get("username")
+    if not username:
+        return jsonify({"ok": False, "authenticated": False})
     cfg = load_config(username)
-    if not cfg.get(f"buffer_channel_{ch}", "").strip():
-        return jsonify({"ok": False, "message": f"Channel {ch} has no ID configured"}), 400
 
-    active = cfg.get("active_channels", [1])
-    if not isinstance(active, list):
-        active = [active]
+    def token_expired(exp_key):
+        exp = cfg.get(exp_key)
+        if not exp:
+            return False
+        try:
+            return datetime.utcnow() > datetime.fromisoformat(exp)
+        except Exception:
+            return False
 
-    if ch in active:
-        if len(active) <= 1:
-            return jsonify({"ok": False, "message": "At least one channel must remain active"}), 400
-        active.remove(ch)
-        state = "OFF"
-    else:
-        active.append(ch)
-        active.sort()
-        state = "ON"
-
-    cfg["active_channels"] = active
-    save_config(username, cfg)
-    name = cfg.get(f"buffer_channel_{ch}_name", f"Channel {ch}")
-    add_log(username, f"Channel [{name}] toggled {state} — Active: {active}", "ok")
-    return jsonify({"ok": True, "active_channels": active, "channel": ch, "state": state})
-
-@app.route("/api/channel/delete", methods=["POST"])
-@require_auth
-def delete_channel(username):
-    data = request.get_json()
-    ch   = data.get("channel")
-    if ch not in [2, 3, 4, 5]:
-        return jsonify({"ok": False, "message": "Only channels 2–5 can be deleted"}), 400
-    cfg  = load_config(username)
-    name = cfg.get(f"buffer_channel_{ch}_name", f"Channel {ch}")
-
-    for key in [f"buffer_channel_{ch}", f"buffer_channel_{ch}_name", f"buffer_channel_{ch}_platform"]:
-        cfg.pop(key, None)
-
-    active = cfg.get("active_channels", [1])
-    if not isinstance(active, list):
-        active = [active]
-    if ch in active:
-        active.remove(ch)
-    if not active:
-        active = [1]
-    cfg["active_channels"] = active
-
-    save_config(username, cfg)
-    add_log(username, f"Channel [{name}] deleted from slot {ch}", "warn")
-    return jsonify({"ok": True, "message": f"Channel {ch} deleted"})
+    return jsonify({
+        "ok": True,
+        "linkedin": {
+            "connected": bool(cfg.get("linkedin_access_token")),
+            "expired":   token_expired("linkedin_token_expires"),
+            "name":      cfg.get("linkedin_name", ""),
+            "expires":   cfg.get("linkedin_token_expires", ""),
+            "env_set":   bool(LI_CLIENT_ID and LI_CLIENT_SECRET),
+        },
+        "facebook": {
+            "connected": bool(cfg.get("facebook_access_token")),
+            "name":      cfg.get("facebook_page_name", ""),
+            "page_id":   cfg.get("facebook_page_id", ""),
+            "env_set":   bool(FB_APP_ID and FB_APP_SECRET),
+        },
+        "instagram": {
+            "connected": bool(cfg.get("instagram_access_token")),
+            "name":      cfg.get("instagram_username", ""),
+            "env_set":   bool(FB_APP_ID and FB_APP_SECRET),
+        },
+    })
 
 # ════════════════════════════════════════════════════════════════════════════════
-#  STATUS ROUTE
+#  LINKEDIN OAUTH
+# ════════════════════════════════════════════════════════════════════════════════
+@app.route("/api/auth/linkedin")
+@require_auth
+def linkedin_auth(username):
+    if not LI_CLIENT_ID:
+        return jsonify({"ok": False, "message": "LINKEDIN_CLIENT_ID not set in environment"}), 400
+    state = secrets.token_hex(16)
+    session["li_state"] = state
+    params = {
+        "response_type": "code",
+        "client_id":     LI_CLIENT_ID,
+        "redirect_uri":  LI_REDIRECT_URI,
+        "state":         state,
+        "scope":         "openid profile w_member_social"
+    }
+    url = "https://www.linkedin.com/oauth/v2/authorization?" + urllib.parse.urlencode(params)
+    return jsonify({"ok": True, "auth_url": url})
+
+@app.route("/api/auth/linkedin/callback")
+def linkedin_callback():
+    username = session.get("username")
+    if not username:
+        return "<script>window.close();</script>Not authenticated", 401
+    code  = request.args.get("code", "")
+    state = request.args.get("state", "")
+    if state != session.get("li_state"):
+        return "<script>window.close();</script>Invalid state", 400
+    try:
+        token_res = requests.post(
+            "https://www.linkedin.com/oauth/v2/accessToken",
+            data={"grant_type": "authorization_code", "code": code,
+                  "redirect_uri": LI_REDIRECT_URI,
+                  "client_id": LI_CLIENT_ID, "client_secret": LI_CLIENT_SECRET},
+            headers={"Content-Type": "application/x-www-form-urlencoded"}, timeout=15
+        ).json()
+        access_token = token_res.get("access_token")
+        expires_in   = token_res.get("expires_in", 5184000)
+        if not access_token:
+            return f"<script>window.close();</script>Token error: {token_res}", 400
+        profile = requests.get(
+            "https://api.linkedin.com/v2/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"}, timeout=10
+        ).json()
+        li_id   = profile.get("sub", "")
+        li_name = profile.get("name") or f"{profile.get('given_name','')} {profile.get('family_name','')}".strip()
+        cfg = load_config(username)
+        cfg["linkedin_access_token"]  = access_token
+        cfg["linkedin_urn"]           = f"urn:li:person:{li_id}"
+        cfg["linkedin_name"]          = li_name or li_id
+        cfg["linkedin_token_expires"] = (datetime.utcnow() + timedelta(seconds=expires_in)).isoformat()
+        save_config(username, cfg)
+        add_log(username, f"LinkedIn connected ✓ — {cfg['linkedin_name']}", "ok")
+        return "<html><body><script>window.opener && window.opener.postMessage('li_connected','*');window.close();</script><p>LinkedIn connected! Closing...</p></body></html>"
+    except Exception as e:
+        return f"<script>window.close();</script>Error: {e}", 500
+
+@app.route("/api/auth/linkedin/disconnect", methods=["POST"])
+@require_auth
+def linkedin_disconnect(username):
+    cfg = load_config(username)
+    for k in ["linkedin_access_token", "linkedin_urn", "linkedin_name", "linkedin_token_expires"]:
+        cfg.pop(k, None)
+    save_config(username, cfg)
+    add_log(username, "LinkedIn disconnected", "warn")
+    return jsonify({"ok": True})
+
+# ════════════════════════════════════════════════════════════════════════════════
+#  FACEBOOK OAUTH
+# ════════════════════════════════════════════════════════════════════════════════
+@app.route("/api/auth/facebook")
+@require_auth
+def facebook_auth(username):
+    if not FB_APP_ID:
+        return jsonify({"ok": False, "message": "FACEBOOK_APP_ID not set in environment"}), 400
+    state = secrets.token_hex(16)
+    session["fb_state"] = state
+    params = {
+        "client_id":     FB_APP_ID,
+        "redirect_uri":  FB_REDIRECT_URI,
+        "state":         state,
+        "scope":         "pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish"
+    }
+    url = "https://www.facebook.com/v19.0/dialog/oauth?" + urllib.parse.urlencode(params)
+    return jsonify({"ok": True, "auth_url": url})
+
+@app.route("/api/auth/facebook/callback")
+def facebook_callback():
+    username = session.get("username")
+    if not username:
+        return "<script>window.close();</script>Not authenticated", 401
+    code  = request.args.get("code", "")
+    state = request.args.get("state", "")
+    if state != session.get("fb_state"):
+        return "<script>window.close();</script>Invalid state", 400
+    try:
+        # Exchange code for token
+        token_res = requests.get(
+            "https://graph.facebook.com/v19.0/oauth/access_token",
+            params={"client_id": FB_APP_ID, "client_secret": FB_APP_SECRET,
+                    "redirect_uri": FB_REDIRECT_URI, "code": code}, timeout=15
+        ).json()
+        user_token = token_res.get("access_token")
+        if not user_token:
+            return f"<script>window.close();</script>Token error: {token_res}", 400
+
+        # Get user's pages
+        pages_res = requests.get(
+            "https://graph.facebook.com/v19.0/me/accounts",
+            params={"access_token": user_token}, timeout=10
+        ).json()
+        pages = pages_res.get("data", [])
+        cfg   = load_config(username)
+
+        if pages:
+            # Use first page by default
+            page        = pages[0]
+            page_token  = page.get("access_token")
+            page_id     = page.get("id")
+            page_name   = page.get("name", "Facebook Page")
+            cfg["facebook_access_token"] = page_token
+            cfg["facebook_page_id"]      = page_id
+            cfg["facebook_page_name"]    = page_name
+
+            # Also check for Instagram business account linked to this page
+            ig_res = requests.get(
+                f"https://graph.facebook.com/v19.0/{page_id}",
+                params={"fields": "instagram_business_account", "access_token": page_token}, timeout=10
+            ).json()
+            ig_account = ig_res.get("instagram_business_account", {})
+            ig_id = ig_account.get("id")
+            if ig_id:
+                # Get Instagram username
+                ig_info = requests.get(
+                    f"https://graph.facebook.com/v19.0/{ig_id}",
+                    params={"fields": "username", "access_token": page_token}, timeout=10
+                ).json()
+                cfg["instagram_access_token"]  = page_token  # same token works for IG
+                cfg["instagram_account_id"]    = ig_id
+                cfg["instagram_username"]      = ig_info.get("username", ig_id)
+                add_log(username, f"Instagram connected ✓ — @{cfg['instagram_username']}", "ok")
+
+            save_config(username, cfg)
+            add_log(username, f"Facebook connected ✓ — {page_name}", "ok")
+            msg = f"Facebook page '{page_name}' connected!"
+            if ig_id:
+                msg += f" Instagram @{cfg.get('instagram_username','')} also connected!"
+        else:
+            # No pages — just save user token
+            cfg["facebook_access_token"] = user_token
+            save_config(username, cfg)
+            msg = "Facebook connected (no pages found — make sure you have a Facebook Page)"
+            add_log(username, "Facebook connected (no pages found)", "warn")
+
+        return f"<html><body><script>window.opener && window.opener.postMessage('fb_connected','*');window.close();</script><p>{msg} Closing...</p></body></html>"
+    except Exception as e:
+        return f"<script>window.close();</script>Error: {e}", 500
+
+@app.route("/api/auth/facebook/disconnect", methods=["POST"])
+@require_auth
+def facebook_disconnect(username):
+    cfg = load_config(username)
+    for k in ["facebook_access_token", "facebook_page_id", "facebook_page_name"]:
+        cfg.pop(k, None)
+    save_config(username, cfg)
+    add_log(username, "Facebook disconnected", "warn")
+    return jsonify({"ok": True})
+
+@app.route("/api/auth/instagram/disconnect", methods=["POST"])
+@require_auth
+def instagram_disconnect(username):
+    cfg = load_config(username)
+    for k in ["instagram_access_token", "instagram_account_id", "instagram_username"]:
+        cfg.pop(k, None)
+    save_config(username, cfg)
+    add_log(username, "Instagram disconnected", "warn")
+    return jsonify({"ok": True})
+
+# ════════════════════════════════════════════════════════════════════════════════
+#  STATUS / RUN / SUBJECTS
 # ════════════════════════════════════════════════════════════════════════════════
 @app.route("/api/status")
 @require_auth
 def get_status(username):
     state    = get_state(username)
     next_run = get_next_run_time_for_user(username)
-
     subjects_file = user_subjects_path(username)
     subjects = []
     if os.path.exists(subjects_file):
         with open(subjects_file, "r", encoding="utf-8") as f:
             subjects = [l.strip() for l in f if l.strip()]
-
-    cfg        = load_config(username)
-    offset     = cfg.get("utc_offset_hours", None)
-    active_chs = cfg.get("active_channels", [1])
-    if not isinstance(active_chs, list):
-        active_chs = [active_chs]
-
-    channels_info = []
-    for i in [1, 2, 3, 4, 5]:
-        cid      = cfg.get(f"buffer_channel_{i}", "").strip()
-        name     = cfg.get(f"buffer_channel_{i}_name", f"Channel {i}")
-        platform = cfg.get(f"buffer_channel_{i}_platform",
-                           CHANNEL_PLATFORM_DEFAULTS.get(i, "linkedin"))
-        channels_info.append({
-            "slot":     i,
-            "id":       cid,
-            "name":     name,
-            "platform": platform,
-            "active":   (i in active_chs) and bool(cid),
-            "exists":   bool(cid),
-        })
-
+    cfg    = load_config(username)
+    offset = cfg.get("utc_offset_hours", None)
     return jsonify({
-        "status":          state["status"],
-        "running":         state["running"],
-        "today_count":     state["today_count"],
-        "total_run":       state["total_run"],
-        "last_run":        state["last_run"],
-        "next_run_iso":    next_run.isoformat() + "Z",
-        "seconds_left":    max(0, int((next_run - datetime.utcnow()).total_seconds())),
-        "subjects":        subjects,
-        "logs":            state["logs"][-30:],
-        "utc_offset":      offset,
-        "active_channels": active_chs,
-        "channels_info":   channels_info,
-        "config":          cfg,
+        "status":       state["status"],
+        "running":      state["running"],
+        "today_count":  state["today_count"],
+        "total_run":    state["total_run"],
+        "last_run":     state["last_run"],
+        "next_run_iso": next_run.isoformat() + "Z",
+        "seconds_left": max(0, int((next_run - datetime.utcnow()).total_seconds())),
+        "subjects":     subjects,
+        "logs":         state["logs"][-30:],
+        "utc_offset":   offset,
+        "config":       cfg,
+        "accounts": {
+            "linkedin":  bool(cfg.get("linkedin_access_token")),
+            "facebook":  bool(cfg.get("facebook_access_token")),
+            "instagram": bool(cfg.get("instagram_access_token")),
+        }
     })
 
-# ════════════════════════════════════════════════════════════════════════════════
-#  MANUAL RUN
-# ════════════════════════════════════════════════════════════════════════════════
 @app.route("/api/run", methods=["POST"])
 @require_auth
 def manual_run(username):
@@ -949,9 +1021,6 @@ def manual_run(username):
     threading.Thread(target=run_batch, args=(username, "manual"), daemon=True).start()
     return jsonify({"ok": True, "message": "Batch triggered!"})
 
-# ════════════════════════════════════════════════════════════════════════════════
-#  SUBJECTS ROUTES
-# ════════════════════════════════════════════════════════════════════════════════
 @app.route("/api/subjects", methods=["GET"])
 @require_auth
 def get_subjects(username):
@@ -970,11 +1039,9 @@ def add_subjects(username):
     image_b64    = data.get("image_base64")
     filename     = data.get("filename", "upload.jpg")
     mode         = data.get("mode", "no_image")
-    content_type = data.get("content_type", "post")  # "post" or "article"
-
+    content_type = data.get("content_type", "post")
     if not new_subjects:
         return jsonify({"ok": False, "message": "No subjects provided"}), 400
-
     uploaded_url = None
     if mode == "manual_image" and image_b64:
         try:
@@ -982,10 +1049,8 @@ def add_subjects(username):
                 image_b64 = image_b64.split(",")[1]
             add_log(username, f"Uploading '{filename}'...", "info")
             res = requests.post("https://freeimage.host/api/1/upload", data={
-                "key":    "6d207e02198a847aa98d0a2a901485a5",
-                "action": "upload",
-                "source": image_b64,
-                "format": "json"
+                "key": "6d207e02198a847aa98d0a2a901485a5",
+                "action": "upload", "source": image_b64, "format": "json"
             }, timeout=30)
             if res.status_code == 200:
                 rj = res.json()
@@ -998,7 +1063,6 @@ def add_subjects(username):
                 add_log(username, f"Upload HTTP {res.status_code}", "error")
         except Exception as e:
             add_log(username, f"Upload error: {e}", "error")
-
     subjects_file = user_subjects_path(username)
     with open(subjects_file, "a", encoding="utf-8") as f:
         for s in new_subjects:
@@ -1010,7 +1074,6 @@ def add_subjects(username):
             elif mode == "manual_image" and uploaded_url:
                 line = f"{line} | IMG: {uploaded_url}"
             f.write(line + "\n")
-
     add_log(username, f"Added {len(new_subjects)} subject(s) [{content_type}/{mode}] ✓", "ok")
     return jsonify({"ok": True, "added": len(new_subjects)})
 
@@ -1026,10 +1089,10 @@ def delete_subject(username):
         subjects = [l.strip() for l in f if l.strip()]
     if index is None or index < 0 or index >= len(subjects):
         return jsonify({"ok": False, "message": "Invalid index"}), 400
-    removed = subjects.pop(index)
+    subjects.pop(index)
     with open(subjects_file, "w", encoding="utf-8") as f:
         f.write("\n".join(subjects))
-    return jsonify({"ok": True, "removed": removed})
+    return jsonify({"ok": True})
 
 # ─── STARTUP ──────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
@@ -1039,202 +1102,6 @@ if __name__ == "__main__":
     print(f"[STARTUP] LinkedIn Agent on port {port}")
     print(f"[STARTUP] Users: {USERS_FILE}")
     print(f"[STARTUP] Data:  {USER_DATA_DIR}/")
-    print(f"[STARTUP] Scheduler fires at {TARGET_HOUR:02d}:00 per user's local timezone")
-    print(f"[STARTUP] Pages: / → login.html | /setup → setup.html | /dashboard → dashboard.html")
+    print(f"[STARTUP] LinkedIn OAuth: {'✓ configured' if LI_CLIENT_ID else '✗ LINKEDIN_CLIENT_ID not set'}")
+    print(f"[STARTUP] Facebook OAuth: {'✓ configured' if FB_APP_ID else '✗ FACEBOOK_APP_ID not set'}")
     app.run(host="0.0.0.0", port=port, debug=False)
-
-# ════════════════════════════════════════════════════════════════════════════════
-#  LINKEDIN DIRECT OAUTH + ARTICLE PUBLISHING
-#  Each user connects their OWN LinkedIn/Facebook/Instagram accounts.
-#  LINKEDIN_CLIENT_ID/SECRET = developer app credentials (set once on Railway).
-#  User tokens = stored per user in their own config.json.
-# ════════════════════════════════════════════════════════════════════════════════
-
-LINKEDIN_CLIENT_ID     = os.environ.get("LINKEDIN_CLIENT_ID", "")
-LINKEDIN_CLIENT_SECRET = os.environ.get("LINKEDIN_CLIENT_SECRET", "")
-LINKEDIN_REDIRECT_URI  = os.environ.get("LINKEDIN_REDIRECT_URI", "")
-
-@app.route("/api/linkedin/auth")
-@require_auth
-def linkedin_auth(username):
-    """Start LinkedIn OAuth flow — redirect user to LinkedIn login."""
-    if not LINKEDIN_CLIENT_ID:
-        return jsonify({"ok": False, "message": "LINKEDIN_CLIENT_ID not set in environment"}), 400
-
-    import urllib.parse
-    state = secrets.token_hex(16)
-    # Store state in session to verify callback
-    session["linkedin_oauth_state"] = state
-
-    params = {
-        "response_type": "code",
-        "client_id":     LINKEDIN_CLIENT_ID,
-        "redirect_uri":  LINKEDIN_REDIRECT_URI,
-        "state":         state,
-        "scope":         "openid profile w_member_social"
-    }
-    url = "https://www.linkedin.com/oauth/v2/authorization?" + urllib.parse.urlencode(params)
-    return jsonify({"ok": True, "auth_url": url})
-
-
-@app.route("/api/linkedin/callback")
-def linkedin_callback():
-    """LinkedIn OAuth callback — exchange code for access token."""
-    username = session.get("username")
-    if not username:
-        return "Not authenticated", 401
-
-    code  = request.args.get("code")
-    state = request.args.get("state")
-
-    if state != session.get("linkedin_oauth_state"):
-        return "Invalid state", 400
-
-    # Exchange code for token
-    try:
-        token_res = requests.post(
-            "https://www.linkedin.com/oauth/v2/accessToken",
-            data={
-                "grant_type":    "authorization_code",
-                "code":          code,
-                "redirect_uri":  LINKEDIN_REDIRECT_URI,
-                "client_id":     LINKEDIN_CLIENT_ID,
-                "client_secret": LINKEDIN_CLIENT_SECRET,
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            timeout=15
-        ).json()
-
-        access_token = token_res.get("access_token")
-        expires_in   = token_res.get("expires_in", 5184000)  # default 60 days
-
-        if not access_token:
-            return f"Token error: {token_res}", 400
-
-        # Get LinkedIn member ID
-        profile_res = requests.get(
-            "https://api.linkedin.com/v2/userinfo",
-            headers={"Authorization": f"Bearer {access_token}"},
-            timeout=10
-        ).json()
-
-        linkedin_id = profile_res.get("sub")  # OpenID sub = LinkedIn URN ID
-        if not linkedin_id:
-            return f"Profile error: {profile_res}", 400
-
-        # Save token + ID to user config
-        cfg = load_config(username)
-        li_name = profile_res.get("name") or profile_res.get("given_name", "") + " " + profile_res.get("family_name", "")
-        cfg["linkedin_access_token"]  = access_token
-        cfg["linkedin_member_id"]     = linkedin_id
-        cfg["linkedin_name"]          = li_name.strip() or linkedin_id
-        cfg["linkedin_token_expires"] = (datetime.utcnow() + timedelta(seconds=expires_in)).isoformat()
-        save_config(username, cfg)
-        add_log(username, f"LinkedIn OAuth connected ✓ {cfg['linkedin_name']} ({linkedin_id})", "ok")
-
-        return "<script>window.close();window.opener.location.reload();</script><p>LinkedIn connected! You can close this window.</p>"
-
-    except Exception as e:
-        return f"OAuth error: {e}", 500
-
-
-@app.route("/api/linkedin/disconnect", methods=["POST"])
-@require_auth
-def linkedin_disconnect(username):
-    cfg = load_config(username)
-    for key in ["linkedin_access_token", "linkedin_member_id", "linkedin_token_expires"]:
-        cfg.pop(key, None)
-    save_config(username, cfg)
-    add_log(username, "LinkedIn OAuth disconnected", "warn")
-    return jsonify({"ok": True})
-
-
-@app.route("/api/linkedin/status")
-def linkedin_status():
-    username = session.get("username")
-    if not username:
-        return jsonify({"ok": False, "connected": False, "expired": False, "member_id": None, "expires": None, "env_set": bool(LINKEDIN_CLIENT_ID)})
-    cfg     = load_config(username)
-    token   = cfg.get("linkedin_access_token")
-    expires = cfg.get("linkedin_token_expires")
-    member  = cfg.get("linkedin_member_id")
-    connected = bool(token and member)
-    expired   = False
-    if expires:
-        try:
-            expired = datetime.utcnow() > datetime.fromisoformat(expires)
-        except Exception:
-            expired = False
-    name = cfg.get("linkedin_name", member)
-    return jsonify({
-        "ok":        True,
-        "connected": connected and not expired,
-        "expired":   expired,
-        "member_id": member,
-        "name":      name,
-        "expires":   expires,
-        "env_set":   bool(LINKEDIN_CLIENT_ID),
-    })
-
-
-def publish_linkedin_article(username, title, body):
-    """
-    Publish a long-form article directly to LinkedIn using OAuth token.
-    Uses LinkedIn UGC Posts API.
-    """
-    cfg    = load_config(username)
-    token  = cfg.get("linkedin_access_token")
-    member = cfg.get("linkedin_member_id")
-
-    if not token or not member:
-        add_log(username, "LinkedIn OAuth not connected — cannot publish article. Go to Setup to connect.", "error")
-        return False
-
-    # Check token expiry
-    expires = cfg.get("linkedin_token_expires")
-    if expires and datetime.utcnow() > datetime.fromisoformat(expires):
-        add_log(username, "LinkedIn OAuth token expired — reconnect in Setup.", "error")
-        return False
-
-    author_urn = f"urn:li:person:{member}"
-
-    payload = {
-        "author":          author_urn,
-        "lifecycleState":  "PUBLISHED",
-        "specificContent": {
-            "com.linkedin.ugc.ShareContent": {
-                "shareCommentary": {
-                    "text": body
-                },
-                "shareMediaCategory": "NONE"
-            }
-        },
-        "visibility": {
-            "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
-        }
-    }
-
-    try:
-        res = requests.post(
-            "https://api.linkedin.com/v2/ugcPosts",
-            headers={
-                "Authorization":   f"Bearer {token}",
-                "Content-Type":    "application/json",
-                "X-Restli-Protocol-Version": "2.0.0"
-            },
-            json=payload,
-            timeout=20
-        )
-        print(f"[LI-ARTICLE] Status: {res.status_code}")
-        print(f"[LI-ARTICLE] Response: {res.text[:400]}")
-
-        if res.status_code in (200, 201):
-            post_id = res.headers.get("x-restli-id", "n/a")
-            add_log(username, f"LinkedIn article published ✓ ID: {post_id}", "ok")
-            return True
-        else:
-            add_log(username, f"LinkedIn article failed: {res.status_code} — {res.text[:200]}", "error")
-            return False
-    except Exception as e:
-        add_log(username, f"LinkedIn article exception: {e}", "error")
-        return False
