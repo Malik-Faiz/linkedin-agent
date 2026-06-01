@@ -93,6 +93,13 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 }
 .platform-sel:focus{border-color:rgba(176,133,255,0.4);background-color:rgba(176,133,255,0.04);box-shadow:0 0 0 3px rgba(176,133,255,0.08);}
 .platform-sel option{background:#0d0a1a;color:var(--text);}
+.platform-sel:disabled{
+  opacity:1;
+  cursor:default;
+  border-color:rgba(160,120,255,0.08);
+  color:var(--muted);
+  background-color:rgba(0,0,0,0.2);
+}
 
 /* ── CHANNELS ── */
 .ch-label{font-size:10px;font-family:var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
@@ -301,7 +308,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
     <!-- Ch4 — optional -->
     <div class="ch-row" id="chRow4">
       <div class="ch-row-hdr">
-        <span class="ch-slot">Channel 4 <span class="o">(optional)</span></span>
+        <span class="ch-slot">Channel 4 — <span style="color:rgba(100,130,255,0.8)">📘 Facebook</span> <span class="o">(optional)</span></span>
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="plat-badge" id="platBadge4">📘 Facebook</span>
           <button class="del-btn" onclick="clearChannel(4)">✕ Delete</button>
@@ -319,18 +326,17 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
       </div>
       <div class="field" style="margin-bottom:0">
         <label>Platform</label>
-        <select class="platform-sel" id="cfgChPlatform4" onchange="updatePlatBadge(4)">
-          <option value="linkedin">💼 LinkedIn</option>
+        <select class="platform-sel" id="cfgChPlatform4" onchange="updatePlatBadge(4)" disabled>
           <option value="facebook" selected>📘 Facebook</option>
-          <option value="instagram">📸 Instagram</option>
         </select>
+        <input type="hidden" id="cfgChPlatform4Hidden" value="facebook">
       </div>
     </div>
 
     <!-- Ch5 — Instagram (new) -->
     <div class="ch-row" id="chRow5">
       <div class="ch-row-hdr">
-        <span class="ch-slot">Channel 5 <span class="o">(optional)</span></span>
+        <span class="ch-slot">Channel 5 — <span style="color:rgba(255,100,180,0.8)">📸 Instagram</span> <span class="o">(optional)</span></span>
         <div style="display:flex;align-items:center;gap:8px;">
           <span class="plat-badge" id="platBadge5">📸 Instagram</span>
           <button class="del-btn" onclick="clearChannel(5)">✕ Delete</button>
@@ -348,11 +354,10 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
       </div>
       <div class="field" style="margin-bottom:0">
         <label>Platform</label>
-        <select class="platform-sel" id="cfgChPlatform5" onchange="updatePlatBadge(5)">
+        <select class="platform-sel" id="cfgChPlatform5" onchange="updatePlatBadge(5)" disabled>
           <option value="instagram" selected>📸 Instagram</option>
-          <option value="linkedin">💼 LinkedIn</option>
-          <option value="facebook">📘 Facebook</option>
         </select>
+        <input type="hidden" id="cfgChPlatform5Hidden" value="instagram">
       </div>
     </div>
 
@@ -396,10 +401,15 @@ let savedKeys = { groq: false, buffer: false, ch1: false };
 // ── PLATFORM BADGE UPDATE ──
 const platLabels = { linkedin: '💼 LinkedIn', facebook: '📘 Facebook', instagram: '📸 Instagram' };
 function updatePlatBadge(slot) {
-  const sel = document.getElementById(`cfgChPlatform${slot}`);
-  const badge = document.getElementById(`platBadge${slot}`);
-  if (sel && badge) badge.textContent = platLabels[sel.value] || sel.value;
+  const hidden = document.getElementById(`cfgChPlatform${slot}Hidden`);
+  const sel    = document.getElementById(`cfgChPlatform${slot}`);
+  const badge  = document.getElementById(`platBadge${slot}`);
+  const val    = hidden ? hidden.value : (sel ? sel.value : '');
+  if (badge) badge.textContent = platLabels[val] || val;
 }
+// Init badges for locked channels on load
+updatePlatBadge(4);
+updatePlatBadge(5);
 
 // ── SAVE CONFIG ──
 async function saveConfig() {
@@ -444,7 +454,9 @@ async function saveConfig() {
     for (let i = 1; i <= 5; i++) {
       const cid  = document.getElementById(`cfgCh${i}`)?.value.trim();
       const name = document.getElementById(`cfgChName${i}`)?.value.trim();
-      const plat = document.getElementById(`cfgChPlatform${i}`)?.value;
+      // For locked channels (4=facebook, 5=instagram) read hidden input
+      const hiddenPlat = document.getElementById(`cfgChPlatform${i}Hidden`);
+      const plat = hiddenPlat ? hiddenPlat.value : document.getElementById(`cfgChPlatform${i}`)?.value;
 
       if (cid)  payload[`buffer_channel_${i}`]          = cid;
       if (name) payload[`buffer_channel_${i}_name`]     = name || `Channel ${i}`;
@@ -559,7 +571,9 @@ function showSavedBadge(inputId) {
       if (nel && name && !hasMask(name)) nel.value = name;
 
       const pel = document.getElementById(`cfgChPlatform${i}`);
-      if (pel) { pel.value = plat; updatePlatBadge(i); }
+      // Don't override locked channels 4 & 5
+      if (pel && !pel.disabled) { pel.value = plat; }
+      updatePlatBadge(i);
     }
 
     if (savedKeys.groq && savedKeys.buffer) {
