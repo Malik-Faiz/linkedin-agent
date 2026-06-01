@@ -315,6 +315,7 @@ def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None, platf
     if platform == "facebook":
         input_data["metadata"] = {"facebook": {"type": "post"}}
     elif platform == "instagram":
+        # Use "image" type for photo posts — Reels require a video which we do not have
         input_data["metadata"] = {"instagram": {"type": "image", "shouldShareToFeed": True}}
     if image_url:
         input_data["assets"] = [{"image": {"url": image_url}}]
@@ -373,6 +374,11 @@ def send_to_buffer(username, post_text, image_url=None, is_article=False, articl
         # Articles only publish to LinkedIn channels
         if is_article and platform != "linkedin":
             add_log(username, f"  → [{name}] Skipped — articles only go to LinkedIn", "info")
+            continue
+
+        # Instagram requires an image or video — skip text-only posts silently
+        if platform == "instagram" and not image_url and not is_article:
+            add_log(username, f"  → [{name}] Skipped — Instagram requires an image (add one via Upload Img or Auto Image)", "warn")
             continue
 
         if is_article:
