@@ -315,7 +315,7 @@ def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None, platf
     if platform == "facebook":
         input_data["metadata"] = {"facebook": {"type": "post"}}
     elif platform == "instagram":
-        input_data["metadata"] = {"instagram": {"type": "reel", "shouldShareToFeed": True}}
+        input_data["metadata"] = {"instagram": {"type": "image", "shouldShareToFeed": True}}
     if image_url:
         input_data["assets"] = [{"image": {"url": image_url}}]
     try:
