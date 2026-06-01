@@ -357,75 +357,20 @@ def send_article_to_linkedin(buffer_key, channel_id, title, body):
     except Exception as e:
         return 500, {"error": str(e)}
 
-def upload_image_to_buffer_multipart(buffer_key, channel_id, image_url):
-    """
-    Download image and upload to Buffer using multipart/form-data
-    with the correct field name Buffer expects.
-    Returns media_id on success, None on failure.
-    """
-    try:
-        # Download image
-        r = requests.get(image_url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
-        if r.status_code != 200:
-            print(f"[BUFFER-IG] Download failed: {r.status_code}")
-            return None
-        image_data = r.content
-        content_type = r.headers.get("content-type", "image/jpeg").split(";")[0].strip()
-        ext = content_type.split("/")[-1] if "/" in content_type else "jpg"
-        print(f"[BUFFER-IG] Downloaded {len(image_data)} bytes, type={content_type}")
-
-        # Upload using multipart with correct field name
-        upload = requests.post(
-            "https://api.buffer.com/1/graphql",
-            headers={"Authorization": f"Bearer {buffer_key}"},
-            files={"operations": (None, '{"query":"mutation{uploadMedia(input:{mediaType:\"image\"}){...on UploadedMedia{mediaId}...on MutationError{message}}}"}', "application/json"),
-                   "map": (None, '{"0":["variables.file"]}', "application/json"),
-                   "0": (f"image.{ext}", image_data, content_type)},
-            timeout=30
-        )
-        print(f"[BUFFER-IG] Upload status: {upload.status_code}")
-        print(f"[BUFFER-IG] Upload response: {upload.text[:500]}")
-        result = upload.json()
-        media_id = ((result.get("data") or {}).get("uploadMedia") or {}).get("mediaId")
-        if media_id:
-            print(f"[BUFFER-IG] mediaId: {media_id}")
-            return media_id
-        return None
-    except Exception as e:
-        print(f"[BUFFER-IG] Upload exception: {e}")
-        return None
-
-
 def send_instagram_with_image_url(buffer_key, channel_id, post_text, image_url):
     """
-    Post image to Instagram via Buffer.
-    Step 1: upload image to get mediaId
-    Step 2: create post with mediaId
-    Falls back to direct URL in assets if upload fails.
+    Post image to Instagram via Buffer GraphQL.
+    Uses type=post with shouldShareToFeed=True and image in assets.
+    Valid Instagram types confirmed by Buffer: post, story, reel.
     """
-    # Try to upload and get a mediaId first
-    media_id = upload_image_to_buffer_multipart(buffer_key, channel_id, image_url)
-
-    if media_id:
-        input_data = {
-            "text": post_text,
-            "channelId": channel_id,
-            "schedulingType": "automatic",
-            "mode": "addToQueue",
-            "mediaIds": [media_id],
-        }
-        print(f"[BUFFER-IG] Posting with mediaId: {media_id}")
-    else:
-        # Fallback: try sending the URL directly in assets
-        print("[BUFFER-IG] No mediaId — falling back to direct URL in assets")
-        input_data = {
-            "text": post_text,
-            "channelId": channel_id,
-            "schedulingType": "automatic",
-            "mode": "addToQueue",
-            "assets": [{"image": {"url": image_url}}],
-        }
-
+    input_data = {
+        "text": post_text,
+        "channelId": channel_id,
+        "schedulingType": "automatic",
+        "mode": "addToQueue",
+        "metadata": {"instagram": {"type": "post", "shouldShareToFeed": True}},
+        "assets": [{"image": {"url": image_url}}],
+    }
     try:
         response = requests.post(
             "https://api.buffer.com/1/graphql",
@@ -438,8 +383,8 @@ def send_instagram_with_image_url(buffer_key, channel_id, post_text, image_url):
             }""", "variables": {"input": input_data}},
             timeout=20
         )
-        print(f"[BUFFER-IG] CreatePost status: {response.status_code}")
-        print(f"[BUFFER-IG] CreatePost response: {str(response.json())[:400]}")
+        print(f"[BUFFER-IG] status: {response.status_code}")
+        print(f"[BUFFER-IG] response: {str(response.json())[:400]}")
         return response.status_code, response.json()
     except Exception as e:
         return 500, {"error": str(e)}
