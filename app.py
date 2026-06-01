@@ -4,7 +4,6 @@ import re
 import warnings
 import os
 import threading
-import base64
 import json
 import hashlib
 import secrets
@@ -28,6 +27,17 @@ Write a highly engaging, professional LinkedIn post based on the user's subject.
 2. Short, punchy sentences.
 3. Call-To-Action (CTA) question at the end.
 4. 3 to 5 relevant hashtags."""
+
+SYSTEM_PROMPT_ARTICLE = """You are an expert LinkedIn article writer.
+Write a long-form, in-depth LinkedIn article based on the user's subject.
+Structure:
+1. Compelling title on the first line prefixed with TITLE:
+2. A strong introduction paragraph.
+3. 4 to 6 sections with clear headings wrapped in ## markdown.
+4. Each section has 2-3 detailed paragraphs with real insights.
+5. A conclusion section with key takeaways.
+6. End with a thought-provoking question for readers.
+Write in a professional yet conversational tone. Minimum 600 words."""
 
 # ─── APP SETUP ────────────────────────────────────────────────────────────────
 app = Flask(__name__, static_folder="static")
@@ -149,7 +159,7 @@ def get_next_run_time_for_user(username):
     """Return the next 08:00 in user's local timezone as a UTC datetime."""
     cfg    = load_config(username)
     offset = cfg.get("utc_offset_hours", 0)
-    now_utc = datetime.utcnow()
+    now_utc  = datetime.utcnow()
     user_now = now_utc + timedelta(hours=offset)
     target_local = user_now.replace(hour=TARGET_HOUR, minute=0, second=0, microsecond=0)
     if user_now >= target_local:
@@ -159,7 +169,7 @@ def get_next_run_time_for_user(username):
 # ─── IMAGE VALIDATION ─────────────────────────────────────────────────────────
 def validate_image_url(url, timeout=8):
     """
-    Check that a URL actually returns a reachable image.
+    Check that a URL returns a reachable image.
     Returns True only if HTTP 200 and content-type is image/*.
     Falls back to streaming GET if server rejects HEAD.
     """
@@ -181,18 +191,19 @@ def validate_image_url(url, timeout=8):
     except Exception:
         return False
 
-# ─── AI / POST FUNCTIONS ──────────────────────────────────────────────────────
+# ─── AI FUNCTIONS ─────────────────────────────────────────────────────────────
 def generate_post(username, subject):
+    """Generate a short LinkedIn post."""
     cfg      = load_config(username)
     groq_key = cfg.get("groq_api_key", "")
-    clean    = subject.replace("(create image)", "").strip()
+    clean    = subject.replace("(create image)", "").replace("(article)", "").strip()
     try:
         response = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
             json={"model": "llama-3.1-8b-instant", "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT_POST},
-                {"role": "user", "content": f"Write a post about: {clean}"}
+                {"role": "user",   "content": f"Write a post about: {clean}"}
             ]}, timeout=30
         ).json()
         if "error" in response:
@@ -203,6 +214,37 @@ def generate_post(username, subject):
         add_log(username, f"Groq failure: {e}", "error")
         return None
 
+def generate_article(username, subject):
+    """Generate a long-form LinkedIn article."""
+    cfg      = load_config(username)
+    groq_key = cfg.get("groq_api_key", "")
+    clean    = subject.replace("(article)", "").strip()
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+            json={"model": "llama-3.1-8b-instant",
+                  "max_tokens": 2000,
+                  "messages": [
+                      {"role": "system", "content": SYSTEM_PROMPT_ARTICLE},
+                      {"role": "user",   "content": f"Write a LinkedIn article about: {clean}"}
+                  ]}, timeout=60
+        ).json()
+        if "error" in response:
+            add_log(username, f"Groq Article Error: {response['error']['message']}", "error")
+            return None, None
+        raw   = response["choices"][0]["message"]["content"]
+        lines = raw.strip().split("\n")
+        title = clean   # default title
+        body  = raw
+        if lines[0].startswith("TITLE:"):
+            title = lines[0].replace("TITLE:", "").strip()
+            body  = "\n".join(lines[1:]).strip()
+        return title, body
+    except Exception as e:
+        add_log(username, f"Groq article failure: {e}", "error")
+        return None, None
+
 def get_image_url(username, subject):
     cfg      = load_config(username)
     serp_key = cfg.get("serpapi_key", "").strip()
@@ -210,7 +252,7 @@ def get_image_url(username, subject):
         add_log(username, "SerpAPI key not set — post sent without image.", "warn")
         return None
 
-    clean = subject.replace("(create image)", "").strip()
+    clean = subject.replace("(create image)", "").replace("(article)", "").strip()
     try:
         response = requests.get("https://serpapi.com/search.json", params={
             "engine": "google_images",
@@ -242,26 +284,38 @@ def get_image_url(username, subject):
         add_log(username, f"SerpAPI Error: {e}", "error")
         return None
 
+# ─── CHANNEL HELPERS ──────────────────────────────────────────────────────────
+# Channel platform defaults:
+#   slot 4 → facebook (locked in UI)
+#   slot 5 → instagram (locked in UI)
+#   slots 1-3 → user-selectable (default: linkedin)
+CHANNEL_PLATFORM_DEFAULTS = {4: "facebook", 5: "instagram"}
+
 def get_active_channels(cfg):
-    """Return list of (slot_num, channel_id, channel_name) for all active channels."""
+    """Return list of (slot, channel_id, channel_name, platform) for all active channels."""
     active_list = cfg.get("active_channels", [1])
     result = []
     for slot in active_list:
-        cid  = cfg.get(f"buffer_channel_{slot}", "").strip()
-        name = cfg.get(f"buffer_channel_{slot}_name", f"Channel {slot}")
+        cid      = cfg.get(f"buffer_channel_{slot}", "").strip()
+        name     = cfg.get(f"buffer_channel_{slot}_name", f"Channel {slot}")
+        platform = cfg.get(f"buffer_channel_{slot}_platform",
+                           CHANNEL_PLATFORM_DEFAULTS.get(slot, "linkedin"))
         if cid:
-            result.append((slot, cid, name))
+            result.append((slot, cid, name, platform))
     return result
 
-def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None, is_facebook=False):
+# ─── BUFFER PUBLISHING ────────────────────────────────────────────────────────
+def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None, platform="linkedin"):
     input_data = {
         "text": post_text,
         "channelId": channel_id,
         "schedulingType": "automatic",
         "mode": "addToQueue"
     }
-    if is_facebook:
+    if platform == "facebook":
         input_data["metadata"] = {"facebook": {"type": "post"}}
+    elif platform == "instagram":
+        input_data["metadata"] = {"instagram": {"type": "feed"}}
     if image_url:
         input_data["assets"] = [{"image": {"url": image_url}}]
     try:
@@ -279,7 +333,32 @@ def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None, is_fa
     except Exception as e:
         return 500, {"error": str(e)}
 
-def send_to_buffer(username, post_text, image_url=None):
+def send_article_to_linkedin(buffer_key, channel_id, title, body):
+    """Send a long-form article to a LinkedIn channel via Buffer."""
+    input_data = {
+        "text": body,
+        "title": title,
+        "channelId": channel_id,
+        "schedulingType": "automatic",
+        "mode": "addToQueue",
+        "metadata": {"linkedin": {"type": "article"}}
+    }
+    try:
+        response = requests.post(
+            "https://api.buffer.com/1/graphql",
+            headers={"Authorization": f"Bearer {buffer_key}", "Content-Type": "application/json"},
+            json={"query": """mutation CreatePost($input: CreatePostInput!) {
+                createPost(input: $input) {
+                    ... on PostActionSuccess { post { id } }
+                    ... on MutationError { message }
+                }
+            }""", "variables": {"input": input_data}}, timeout=30
+        )
+        return response.status_code, response.json()
+    except Exception as e:
+        return 500, {"error": str(e)}
+
+def send_to_buffer(username, post_text, image_url=None, is_article=False, article_title=None):
     cfg      = load_config(username)
     buf_key  = cfg.get("buffer_api_key", "")
     channels = get_active_channels(cfg)
@@ -289,9 +368,17 @@ def send_to_buffer(username, post_text, image_url=None):
         return 0
 
     success = 0
-    for slot, cid, name in channels:
-        is_fb = (slot == 4 or 'facebook' in name.lower())
-        status, result = send_to_one_channel(buf_key, cid, post_text, image_url, is_facebook=is_fb)
+    for slot, cid, name, platform in channels:
+
+        # Articles only publish to LinkedIn channels
+        if is_article and platform != "linkedin":
+            add_log(username, f"  → [{name}] Skipped — articles only go to LinkedIn", "info")
+            continue
+
+        if is_article:
+            status, result = send_article_to_linkedin(buf_key, cid, article_title, post_text)
+        else:
+            status, result = send_to_one_channel(buf_key, cid, post_text, image_url, platform=platform)
 
         if status != 200:
             add_log(username, f"  → [{name}] HTTP {status}: {result}", "error")
@@ -305,28 +392,30 @@ def send_to_buffer(username, post_text, image_url=None):
         create_post = (result.get("data") or {}).get("createPost") or {}
 
         if "message" in create_post:
-            # ── IMAGE FALLBACK: if Buffer rejects image, retry without it ──
             err_msg = create_post["message"]
-            if image_url and ("image" in err_msg.lower() or "dimensions" in err_msg.lower() or "fetch" in err_msg.lower()):
-                add_log(username, f"  → [{name}] Image rejected by Buffer — retrying without image", "warn")
-                status2, result2 = send_to_one_channel(buf_key, cid, post_text, None, is_facebook=is_fb)
-                create_post2 = (result2.get("data") or {}).get("createPost") or {}
-                if status2 == 200 and "post" in create_post2:
-                    pid = (create_post2.get("post") or {}).get("id")
+            # Image fallback — retry without image if Buffer rejects it
+            if image_url and not is_article and (
+                "image" in err_msg.lower() or
+                "dimensions" in err_msg.lower() or
+                "fetch" in err_msg.lower()
+            ):
+                add_log(username, f"  → [{name}] Image rejected — retrying without image", "warn")
+                status2, result2 = send_to_one_channel(buf_key, cid, post_text, None, platform=platform)
+                cp2 = (result2.get("data") or {}).get("createPost") or {}
+                if status2 == 200 and "post" in cp2:
+                    pid = (cp2.get("post") or {}).get("id")
                     add_log(username, f"  → [{name}] Queued without image ✓ ID: {pid}", "ok")
                     success += 1
                     continue
                 else:
-                    add_log(username, f"  → [{name}] Retry also failed: {create_post2.get('message','unknown')}", "error")
+                    add_log(username, f"  → [{name}] Retry also failed: {cp2.get('message','unknown')}", "error")
             else:
                 add_log(username, f"  → [{name}] Buffer error: {err_msg}", "error")
             continue
 
-        pid = (create_post.get("post") or {}).get("id")
-        if pid:
-            add_log(username, f"  → [{name}] Queued ✓ ID: {pid}", "ok")
-        else:
-            add_log(username, f"  → [{name}] Queued ✓ (no ID)", "ok")
+        pid   = (create_post.get("post") or {}).get("id")
+        label = "article" if is_article else "post"
+        add_log(username, f"  → [{name}] Queued {label} ✓ ID: {pid or 'n/a'}", "ok")
         success += 1
 
     return success
@@ -368,38 +457,51 @@ def run_batch(username, triggered_by="scheduler"):
     for j, subject in enumerate(batch):
         manual_image_url = None
         base_subject     = subject
+        is_article       = "(article)" in subject.lower()
 
         if "| IMG:" in subject:
             parts            = subject.split("| IMG:")
             base_subject     = parts[0].strip()
             manual_image_url = parts[1].strip()
 
-        add_log(username, f"[{j+1}/{len(batch)}] {base_subject[:50]}", "info")
-        post_text = generate_post(username, base_subject)
-        if not post_text:
-            continue
-        add_log(username, f"[{j+1}/{len(batch)}] Post generated ✓", "ok")
+        add_log(username, f"[{j+1}/{len(batch)}] {'[ARTICLE] ' if is_article else ''}{base_subject[:50]}", "info")
 
-        image_url = None
-        if manual_image_url:
-            # Validate manually uploaded image URL too
-            if validate_image_url(manual_image_url):
-                image_url = manual_image_url
-                add_log(username, f"[{j+1}/{len(batch)}] Using uploaded image ✓", "ok")
-            else:
-                add_log(username, f"[{j+1}/{len(batch)}] Uploaded image URL unreachable — sending without image", "warn")
-        elif "(create image)" in base_subject.lower():
-            image_url = get_image_url(username, base_subject)
-            if image_url:
-                add_log(username, f"[{j+1}/{len(batch)}] Image fetched ✓", "ok")
+        if is_article:
+            # ── ARTICLE FLOW ──
+            title, body = generate_article(username, base_subject)
+            if not title or not body:
+                continue
+            add_log(username, f"[{j+1}/{len(batch)}] Article generated ✓ — {title[:40]}", "ok")
+            sent = send_to_buffer(username, body, is_article=True, article_title=title)
 
-        sent = send_to_buffer(username, post_text, image_url)
+        else:
+            # ── POST FLOW ──
+            post_text = generate_post(username, base_subject)
+            if not post_text:
+                continue
+            add_log(username, f"[{j+1}/{len(batch)}] Post generated ✓", "ok")
+
+            image_url = None
+            if manual_image_url:
+                if validate_image_url(manual_image_url):
+                    image_url = manual_image_url
+                    add_log(username, f"[{j+1}/{len(batch)}] Using uploaded image ✓", "ok")
+                else:
+                    add_log(username, f"[{j+1}/{len(batch)}] Uploaded image unreachable — sending without image", "warn")
+            elif "(create image)" in base_subject.lower():
+                image_url = get_image_url(username, base_subject)
+                if image_url:
+                    add_log(username, f"[{j+1}/{len(batch)}] Image fetched ✓", "ok")
+
+            sent = send_to_buffer(username, post_text, image_url)
+
         if sent > 0:
             add_log(username, f"[{j+1}/{len(batch)}] Sent to {sent} channel(s) ✓", "ok")
             state["today_count"] += 1
             state["total_run"]   += sent
         else:
             add_log(username, f"[{j+1}/{len(batch)}] All channels failed.", "error")
+
         time.sleep(10)
 
     state["last_run"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -444,7 +546,6 @@ def keep_alive_loop():
 # ════════════════════════════════════════════════════════════════════════════════
 #  PAGE ROUTES
 # ════════════════════════════════════════════════════════════════════════════════
-
 @app.route("/")
 def page_login():
     return load_html("login.html")
@@ -459,12 +560,17 @@ def page_dashboard():
 
 @app.route("/ping")
 def ping():
-    return jsonify({"status": "alive", "utc_time": datetime.utcnow().strftime("%H:%M:%S"), "utc_iso": datetime.utcnow().isoformat() + "Z"})
+    # Always UTC — frontend converts to user local time
+    utc_now = datetime.utcnow()
+    return jsonify({
+        "status":   "alive",
+        "utc_time": utc_now.strftime("%H:%M:%S"),
+        "utc_iso":  utc_now.isoformat() + "Z"
+    })
 
 # ════════════════════════════════════════════════════════════════════════════════
 #  AUTH ROUTES
 # ════════════════════════════════════════════════════════════════════════════════
-
 @app.route("/api/register", methods=["POST"])
 def register():
     data     = request.get_json()
@@ -522,7 +628,6 @@ def login():
 
     session["username"] = username
     session.permanent   = True
-
     cfg = load_config(username)
     has_config = bool(cfg.get("groq_api_key") and cfg.get("buffer_api_key"))
     return jsonify({"ok": True, "username": username, "has_config": has_config})
@@ -544,15 +649,18 @@ def me():
 # ════════════════════════════════════════════════════════════════════════════════
 #  CONFIG ROUTES
 # ════════════════════════════════════════════════════════════════════════════════
-
 @app.route("/api/config", methods=["GET"])
 @require_auth
 def get_config(username):
     cfg = load_config(username)
     no_mask = {
         "active_channel", "utc_offset_hours", "active_channels",
-        "buffer_channel_1", "buffer_channel_2", "buffer_channel_3", "buffer_channel_4",
-        "buffer_channel_1_name", "buffer_channel_2_name", "buffer_channel_3_name", "buffer_channel_4_name",
+        "buffer_channel_1",          "buffer_channel_2",          "buffer_channel_3",
+        "buffer_channel_4",          "buffer_channel_5",
+        "buffer_channel_1_name",     "buffer_channel_2_name",     "buffer_channel_3_name",
+        "buffer_channel_4_name",     "buffer_channel_5_name",
+        "buffer_channel_1_platform", "buffer_channel_2_platform", "buffer_channel_3_platform",
+        "buffer_channel_4_platform", "buffer_channel_5_platform",
     }
     masked = {}
     for k, v in cfg.items():
@@ -570,20 +678,31 @@ def save_config_route(username):
     data = request.get_json()
     cfg  = load_config(username)
 
-    # Only overwrite sensitive keys if a real (non-masked) value was sent
+    # Only overwrite sensitive keys when a real non-masked value is sent
     for field in ["groq_api_key", "buffer_api_key", "serpapi_key"]:
         val = (data.get(field) or "").strip()
-        if val and not val.startswith("*") and "*" not in val:
+        if val and "*" not in val:
             cfg[field] = val
 
-    # Channel IDs and names — only update if non-masked value provided
-    for i in [1, 2, 3, 4]:
-        cid  = (data.get(f"buffer_channel_{i}") or "").strip()
-        name = (data.get(f"buffer_channel_{i}_name") or "").strip()
+    # Channels 1–5: ID, name, platform
+    for i in [1, 2, 3, 4, 5]:
+        cid      = (data.get(f"buffer_channel_{i}") or "").strip()
+        name     = (data.get(f"buffer_channel_{i}_name") or "").strip()
+        # Enforce locked platforms for slots 4 & 5 regardless of what frontend sends
+        if i == 4:
+            platform = "facebook"
+        elif i == 5:
+            platform = "instagram"
+        else:
+            platform = (data.get(f"buffer_channel_{i}_platform") or "").strip() or "linkedin"
+
         if cid and "*" not in cid:
             cfg[f"buffer_channel_{i}"] = cid
         if name and "*" not in name:
             cfg[f"buffer_channel_{i}_name"] = name
+        # Always save the platform (even if no new ID — keeps it consistent)
+        if cid or cfg.get(f"buffer_channel_{i}"):
+            cfg[f"buffer_channel_{i}_platform"] = platform
 
     if "active_channels" not in cfg:
         cfg["active_channels"] = [1]
@@ -597,14 +716,13 @@ def save_config_route(username):
 # ════════════════════════════════════════════════════════════════════════════════
 #  CHANNEL ROUTES
 # ════════════════════════════════════════════════════════════════════════════════
-
 @app.route("/api/channel/toggle", methods=["POST"])
 @require_auth
 def toggle_channel(username):
     data = request.get_json()
     ch   = data.get("channel")
-    if ch not in [1, 2, 3, 4]:
-        return jsonify({"ok": False, "message": "Channel must be 1–4"}), 400
+    if ch not in [1, 2, 3, 4, 5]:
+        return jsonify({"ok": False, "message": "Channel must be 1–5"}), 400
     cfg = load_config(username)
     if not cfg.get(f"buffer_channel_{ch}", "").strip():
         return jsonify({"ok": False, "message": f"Channel {ch} has no ID configured"}), 400
@@ -634,12 +752,12 @@ def toggle_channel(username):
 def delete_channel(username):
     data = request.get_json()
     ch   = data.get("channel")
-    if ch not in [2, 3, 4]:
-        return jsonify({"ok": False, "message": "Only channels 2, 3, 4 can be deleted"}), 400
+    if ch not in [2, 3, 4, 5]:
+        return jsonify({"ok": False, "message": "Only channels 2–5 can be deleted"}), 400
     cfg  = load_config(username)
     name = cfg.get(f"buffer_channel_{ch}_name", f"Channel {ch}")
 
-    for key in [f"buffer_channel_{ch}", f"buffer_channel_{ch}_name"]:
+    for key in [f"buffer_channel_{ch}", f"buffer_channel_{ch}_name", f"buffer_channel_{ch}_platform"]:
         cfg.pop(key, None)
 
     active = cfg.get("active_channels", [1])
@@ -658,7 +776,6 @@ def delete_channel(username):
 # ════════════════════════════════════════════════════════════════════════════════
 #  STATUS ROUTE
 # ════════════════════════════════════════════════════════════════════════════════
-
 @app.route("/api/status")
 @require_auth
 def get_status(username):
@@ -678,15 +795,18 @@ def get_status(username):
         active_chs = [active_chs]
 
     channels_info = []
-    for i in [1, 2, 3, 4]:
-        cid  = cfg.get(f"buffer_channel_{i}", "").strip()
-        name = cfg.get(f"buffer_channel_{i}_name", f"Channel {i}")
+    for i in [1, 2, 3, 4, 5]:
+        cid      = cfg.get(f"buffer_channel_{i}", "").strip()
+        name     = cfg.get(f"buffer_channel_{i}_name", f"Channel {i}")
+        platform = cfg.get(f"buffer_channel_{i}_platform",
+                           CHANNEL_PLATFORM_DEFAULTS.get(i, "linkedin"))
         channels_info.append({
-            "slot":   i,
-            "id":     cid,
-            "name":   name,
-            "active": (i in active_chs) and bool(cid),
-            "exists": bool(cid),
+            "slot":     i,
+            "id":       cid,
+            "name":     name,
+            "platform": platform,
+            "active":   (i in active_chs) and bool(cid),
+            "exists":   bool(cid),
         })
 
     return jsonify({
@@ -706,9 +826,8 @@ def get_status(username):
     })
 
 # ════════════════════════════════════════════════════════════════════════════════
-#  MANUAL RUN ROUTE
+#  MANUAL RUN
 # ════════════════════════════════════════════════════════════════════════════════
-
 @app.route("/api/run", methods=["POST"])
 @require_auth
 def manual_run(username):
@@ -721,7 +840,6 @@ def manual_run(username):
 # ════════════════════════════════════════════════════════════════════════════════
 #  SUBJECTS ROUTES
 # ════════════════════════════════════════════════════════════════════════════════
-
 @app.route("/api/subjects", methods=["GET"])
 @require_auth
 def get_subjects(username):
@@ -740,19 +858,19 @@ def add_subjects(username):
     image_b64    = data.get("image_base64")
     filename     = data.get("filename", "upload.jpg")
     mode         = data.get("mode", "no_image")
+    content_type = data.get("content_type", "post")  # "post" or "article"
 
     if not new_subjects:
         return jsonify({"ok": False, "message": "No subjects provided"}), 400
 
     uploaded_url = None
-
     if mode == "manual_image" and image_b64:
         try:
             if "," in image_b64:
                 image_b64 = image_b64.split(",")[1]
             add_log(username, f"Uploading '{filename}'...", "info")
             res = requests.post("https://freeimage.host/api/1/upload", data={
-                "key": "6d207e02198a847aa98d0a2a901485a5",
+                "key":    "6d207e02198a847aa98d0a2a901485a5",
                 "action": "upload",
                 "source": image_b64,
                 "format": "json"
@@ -773,13 +891,15 @@ def add_subjects(username):
     with open(subjects_file, "a", encoding="utf-8") as f:
         for s in new_subjects:
             line = s.strip()
-            if mode == "auto_image":
+            if content_type == "article":
+                line = f"{line} (article)"
+            elif mode == "auto_image":
                 line = f"{line} (create image)"
             elif mode == "manual_image" and uploaded_url:
                 line = f"{line} | IMG: {uploaded_url}"
             f.write(line + "\n")
 
-    add_log(username, f"Added {len(new_subjects)} subject(s) [{mode}] ✓", "ok")
+    add_log(username, f"Added {len(new_subjects)} subject(s) [{content_type}/{mode}] ✓", "ok")
     return jsonify({"ok": True, "added": len(new_subjects)})
 
 @app.route("/api/subjects/delete", methods=["POST"])
@@ -794,10 +914,10 @@ def delete_subject(username):
         subjects = [l.strip() for l in f if l.strip()]
     if index is None or index < 0 or index >= len(subjects):
         return jsonify({"ok": False, "message": "Invalid index"}), 400
-    subjects.pop(index)
+    removed = subjects.pop(index)
     with open(subjects_file, "w", encoding="utf-8") as f:
         f.write("\n".join(subjects))
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "removed": removed})
 
 # ─── STARTUP ──────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
