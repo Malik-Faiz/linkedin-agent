@@ -315,9 +315,7 @@ def send_to_one_channel(buffer_key, channel_id, post_text, image_url=None, platf
     if platform == "facebook":
         input_data["metadata"] = {"facebook": {"type": "post"}}
     elif platform == "instagram":
-        # Do NOT send type — Buffer auto-detects image vs reel from the asset
-        # Only send shouldShareToFeed so it posts to the feed grid
-        input_data["metadata"] = {"instagram": {"shouldShareToFeed": True}}
+        pass  # No metadata — Buffer auto-handles image posts without requiring PostType
     if image_url:
         input_data["assets"] = [{"image": {"url": image_url}}]
     try:
