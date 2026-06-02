@@ -935,12 +935,17 @@ def linkedin_auth(username):
         "redirect_uri":  LI_REDIRECT_URI,
         "state":         state_payload,
         "scope":         "openid profile w_member_social",
-        # ↓ FORCE LinkedIn to show the login screen every time so each slot
-        #   gets a genuinely separate account — no silent reuse of existing session
-        "prompt":        "login",
     }
-    url = "https://www.linkedin.com/oauth/v2/authorization?" + urllib.parse.urlencode(params)
-    return jsonify({"ok": True, "auth_url": url})
+    oauth_url = "https://www.linkedin.com/oauth/v2/authorization?" + urllib.parse.urlencode(params)
+
+    # LinkedIn ignores prompt=login when a session cookie already exists.
+    # Real fix: route the popup through our own /api/auth/linkedin/start/<slot>
+    # which serves an HTML page that:
+    #   1. Clears LinkedIn cookies by loading linkedin.com/m/logout in an invisible iframe
+    #   2. After a short delay, redirects to the OAuth URL
+    # This forces a fresh login screen every time regardless of existing LinkedIn session.
+    start_url = f"{request.host_url.rstrip('/')}/api/auth/linkedin/start/{slot}?oauth={urllib.parse.quote(oauth_url)}"
+    return jsonify({"ok": True, "auth_url": start_url})
 
 
 def _li_account_picker_page(username, slot, access_token, expires_in, personal_name, personal_id, orgs):
@@ -1115,6 +1120,52 @@ def linkedin_pick():
 
     add_log(username, f"LinkedIn slot {slot} → {acct_type} '{acct_name}' connected ✓", "ok")
     return jsonify({"ok": True})
+
+
+@app.route("/api/auth/linkedin/start/<int:slot>")
+def linkedin_start(slot):
+    """
+    Intermediate page opened in the OAuth popup.
+    Solves the "same account reused" problem:
+      - LinkedIn ignores prompt=login if the user already has a LinkedIn session cookie.
+      - We can't clear linkedin.com cookies from our domain (cross-origin).
+      - Solution: serve an HTML page that opens linkedin.com/m/logout in an invisible
+        iframe, waits 1.5 s for the logout to complete, then navigates to the real
+        OAuth URL. This clears the LinkedIn session before the auth dialog appears,
+        forcing the user to type their credentials again every time.
+    """
+    oauth_url = request.args.get("oauth", "")
+    if not oauth_url:
+        return "Missing oauth param", 400
+
+    # Decode back to real URL
+    oauth_url = urllib.parse.unquote(oauth_url)
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>Connecting LinkedIn #{slot}...</title>
+<style>
+  body{{margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+       min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',sans-serif;
+       text-align:center;gap:16px;}}
+  .spin{{font-size:32px;animation:sp 1s linear infinite;display:inline-block;}}
+  @keyframes sp{{to{{transform:rotate(360deg);}}}}
+  p{{font-size:13px;color:rgba(200,185,255,0.5);margin:0;}}
+  iframe{{display:none;}}
+</style>
+</head>
+<body>
+  <div class="spin">⟳</div>
+  <p>Preparing fresh login for Channel {slot}...</p>
+  <!-- Logout iframe clears LinkedIn session cookie -->
+  <iframe id="logoutFrame" src="https://www.linkedin.com/m/logout"></iframe>
+<script>
+  // Give LinkedIn time to process the logout, then redirect to OAuth
+  setTimeout(function() {{
+    window.location.href = {json.dumps(oauth_url)};
+  }}, 1800);
+</script>
+</body></html>"""
 
 
 @app.route("/api/auth/linkedin/callback")
