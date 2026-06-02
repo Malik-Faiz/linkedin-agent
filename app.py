@@ -1392,16 +1392,26 @@ def facebook_auth(username):
     # Encode username in state for session-less callback
     state = f"{username}:{state_token}"
     params = {
-        "client_id":     FB_APP_ID,
-        "redirect_uri":  FB_REDIRECT_URI,
-        "state":         state,
-        "scope":         "pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish",
-        "auth_type":     "reauthenticate",  # forces FB to show login even if session exists
+        "client_id":    FB_APP_ID,
+        "redirect_uri": FB_REDIRECT_URI,
+        "state":        state,
+        "scope":        "pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish",
     }
     oauth_url = "https://www.facebook.com/v19.0/dialog/oauth?" + urllib.parse.urlencode(params)
-    # Store oauth_url in session so signout route can retrieve it
+
+    # Store oauth_url in session so reauth route can retrieve it after logout
     session["fb_oauth_url"] = oauth_url
-    return jsonify({"ok": True, "auth_url": oauth_url})
+
+    # ── LOGOUT FIRST then go to OAuth ──────────────────────────────────────
+    # facebook.com/logout.php?next= DOES accept external URLs.
+    # This clears the FB session so the user sees a fresh sign-in page
+    # instead of the "Continue as X" or direct feed redirect.
+    host       = request.host_url.rstrip("/")
+    reauth_url = f"{host}/api/auth/facebook/reauth"
+    # Store oauth_url server-side so reauth page can redirect to it
+    session["fb_reauth_target"] = oauth_url
+    logout_url = f"https://www.facebook.com/logout.php?next={urllib.parse.quote(reauth_url)}"
+    return jsonify({"ok": True, "auth_url": logout_url})
 
 
 @app.route("/api/auth/facebook/callback")
@@ -1538,40 +1548,49 @@ function doSignOut() {{
 def facebook_reauth():
     """
     Landing page after Facebook logout.
-    Shows a Sign In button pointing back to the OAuth URL stored in sessionStorage.
-    Facebook logout redirects here (facebook.com/logout.php?next=this_url).
+    Facebook redirects here after logout.php?next=this_url.
+    Immediately redirects to the stored OAuth URL — user sees fresh FB sign-in.
     """
-    return """<!DOCTYPE html>
-<html><head><meta charset='UTF-8'><title>Sign in to Facebook</title>
+    # Get OAuth URL from server-side session (more reliable than sessionStorage)
+    oauth_url = session.get("fb_reauth_target", "")
+
+    if not oauth_url:
+        # Fallback: tell user to close and retry
+        return """<!DOCTYPE html>
+<html><head><meta charset='UTF-8'><title>Signed out</title>
+<style>body{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;flex-direction:column;
+align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;text-align:center;padding:28px;gap:16px;}
+h2{font-size:19px;font-weight:800;}p{font-size:13px;color:rgba(200,185,255,.55);}
+.btn{padding:12px 24px;border-radius:10px;border:none;background:linear-gradient(135deg,#1877f2,#0866ff);
+color:#fff;font-size:14px;font-weight:700;cursor:pointer;}</style></head>
+<body><h2>✓ Signed out</h2><p>Please close this window and click Connect again.</p>
+<button class='btn' onclick='window.close()'>Close</button></body></html>"""
+
+    # Redirect immediately to OAuth — user sees blank Facebook sign-in form
+    safe = oauth_url.replace("'", "\'")
+    return f"""<!DOCTYPE html>
+<html><head><meta charset='UTF-8'><title>Connecting Facebook...</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;}
-body{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;flex-direction:column;
+*{{box-sizing:border-box;margin:0;padding:0;}}
+body{{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;flex-direction:column;
      align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;
-     text-align:center;padding:28px;gap:16px;}
-h2{font-size:19px;font-weight:800;}
-p{font-size:13px;color:rgba(200,185,255,.55);max-width:300px;line-height:1.7;}
-.btn{padding:14px 28px;border-radius:12px;border:none;
-     background:linear-gradient(135deg,#1877f2,#0866ff);color:#fff;
-     font-size:15px;font-weight:700;cursor:pointer;font-family:'Segoe UI',sans-serif;
-     transition:all .2s;}
-.btn:hover{opacity:.88;transform:translateY(-1px);}
+     text-align:center;padding:28px;gap:14px;}}
+.ico{{font-size:44px;}}
+h3{{font-size:18px;font-weight:700;}}
+p{{font-size:12px;color:rgba(200,185,255,.5);}}
+.bar{{width:220px;height:3px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden;}}
+.fill{{height:100%;width:0%;background:linear-gradient(90deg,#1877f2,#0866ff);border-radius:99px;}}
 </style></head>
 <body>
-<h2>✓ Signed out of Facebook</h2>
-<p>Now sign in with the Facebook account you want to connect.</p>
-<button class='btn' id='btn'>Sign In with Facebook →</button>
+<div class="ico">📘</div>
+<h3>Signed out — opening Facebook sign-in...</h3>
+<p>Sign in with the account you want to connect.</p>
+<div class="bar"><div class="fill" id="fill"></div></div>
 <script>
-var u = sessionStorage.getItem('fb_reauth_url');
-document.getElementById('btn').onclick = function() {
-  if (u) {
-    sessionStorage.removeItem('fb_reauth_url');
-    window.location.href = u;
-  } else {
-    window.close();
-  }
-};
-// Auto-click after short delay if URL exists
-if (u) { setTimeout(function(){ document.getElementById('btn').click(); }, 800); }
+var f=document.getElementById('fill'),s=Date.now(),d=700;
+function go(){{var p=Math.min(100,(Date.now()-s)/d*100);f.style.width=p+'%';
+  if(p<100)requestAnimationFrame(go);else window.location.href='{safe}';}}
+requestAnimationFrame(go);
 </script>
 </body></html>"""
 
