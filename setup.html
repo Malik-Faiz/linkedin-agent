@@ -430,8 +430,10 @@ function renderLinkedInSlot(n, ch) {
   if (ch.connected) {
     slot.className   = 'ch-slot connected';
     dot.className    = 'live-dot on';
-    name.textContent = ch.name || `LinkedIn Account ${n}`;
-    status.textContent = `✓ Connected${ch.expires ? ' · expires ' + new Date(ch.expires).toLocaleDateString() : ''}`;
+    const typeIcon   = ch.account_type === 'organization' ? '🏢' : '👤';
+    const typeLabel  = ch.account_type === 'organization' ? 'Company Page' : 'Personal';
+    name.textContent = `${typeIcon} ${ch.name || 'LinkedIn Account ' + n}`;
+    status.textContent = `✓ ${typeLabel}${ch.expires ? ' · expires ' + new Date(ch.expires).toLocaleDateString() : ''}`;
     btn.style.display  = 'none';
     disc.style.display = 'block';
     num.style.color    = 'var(--green)';
@@ -447,7 +449,7 @@ function renderLinkedInSlot(n, ch) {
     slot.className   = 'ch-slot';
     dot.className    = 'live-dot off';
     name.textContent = `LinkedIn Account ${n}`;
-    status.textContent = 'Not connected';
+    status.textContent = 'Not connected — click Connect to choose personal or company page';
     btn.innerHTML      = '🔗 Connect';
     btn.style.display  = 'flex';
     disc.style.display = 'none';
