@@ -950,7 +950,8 @@ def linkedin_auth(username):
         "redirect_uri":  LI_REDIRECT_URI,
         "state":         state_payload,
         "scope":         "openid profile w_member_social",
-        "prompt":        "login",   # belt-and-suspenders: ask for login even after logout
+        "prompt":        "login",       # force credential prompt — works when no session
+        "login_hint":    "",            # clear any prefilled email hint
     }
     oauth_url = "https://www.linkedin.com/oauth/v2/authorization?" + urllib.parse.urlencode(params)
 
@@ -1141,58 +1142,23 @@ def linkedin_pick():
 @app.route("/api/auth/start")
 def auth_start():
     """
-    Universal OAuth pre-flight — navigates the popup DIRECTLY to the platform
-    logout URL, then our /api/auth/after-logout page redirects to OAuth.
+    Universal OAuth pre-flight page.
 
-    Why iframes don't work:
-      Chrome 80+ / Safari ITP block third-party cookies in iframes (SameSite=Lax).
-      So loading logout in an iframe does nothing — the session cookie is never sent.
+    The ONLY reliable way to force a fresh login on LinkedIn/Facebook is:
+      1. Open the OAuth URL directly with prompt=login (LinkedIn) or
+         auth_type=reauthenticate (Facebook) — these are the OFFICIAL params
+         for forcing re-authentication even when a session cookie exists.
+      2. Show a brief "connecting" screen first so the user sees feedback,
+         then immediately redirect to the OAuth URL.
 
-    Real solution — full-page navigation chain:
-      popup opens /api/auth/start
-        → immediately redirects to platform logout URL
-            (e.g. linkedin.com/m/logout?next=our-after-logout-page)
-        → platform logs user out, redirects to our /api/auth/after-logout
-        → after-logout page shows a "signing in..." screen and
-          redirects to the real OAuth URL
+    We do NOT try to call platform logout URLs because:
+      - LinkedIn's ?next= param only accepts whitelisted domains (not ours)
+        so it drops the redirect and lands on linkedin.com instead of OAuth.
+      - Facebook logout requires a valid access_token in the URL.
+      - Both approaches break the popup flow.
 
-    This way the logout happens in the REAL browser context (not an iframe),
-    so the session cookie IS cleared and the platform shows a fresh login page.
-    """
-    platform  = request.args.get("platform", "linkedin")
-    oauth_url = request.args.get("oauth", "")
-    label     = request.args.get("label", "")
-
-    if not oauth_url:
-        return "Missing oauth param", 400
-
-    oauth_url = urllib.parse.unquote(oauth_url)
-
-    # Build our after-logout page URL — platform redirects here after logging out
-    host          = request.host_url.rstrip("/")
-    after_url     = (f"{host}/api/auth/after-logout"
-                     f"?platform={urllib.parse.quote(platform)}"
-                     f"&oauth={urllib.parse.quote(oauth_url)}"
-                     f"&label={urllib.parse.quote(label)}")
-
-    # LinkedIn supports a ?next= redirect after logout
-    if platform == "linkedin":
-        logout_url = f"https://www.linkedin.com/m/logout?next={urllib.parse.quote(after_url)}"
-
-    # Facebook logout requires a valid access_token param — without it, it just
-    # shows facebook.com home. Better to skip FB logout and rely on auth_type=reauthenticate
-    # which we already add to the OAuth URL. So for FB/IG we go straight to after-logout.
-    else:
-        logout_url = after_url  # skip direct logout, use reauthenticate instead
-
-    return redirect(logout_url)
-
-
-@app.route("/api/auth/after-logout")
-def auth_after_logout():
-    """
-    Shown in the popup after platform logout completes.
-    Immediately navigates to the real OAuth URL.
+    prompt=login / auth_type=reauthenticate ARE supported and DO work —
+    they force a credential prompt even with an active session cookie.
     """
     platform  = request.args.get("platform", "linkedin")
     oauth_url = request.args.get("oauth", "")
@@ -1210,36 +1176,35 @@ def auth_after_logout():
     icon      = platform_icons.get(platform, "🔗")
     disp_name = label or platform.replace("_direct", "").capitalize()
 
+    # Redirect immediately — just show a brief branded screen before handing off
     return f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
-<title>Connecting {disp_name}...</title>
+<title>Connect {disp_name}</title>
 <style>
   *{{box-sizing:border-box;margin:0;padding:0;}}
   body{{display:flex;flex-direction:column;align-items:center;justify-content:center;
        min-height:100vh;background:#05030f;color:#ede8ff;
        font-family:'Segoe UI',sans-serif;text-align:center;gap:14px;padding:24px;}}
-  .ico{{font-size:44px;margin-bottom:4px;}}
-  h3{{font-size:17px;font-weight:700;letter-spacing:-0.3px;}}
+  .ico{{font-size:48px;margin-bottom:4px;}}
+  h3{{font-size:18px;font-weight:700;letter-spacing:-0.3px;}}
   p{{font-size:12px;color:rgba(200,185,255,0.5);max-width:280px;line-height:1.6;}}
   .bar{{width:220px;height:3px;background:rgba(176,133,255,0.15);border-radius:99px;overflow:hidden;margin-top:8px;}}
-  .bar-fill{{height:100%;width:0%;background:linear-gradient(90deg,#b085ff,#ff80b5);
-             border-radius:99px;}}
+  .bar-fill{{height:100%;width:0%;background:linear-gradient(90deg,#b085ff,#ff80b5);border-radius:99px;}}
 </style>
-<meta http-equiv="refresh" content="1;url={oauth_url}">
 </head>
 <body>
   <div class="ico">{icon}</div>
-  <h3>Opening {disp_name} sign-in...</h3>
-  <p>Session cleared. Loading sign-in page now.</p>
+  <h3>Opening {disp_name} sign-in</h3>
+  <p>You will be asked to sign in fresh. Use the account you want to connect.</p>
   <div class="bar"><div class="bar-fill" id="bar"></div></div>
 <script>
-  // Animate bar then redirect
   var bar = document.getElementById('bar');
   var s   = Date.now();
+  var dur = 600;
   function go() {{
-    var p = Math.min(100, (Date.now()-s)/900*100);
-    bar.style.width = p+'%';
-    if(p < 100) requestAnimationFrame(go);
+    var p = Math.min(100, (Date.now()-s)/dur*100);
+    bar.style.width = p + '%';
+    if (p < 100) requestAnimationFrame(go);
     else window.location.href = {json.dumps(oauth_url)};
   }}
   requestAnimationFrame(go);
