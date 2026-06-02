@@ -1115,14 +1115,33 @@ def linkedin_signout(username, slot):
     oauth_url = session.get(token_key, "")
     if not oauth_url:
         return redirect("/setup")
-    encoded = __import__('urllib').parse.quote(oauth_url)
-    # Navigate to logout; after LinkedIn logs out it shows its page.
-    # sessionStorage on our /api/auth/linkedin/reauth page will catch the return.
+
+    # Safely embed oauth_url as a JS string
+    safe_oauth = oauth_url.replace("\\", "\\\\").replace("'", "\\'")
+
+
     return f"""<!DOCTYPE html>
 <html><head><meta charset='UTF-8'><title>Signing out...</title>
-<style>*{{box-sizing:border-box;margin:0;padding:0;}}body{{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;text-align:center;padding:28px;gap:16px;}}h2{{font-size:19px;font-weight:800;}}p{{font-size:13px;color:rgba(200,185,255,.55);max-width:300px;line-height:1.7;}}.spin{{font-size:36px;animation:sp 1s linear infinite;display:inline-block;}}@keyframes sp{{to{{transform:rotate(360deg);}}}}</style></head>
-<body><div class='spin'>⟳</div><h2>Signing out...</h2><p>Signing you out of LinkedIn. Please wait...</p>
-<script>sessionStorage.setItem('li_reauth_url',{_json.dumps(oauth_url)});setTimeout(function(){{window.location.href='https://www.linkedin.com/m/logout';}},600);</script>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0;}}
+body{{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;flex-direction:column;
+     align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;
+     text-align:center;padding:28px;gap:16px;}}
+h2{{font-size:19px;font-weight:800;}}
+p{{font-size:13px;color:rgba(200,185,255,.55);max-width:300px;line-height:1.7;}}
+.spin{{font-size:36px;animation:sp 1s linear infinite;display:inline-block;}}
+@keyframes sp{{to{{transform:rotate(360deg);}}}}
+</style></head>
+<body>
+<div class='spin'>⟳</div>
+<h2>Signing out of LinkedIn...</h2>
+<p>Please wait, signing you out so you can connect a different account.</p>
+<script>
+  sessionStorage.setItem('li_reauth_url', '{safe_oauth}');
+  setTimeout(function() {{
+    window.location.href = 'https://www.linkedin.com/m/logout';
+  }}, 800);
+</script>
 </body></html>"""
 
 
