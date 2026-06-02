@@ -950,6 +950,7 @@ def linkedin_auth(username):
         "redirect_uri":  LI_REDIRECT_URI,
         "state":         state_payload,
         "scope":         "openid profile w_member_social",
+        "prompt":        "login",   # belt-and-suspenders: ask for login even after logout
     }
     oauth_url = "https://www.linkedin.com/oauth/v2/authorization?" + urllib.parse.urlencode(params)
 
@@ -1140,39 +1141,67 @@ def linkedin_pick():
 @app.route("/api/auth/start")
 def auth_start():
     """
-    Universal OAuth pre-flight page — opened in the popup for ALL platforms.
+    Universal OAuth pre-flight — navigates the popup DIRECTLY to the platform
+    logout URL, then our /api/auth/after-logout page redirects to OAuth.
 
-    Problem: Every platform (LinkedIn, Facebook, Instagram) silently reuses the
-    browser's existing session cookie, so clicking "Connect" on a second account
-    auto-approves as the first account without showing any login screen.
+    Why iframes don't work:
+      Chrome 80+ / Safari ITP block third-party cookies in iframes (SameSite=Lax).
+      So loading logout in an iframe does nothing — the session cookie is never sent.
 
-    Solution per platform:
-      LinkedIn  → load linkedin.com/m/logout in a hidden iframe, wait 2s, redirect
-      Facebook  → load facebook.com/logout.php in a hidden iframe, wait 2s, redirect
-                  (also appended auth_type=reauthenticate to the OAuth URL)
-      Instagram → same as Facebook (uses FB OAuth dialog)
+    Real solution — full-page navigation chain:
+      popup opens /api/auth/start
+        → immediately redirects to platform logout URL
+            (e.g. linkedin.com/m/logout?next=our-after-logout-page)
+        → platform logs user out, redirects to our /api/auth/after-logout
+        → after-logout page shows a "signing in..." screen and
+          redirects to the real OAuth URL
 
-    The logout iframe runs cross-origin but the browser still sends/receives the
-    session cookie for that domain, which clears the active session. After the delay
-    we redirect to the real OAuth URL — now the user sees a fresh sign-in page.
+    This way the logout happens in the REAL browser context (not an iframe),
+    so the session cookie IS cleared and the platform shows a fresh login page.
     """
-    platform  = request.args.get("platform", "linkedin")   # linkedin|facebook|instagram
+    platform  = request.args.get("platform", "linkedin")
     oauth_url = request.args.get("oauth", "")
-    label     = request.args.get("label", "")               # display label e.g. "Channel 2"
+    label     = request.args.get("label", "")
 
     if not oauth_url:
         return "Missing oauth param", 400
 
     oauth_url = urllib.parse.unquote(oauth_url)
 
-    # Pick the logout URL per platform
-    logout_urls = {
-        "linkedin":         "https://www.linkedin.com/m/logout",
-        "facebook":         "https://www.facebook.com/logout.php",
-        "instagram":        "https://www.facebook.com/logout.php",   # IG uses FB session
-        "instagram_direct": "https://www.facebook.com/logout.php",
-    }
-    logout_url = logout_urls.get(platform, "https://www.linkedin.com/m/logout")
+    # Build our after-logout page URL — platform redirects here after logging out
+    host          = request.host_url.rstrip("/")
+    after_url     = (f"{host}/api/auth/after-logout"
+                     f"?platform={urllib.parse.quote(platform)}"
+                     f"&oauth={urllib.parse.quote(oauth_url)}"
+                     f"&label={urllib.parse.quote(label)}")
+
+    # LinkedIn supports a ?next= redirect after logout
+    if platform == "linkedin":
+        logout_url = f"https://www.linkedin.com/m/logout?next={urllib.parse.quote(after_url)}"
+
+    # Facebook logout requires a valid access_token param — without it, it just
+    # shows facebook.com home. Better to skip FB logout and rely on auth_type=reauthenticate
+    # which we already add to the OAuth URL. So for FB/IG we go straight to after-logout.
+    else:
+        logout_url = after_url  # skip direct logout, use reauthenticate instead
+
+    return redirect(logout_url)
+
+
+@app.route("/api/auth/after-logout")
+def auth_after_logout():
+    """
+    Shown in the popup after platform logout completes.
+    Immediately navigates to the real OAuth URL.
+    """
+    platform  = request.args.get("platform", "linkedin")
+    oauth_url = request.args.get("oauth", "")
+    label     = request.args.get("label", "")
+
+    if not oauth_url:
+        return "Missing oauth param", 400
+
+    oauth_url = urllib.parse.unquote(oauth_url)
 
     platform_icons = {
         "linkedin": "💼", "facebook": "📘",
@@ -1183,7 +1212,7 @@ def auth_start():
 
     return f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
-<title>Sign in to {disp_name}...</title>
+<title>Connecting {disp_name}...</title>
 <style>
   *{{box-sizing:border-box;margin:0;padding:0;}}
   body{{display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -1194,38 +1223,39 @@ def auth_start():
   p{{font-size:12px;color:rgba(200,185,255,0.5);max-width:280px;line-height:1.6;}}
   .bar{{width:220px;height:3px;background:rgba(176,133,255,0.15);border-radius:99px;overflow:hidden;margin-top:8px;}}
   .bar-fill{{height:100%;width:0%;background:linear-gradient(90deg,#b085ff,#ff80b5);
-             border-radius:99px;transition:width 0.1s linear;}}
-  iframe{{display:none;}}
+             border-radius:99px;}}
 </style>
+<meta http-equiv="refresh" content="1;url={oauth_url}">
 </head>
 <body>
   <div class="ico">{icon}</div>
-  <h3>Signing out of {disp_name}...</h3>
-  <p>Clearing existing session so you can sign in with a different account.</p>
+  <h3>Opening {disp_name} sign-in...</h3>
+  <p>Session cleared. Loading sign-in page now.</p>
   <div class="bar"><div class="bar-fill" id="bar"></div></div>
-  <!-- Logout iframe — clears the platform session cookie -->
-  <iframe src="{logout_url}"></iframe>
 <script>
-  // Animate progress bar over 2 seconds then redirect
-  var start = Date.now();
-  var dur   = 2000;
-  var bar   = document.getElementById('bar');
-  function step() {{
-    var pct = Math.min(100, (Date.now() - start) / dur * 100);
-    bar.style.width = pct + '%';
-    if (pct < 100) {{ requestAnimationFrame(step); }}
-    else {{ window.location.href = {json.dumps(oauth_url)}; }}
+  // Animate bar then redirect
+  var bar = document.getElementById('bar');
+  var s   = Date.now();
+  function go() {{
+    var p = Math.min(100, (Date.now()-s)/900*100);
+    bar.style.width = p+'%';
+    if(p < 100) requestAnimationFrame(go);
+    else window.location.href = {json.dumps(oauth_url)};
   }}
-  requestAnimationFrame(step);
+  requestAnimationFrame(go);
 </script>
 </body></html>"""
 
 
-# Keep old route as alias so existing links still work
 @app.route("/api/auth/linkedin/start/<int:slot>")
 def linkedin_start(slot):
+    """Kept for backwards compatibility."""
     oauth_url = request.args.get("oauth", "")
-    return redirect(f"/api/auth/start?platform=linkedin&oauth={urllib.parse.quote(oauth_url)}&label=LinkedIn+%23{slot}")
+    return redirect(
+        f"/api/auth/start?platform=linkedin"
+        f"&oauth={urllib.parse.quote(oauth_url)}"
+        f"&label=LinkedIn+%23{slot}"
+    )
 
 
 @app.route("/api/auth/linkedin/callback")
