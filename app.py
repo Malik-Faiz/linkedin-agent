@@ -1399,14 +1399,16 @@ def facebook_auth(username):
     }
     oauth_url = "https://www.facebook.com/v19.0/dialog/oauth?" + urllib.parse.urlencode(params)
 
-    # Store OAuth URL server-side so pre-login page can use it
-    session["fb_oauth_url"]      = oauth_url
-    session["fb_reauth_target"]  = oauth_url
+    # Store OAuth URL so the signout-retry button can use it
+    session["fb_oauth_url"]     = oauth_url
+    session["fb_reauth_target"] = oauth_url
 
-    # Return our pre-login page URL — user manually clicks Sign Out then Sign In
-    host         = request.host_url.rstrip("/")
-    prelogin_url = f"{host}/api/auth/facebook/prelogin"
-    return jsonify({"ok": True, "auth_url": prelogin_url})
+    # Open OAuth URL directly — this ALWAYS shows the Allow button on Facebook.
+    # The Allow button is what connects Facebook to our app.
+    # Do NOT navigate away (no logout redirects) — that breaks the OAuth context
+    # and Facebook goes to feed instead of showing Allow.
+    # The "Sign out & use different account" button on the success page handles switching.
+    return jsonify({"ok": True, "auth_url": oauth_url})
 
 
 @app.route("/api/auth/facebook/callback")
@@ -1492,9 +1494,9 @@ def facebook_callback():
 
         # Store oauth_url for signout-and-retry
         oauth_url = session.get("fb_oauth_url", "")
-        safe_oauth = oauth_url.replace("\\", "\\\\").replace("'", "\\'")
+        safe_oauth = oauth_url.replace("'", "\'")
+        display_name = page_name if pages else 'Facebook Account'
 
-        # Auto-connect and close — show sign-out option briefly
         return f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
 <title>Facebook Connected</title>
@@ -1502,34 +1504,34 @@ def facebook_callback():
 *{{box-sizing:border-box;margin:0;padding:0;}}
 body{{min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',sans-serif;
      display:flex;align-items:center;justify-content:center;padding:24px;}}
-.wrap{{width:100%;max-width:380px;text-align:center;gap:16px;display:flex;flex-direction:column;align-items:center;}}
-.ico{{font-size:52px;margin-bottom:4px;}}
+.wrap{{width:100%;max-width:380px;text-align:center;display:flex;flex-direction:column;
+       align-items:center;gap:14px;}}
+.ico{{font-size:52px;}}
 h2{{font-size:20px;font-weight:800;letter-spacing:-0.5px;}}
-.sub{{font-size:13px;color:rgba(200,185,255,0.6);line-height:1.6;}}
-.signout-btn{{display:flex;align-items:center;justify-content:center;gap:8px;
-              padding:11px 22px;border-radius:11px;margin-top:8px;
-              border:1.5px solid rgba(255,96,96,0.25);background:rgba(255,96,96,0.07);
-              color:rgba(255,130,130,0.9);font-size:13px;font-weight:600;
+.sub{{font-size:13px;color:rgba(200,185,255,.6);line-height:1.6;}}
+.signout-btn{{padding:11px 22px;border-radius:11px;
+              border:1.5px solid rgba(255,96,96,.25);background:rgba(255,96,96,.07);
+              color:rgba(255,130,130,.9);font-size:13px;font-weight:600;
               cursor:pointer;font-family:'Segoe UI',sans-serif;transition:all .2s;}}
-.signout-btn:hover{{border-color:rgba(255,96,96,0.5);background:rgba(255,96,96,0.15);}}
-.note{{font-size:10px;color:rgba(200,185,255,0.25);line-height:1.6;}}
+.signout-btn:hover{{border-color:rgba(255,96,96,.5);background:rgba(255,96,96,.15);}}
+.note{{font-size:10px;color:rgba(200,185,255,.25);}}
 </style></head>
 <body>
 <div class="wrap">
   <div class="ico">📘✓</div>
   <h2>Facebook Connected!</h2>
-  <p class="sub">{page_name if pages else 'Account'} connected successfully.<br>Closing window...</p>
-  <button class="signout-btn" onclick="doSignOut()">↩ Wrong account? Sign out &amp; retry</button>
-  <p class="note">Window closes automatically in 2 seconds</p>
+  <p class="sub">{display_name} connected.<br>Closing in 2 seconds...</p>
+  <button class="signout-btn" onclick="doSignOut()">↩ Wrong account? Sign out &amp; use different</button>
+  <p class="note">Signs you out so you can connect a different account</p>
 </div>
 <script>
-// Auto-notify parent and close
 window.opener && window.opener.postMessage('channel_connected:facebook:1', '*');
 var t = setTimeout(function() {{ window.close(); }}, 2000);
-
 function doSignOut() {{
   clearTimeout(t);
-  window.location.href = '/api/auth/facebook/prelogin';
+  // Navigate to Facebook logout then come back to OAuth
+  sessionStorage.setItem('fb_oauth_url', '{safe_oauth}');
+  window.location.href = 'https://www.facebook.com/logout.php';
 }}
 </script>
 </body></html>"""
@@ -1633,22 +1635,44 @@ function doLogout() {{
 @app.route("/api/auth/facebook/reauth")
 def facebook_reauth():
     """
-    Called when user clicks "Continue to Sign In" on the prelogin page
-    after manually signing out of Facebook.
-    Redirects straight to the Facebook OAuth URL.
+    Landing page after user manually logs out of Facebook.
+    Reads OAuth URL from sessionStorage (set by the signout button)
+    and shows a Sign In button that goes straight to OAuth.
     """
-    oauth_url = session.get("fb_reauth_target", "")
-    if not oauth_url:
-        return """<html><body style='background:#05030f;color:#ede8ff;font-family:sans-serif;
-        display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;'>
-        <div><h3>⚠ Session expired</h3><p style='margin-top:10px;opacity:.6'>
-        Please close this window and click Connect again.</p>
-        <button onclick='window.close()' style='margin-top:16px;padding:10px 20px;
-        background:#1877f2;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:14px;'>
-        Close</button></div></body></html>"""
-
-    # Redirect to OAuth — user sees blank Facebook sign-in form ✓
-    return redirect(oauth_url)
+    return """<!DOCTYPE html>
+<html><head><meta charset='UTF-8'><title>Sign in to Facebook</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;flex-direction:column;
+     align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;
+     text-align:center;padding:28px;gap:16px;}
+.ico{font-size:48px;}
+h2{font-size:19px;font-weight:800;}
+p{font-size:13px;color:rgba(200,185,255,.55);max-width:300px;line-height:1.7;}
+.btn{padding:14px 32px;border-radius:12px;border:none;
+     background:linear-gradient(135deg,#1877f2,#0866ff);color:#fff;
+     font-size:15px;font-weight:700;cursor:pointer;font-family:'Segoe UI',sans-serif;
+     transition:all .2s;box-shadow:0 6px 20px rgba(24,119,242,.35);}
+.btn:hover{opacity:.88;transform:translateY(-1px);}
+</style></head>
+<body>
+<div class="ico">📘</div>
+<h2>✓ Signed out of Facebook</h2>
+<p>Now sign in with the account you want to connect to your AI agent.</p>
+<button class='btn' id='btn'>Sign In with Facebook →</button>
+<script>
+var u = sessionStorage.getItem('fb_oauth_url');
+if (u) {
+  sessionStorage.removeItem('fb_oauth_url');
+  // Auto redirect after short delay
+  setTimeout(function() { window.location.href = u; }, 800);
+  document.getElementById('btn').onclick = function() { window.location.href = u; };
+} else {
+  document.getElementById('btn').onclick = function() { window.close(); };
+  document.querySelector('p').textContent = 'Please close this window and click Connect again.';
+}
+</script>
+</body></html>"""
 
 
 @app.route("/api/auth/facebook/disconnect", methods=["POST"])
