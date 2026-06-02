@@ -958,7 +958,7 @@ def linkedin_auth(username):
     return jsonify({"ok": True, "auth_url": oauth_url})
 
 
-def _li_account_picker_page(username, slot, access_token, expires_in, personal_name, personal_id, orgs):
+def _li_account_picker_page(username, slot, access_token, expires_in, personal_name, personal_id, orgs, oauth_url=''):
     """
     Renders an in-popup page that lets the user pick:
       • their personal LinkedIn profile, OR
@@ -988,6 +988,12 @@ def _li_account_picker_page(username, slot, access_token, expires_in, personal_n
         "personal_name": personal_name,
     }
 
+    # Store oauth_url so signout route can restart the flow
+    token_key2 = f"li_oauth_{username}_{slot}"
+    session[token_key2] = oauth_url
+
+    safe_name = personal_name.replace("'", "\\'")
+
     return f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Choose LinkedIn Account</title>
@@ -996,7 +1002,7 @@ def _li_account_picker_page(username, slot, access_token, expires_in, personal_n
 body{{min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',sans-serif;
      display:flex;align-items:center;justify-content:center;padding:24px;}}
 .wrap{{width:100%;max-width:420px;}}
-.hdr{{text-align:center;margin-bottom:28px;}}
+.hdr{{text-align:center;margin-bottom:24px;}}
 .hdr h2{{font-size:20px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px;}}
 .hdr p{{font-size:12px;color:rgba(200,185,255,0.55);}}
 .slot-badge{{display:inline-block;background:rgba(176,133,255,0.15);border:1px solid rgba(176,133,255,0.3);
@@ -1021,6 +1027,15 @@ body{{min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',s
 .loading{{display:none;text-align:center;padding:20px;font-size:13px;color:rgba(200,185,255,0.5);}}
 .spin{{display:inline-block;animation:sp 0.8s linear infinite;}}
 @keyframes sp{{to{{transform:rotate(360deg);}}}}
+.signout-row{{display:flex;align-items:center;justify-content:center;margin-top:24px;}}
+.signout-btn{{display:flex;align-items:center;gap:8px;padding:11px 22px;border-radius:11px;
+              border:1.5px solid rgba(255,96,96,0.25);background:rgba(255,96,96,0.07);
+              color:rgba(255,130,130,0.9);font-size:13px;font-weight:600;
+              cursor:pointer;transition:all 0.2s;font-family:'Segoe UI',sans-serif;}}
+.signout-btn:hover{{border-color:rgba(255,96,96,0.5);background:rgba(255,96,96,0.15);
+                    transform:translateY(-1px);}}
+.signout-note{{font-size:10px;color:rgba(200,185,255,0.3);text-align:center;
+               margin-top:8px;line-height:1.6;}}
 </style></head>
 <body>
 <div class="wrap">
@@ -1031,7 +1046,7 @@ body{{min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',s
   </div>
 
   <div class="section-label">Personal Profile</div>
-  <label class="acct-card" onclick="pick('personal', '{personal_id}', '{personal_name.replace("'", "\'")}')">
+  <label class="acct-card" onclick="pick('personal', '{personal_id}', '{safe_name}')">
     <span class="acct-ico">👤</span>
     <span class="acct-info">
       <strong>{personal_name}</strong>
@@ -1045,6 +1060,13 @@ body{{min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',s
   <div class="loading" id="loadingBox">
     <span class="spin">⟳</span> Connecting...
   </div>
+
+  <div class="signout-row">
+    <button class="signout-btn" onclick="doSignOut()">
+      ↩ Sign out &amp; use a different account
+    </button>
+  </div>
+  <p class="signout-note">Signs you out of LinkedIn so you can connect a different account</p>
 </div>
 
 <script>
@@ -1056,8 +1078,8 @@ async function pick(acct_type, acct_id, acct_name) {{
       method: 'POST',
       headers: {{'Content-Type':'application/json'}},
       body: JSON.stringify({{
-        username: '{username}',
-        slot:     {slot},
+        username:  '{username}',
+        slot:      {slot},
         acct_type: acct_type,
         acct_id:   acct_id,
         acct_name: acct_name,
@@ -1078,16 +1100,44 @@ async function pick(acct_type, acct_id, acct_name) {{
     document.getElementById('loadingBox').style.display='none';
   }}
 }}
+
+function doSignOut() {{
+  window.location.href = '/api/auth/linkedin/signout/{username}/{slot}';
+}}
 </script>
+</body></html>"""
+
+
+@app.route("/api/auth/linkedin/signout/<username>/<int:slot>")
+def linkedin_signout(username, slot):
+    """Sign user out of LinkedIn then redirect back to OAuth URL for fresh sign-in."""
+    token_key = f"li_oauth_{username}_{slot}"
+    oauth_url = session.get(token_key, "")
+    if not oauth_url:
+        return redirect("/setup")
+    encoded = __import__('urllib').parse.quote(oauth_url)
+    # Navigate to logout; after LinkedIn logs out it shows its page.
+    # sessionStorage on our /api/auth/linkedin/reauth page will catch the return.
+    return f"""<!DOCTYPE html>
+<html><head><meta charset='UTF-8'><title>Signing out...</title>
+<style>*{{box-sizing:border-box;margin:0;padding:0;}}body{{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;text-align:center;padding:28px;gap:16px;}}h2{{font-size:19px;font-weight:800;}}p{{font-size:13px;color:rgba(200,185,255,.55);max-width:300px;line-height:1.7;}}.spin{{font-size:36px;animation:sp 1s linear infinite;display:inline-block;}}@keyframes sp{{to{{transform:rotate(360deg);}}}}</style></head>
+<body><div class='spin'>⟳</div><h2>Signing out...</h2><p>Signing you out of LinkedIn. Please wait...</p>
+<script>sessionStorage.setItem('li_reauth_url',{_json.dumps(oauth_url)});setTimeout(function(){{window.location.href='https://www.linkedin.com/m/logout';}},600);</script>
+</body></html>"""
+
+
+@app.route("/api/auth/linkedin/reauth")
+def linkedin_reauth():
+    """Landing page after LinkedIn logout — shows Sign In button pointing to OAuth URL."""
+    return """<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Sign in</title>
+<style>*{box-sizing:border-box;margin:0;padding:0;}body{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;text-align:center;padding:28px;gap:16px;}h2{font-size:19px;font-weight:800;}p{font-size:13px;color:rgba(200,185,255,.55);max-width:300px;line-height:1.7;}.btn{padding:14px 28px;border-radius:12px;border:none;background:linear-gradient(135deg,#0077b5,#0099cc);color:#fff;font-size:15px;font-weight:700;cursor:pointer;}</style></head>
+<body><h2>✓ Signed out of LinkedIn</h2><p>Now sign in with the account you want to connect.</p><button class='btn' id='btn'>Sign In with LinkedIn →</button>
+<script>var u=sessionStorage.getItem('li_reauth_url');document.getElementById('btn').onclick=function(){if(u){sessionStorage.removeItem('li_reauth_url');window.location.href=u;}else{window.close();}};</script>
 </body></html>"""
 
 
 @app.route("/api/auth/linkedin/pick", methods=["POST"])
 def linkedin_pick():
-    """
-    Called from the in-popup picker page.
-    Saves the chosen account (personal or company page) to the slot.
-    """
     data      = request.get_json()
     username  = data.get("username", "")
     slot      = int(data.get("slot", 1))
@@ -1273,8 +1323,18 @@ def linkedin_callback():
         session.modified = True
 
         # Show account picker in popup
+        # Rebuild oauth_url to pass into picker (for sign-out-and-retry)
+        _oauth_url = "https://www.linkedin.com/oauth/v2/authorization?" + __import__('urllib').parse.urlencode({
+            "response_type": "code",
+            "client_id":     LI_CLIENT_ID,
+            "redirect_uri":  LI_REDIRECT_URI,
+            "state":         state_raw,
+            "scope":         "openid profile w_member_social",
+            "prompt":        "login",
+        })
         return _li_account_picker_page(
-            username, slot, access_token, expires_in, li_name, li_id, orgs
+            username, slot, access_token, expires_in, li_name, li_id, orgs,
+            oauth_url=_oauth_url
         )
 
     except Exception as e:
