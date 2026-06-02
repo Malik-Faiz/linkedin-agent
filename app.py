@@ -1399,19 +1399,14 @@ def facebook_auth(username):
     }
     oauth_url = "https://www.facebook.com/v19.0/dialog/oauth?" + urllib.parse.urlencode(params)
 
-    # Store oauth_url in session so reauth route can retrieve it after logout
-    session["fb_oauth_url"] = oauth_url
+    # Store OAuth URL server-side so pre-login page can use it
+    session["fb_oauth_url"]      = oauth_url
+    session["fb_reauth_target"]  = oauth_url
 
-    # ── LOGOUT FIRST then go to OAuth ──────────────────────────────────────
-    # facebook.com/logout.php?next= DOES accept external URLs.
-    # This clears the FB session so the user sees a fresh sign-in page
-    # instead of the "Continue as X" or direct feed redirect.
-    host       = request.host_url.rstrip("/")
-    reauth_url = f"{host}/api/auth/facebook/reauth"
-    # Store oauth_url server-side so reauth page can redirect to it
-    session["fb_reauth_target"] = oauth_url
-    logout_url = f"https://www.facebook.com/logout.php?next={urllib.parse.quote(reauth_url)}"
-    return jsonify({"ok": True, "auth_url": logout_url})
+    # Return our pre-login page URL — user manually clicks Sign Out then Sign In
+    host         = request.host_url.rstrip("/")
+    prelogin_url = f"{host}/api/auth/facebook/prelogin"
+    return jsonify({"ok": True, "auth_url": prelogin_url})
 
 
 @app.route("/api/auth/facebook/callback")
@@ -1534,9 +1529,7 @@ var t = setTimeout(function() {{ window.close(); }}, 2000);
 
 function doSignOut() {{
   clearTimeout(t);
-  sessionStorage.setItem('fb_reauth_url', '{safe_oauth}');
-  window.location.href = 'https://www.facebook.com/logout.php?next=' +
-    encodeURIComponent(window.location.origin + '/api/auth/facebook/reauth');
+  window.location.href = '/api/auth/facebook/prelogin';
 }}
 </script>
 </body></html>"""
@@ -1544,55 +1537,118 @@ function doSignOut() {{
         return f"<script>window.close();</script>Error: {e}", 500
 
 
-@app.route("/api/auth/facebook/reauth")
-def facebook_reauth():
+@app.route("/api/auth/facebook/prelogin")
+def facebook_prelogin():
     """
-    Landing page after Facebook logout.
-    Facebook redirects here after logout.php?next=this_url.
-    Immediately redirects to the stored OAuth URL — user sees fresh FB sign-in.
+    Shown in popup BEFORE Facebook OAuth.
+    User sees:
+      [1] Sign out of Facebook  → navigates to facebook.com/logout
+      [2] After signing out, clicks "Sign In" → goes to OAuth URL → Allow → connected
+    Same pattern as LinkedIn signout page which works correctly.
     """
-    # Get OAuth URL from server-side session (more reliable than sessionStorage)
-    oauth_url = session.get("fb_reauth_target", "")
-
+    oauth_url = session.get("fb_oauth_url", "")
     if not oauth_url:
-        # Fallback: tell user to close and retry
-        return """<!DOCTYPE html>
-<html><head><meta charset='UTF-8'><title>Signed out</title>
-<style>body{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;flex-direction:column;
-align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;text-align:center;padding:28px;gap:16px;}
-h2{font-size:19px;font-weight:800;}p{font-size:13px;color:rgba(200,185,255,.55);}
-.btn{padding:12px 24px;border-radius:10px;border:none;background:linear-gradient(135deg,#1877f2,#0866ff);
-color:#fff;font-size:14px;font-weight:700;cursor:pointer;}</style></head>
-<body><h2>✓ Signed out</h2><p>Please close this window and click Connect again.</p>
-<button class='btn' onclick='window.close()'>Close</button></body></html>"""
+        return redirect("/setup")
 
-    # Redirect immediately to OAuth — user sees blank Facebook sign-in form
-    safe = oauth_url.replace("'", "\'")
+    safe_oauth = oauth_url.replace("'", "\'")
+    host       = request.host_url.rstrip("/")
+    reauth_url = f"{host}/api/auth/facebook/reauth"
+
     return f"""<!DOCTYPE html>
-<html><head><meta charset='UTF-8'><title>Connecting Facebook...</title>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connect Facebook</title>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0;}}
 body{{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;flex-direction:column;
      align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;
-     text-align:center;padding:28px;gap:14px;}}
-.ico{{font-size:44px;}}
-h3{{font-size:18px;font-weight:700;}}
-p{{font-size:12px;color:rgba(200,185,255,.5);}}
-.bar{{width:220px;height:3px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden;}}
-.fill{{height:100%;width:0%;background:linear-gradient(90deg,#1877f2,#0866ff);border-radius:99px;}}
+     text-align:center;padding:28px;gap:0;}}
+.ico{{font-size:52px;margin-bottom:18px;}}
+h2{{font-size:20px;font-weight:800;letter-spacing:-.5px;margin-bottom:10px;}}
+.sub{{font-size:13px;color:rgba(200,185,255,.55);line-height:1.7;max-width:300px;margin-bottom:28px;}}
+.step{{display:flex;align-items:flex-start;gap:12px;background:rgba(255,255,255,.03);
+       border:1px solid rgba(160,120,255,.18);border-radius:14px;padding:14px 16px;
+       margin-bottom:10px;text-align:left;width:100%;max-width:340px;}}
+.step-num{{width:24px;height:24px;border-radius:50%;background:rgba(24,119,242,.2);
+           border:1px solid rgba(24,119,242,.4);color:#4a90d9;font-size:11px;
+           display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}}
+.step-text{{font-size:12px;color:rgba(200,185,255,.75);line-height:1.6;}}
+.step-text strong{{color:#ede8ff;display:block;margin-bottom:2px;font-size:13px;}}
+.btn{{margin-top:22px;width:100%;max-width:340px;padding:15px;border-radius:13px;
+      font-size:15px;font-weight:700;cursor:pointer;border:none;transition:all .2s;
+      font-family:'Segoe UI',sans-serif;}}
+.btn-lo{{background:linear-gradient(135deg,#1877f2,#0866ff);color:#fff;
+          box-shadow:0 6px 20px rgba(24,119,242,.35);}}
+.btn-lo:hover{{opacity:.88;transform:translateY(-1px);}}
+.btn-go{{background:linear-gradient(135deg,#b085ff,#ff80b5);color:#fff;
+          box-shadow:0 6px 20px rgba(176,133,255,.35);display:none;margin-top:10px;}}
+.btn-go:hover{{opacity:.88;transform:translateY(-1px);}}
+.note{{font-size:11px;color:rgba(200,185,255,.35);margin-top:14px;max-width:300px;line-height:1.6;}}
 </style></head>
 <body>
 <div class="ico">📘</div>
-<h3>Signed out — opening Facebook sign-in...</h3>
-<p>Sign in with the account you want to connect.</p>
-<div class="bar"><div class="fill" id="fill"></div></div>
+<h2>Connect Facebook Channel</h2>
+<p class="sub">Sign out of Facebook first, then sign in with the account you want to connect.</p>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-text"><strong>Sign out of Facebook</strong>Click below — Facebook will open and sign you out.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-text"><strong>Come back here</strong>After signing out, click "Continue to Sign In".</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-text"><strong>Sign in &amp; Allow</strong>Sign in with the account you want, then click Allow.</div>
+</div>
+
+<button class="btn btn-lo" id="btnLogout" onclick="doLogout()">Sign Out of Facebook</button>
+<button class="btn btn-go" id="btnGo" onclick="window.location.href='{reauth_url}'">✓ Continue to Sign In →</button>
+<p class="note" id="noteText">Click "Sign Out of Facebook" first</p>
+
 <script>
-var f=document.getElementById('fill'),s=Date.now(),d=700;
-function go(){{var p=Math.min(100,(Date.now()-s)/d*100);f.style.width=p+'%';
-  if(p<100)requestAnimationFrame(go);else window.location.href='{safe}';}}
-requestAnimationFrame(go);
+window.addEventListener('load', function() {{
+  if (sessionStorage.getItem('fb_logged_out')) {{
+    sessionStorage.removeItem('fb_logged_out');
+    document.getElementById('btnLogout').style.display = 'none';
+    document.getElementById('btnGo').style.display     = 'block';
+    document.getElementById('noteText').textContent    = '✓ Signed out! Click Continue to sign in.';
+    document.getElementById('noteText').style.color    = 'rgba(61,255,192,.6)';
+  }}
+}});
+
+document.getElementById('btnLogout').addEventListener('click', function() {{
+  sessionStorage.setItem('fb_logged_out', '1');
+}}, true);
+
+function doLogout() {{
+  document.getElementById('btnLogout').disabled     = true;
+  document.getElementById('btnLogout').textContent  = 'Signing out...';
+  window.location.href = 'https://www.facebook.com/logout.php';
+}}
 </script>
 </body></html>"""
+
+
+@app.route("/api/auth/facebook/reauth")
+def facebook_reauth():
+    """
+    Called when user clicks "Continue to Sign In" on the prelogin page
+    after manually signing out of Facebook.
+    Redirects straight to the Facebook OAuth URL.
+    """
+    oauth_url = session.get("fb_reauth_target", "")
+    if not oauth_url:
+        return """<html><body style='background:#05030f;color:#ede8ff;font-family:sans-serif;
+        display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;'>
+        <div><h3>⚠ Session expired</h3><p style='margin-top:10px;opacity:.6'>
+        Please close this window and click Connect again.</p>
+        <button onclick='window.close()' style='margin-top:16px;padding:10px 20px;
+        background:#1877f2;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:14px;'>
+        Close</button></div></body></html>"""
+
+    # Redirect to OAuth — user sees blank Facebook sign-in form ✓
+    return redirect(oauth_url)
 
 
 @app.route("/api/auth/facebook/disconnect", methods=["POST"])
