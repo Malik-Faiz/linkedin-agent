@@ -1489,62 +1489,41 @@ def facebook_callback():
         oauth_url = session.get("fb_oauth_url", "")
         safe_oauth = oauth_url.replace("\\", "\\\\").replace("'", "\\'")
 
-        # Show success page with sign-out option
+        # Auto-connect and close — show sign-out option briefly
         return f"""<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html><head><meta charset="UTF-8">
 <title>Facebook Connected</title>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0;}}
 body{{min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',sans-serif;
      display:flex;align-items:center;justify-content:center;padding:24px;}}
-.wrap{{width:100%;max-width:400px;text-align:center;}}
-.slot-badge{{display:inline-block;background:rgba(24,119,242,0.15);border:1px solid rgba(24,119,242,0.3);
-             color:#4a90d9;border-radius:20px;padding:4px 14px;font-size:11px;margin-bottom:16px;}}
-h2{{font-size:20px;font-weight:800;letter-spacing:-0.5px;margin-bottom:8px;}}
-.page-name{{font-size:14px;color:rgba(200,185,255,0.7);margin-bottom:24px;font-family:'Segoe UI',sans-serif;}}
-.acct-card{{display:flex;align-items:center;gap:14px;padding:14px 16px;
-            border:1.5px solid rgba(61,255,192,0.3);border-radius:14px;
-            background:rgba(61,255,192,0.04);margin-bottom:20px;text-align:left;}}
-.acct-ico{{font-size:26px;flex-shrink:0;}}
-.acct-info strong{{display:block;font-size:14px;font-weight:700;}}
-.acct-info small{{display:block;font-size:11px;color:rgba(200,185,255,0.5);margin-top:2px;}}
-.btn-connect{{width:100%;padding:14px;border-radius:12px;border:none;
-              background:linear-gradient(135deg,#1877f2,#0866ff);color:#fff;
-              font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;
-              font-family:'Segoe UI',sans-serif;transition:all .2s;}}
-.btn-connect:hover{{opacity:.88;transform:translateY(-1px);}}
+.wrap{{width:100%;max-width:380px;text-align:center;gap:16px;display:flex;flex-direction:column;align-items:center;}}
+.ico{{font-size:52px;margin-bottom:4px;}}
+h2{{font-size:20px;font-weight:800;letter-spacing:-0.5px;}}
+.sub{{font-size:13px;color:rgba(200,185,255,0.6);line-height:1.6;}}
 .signout-btn{{display:flex;align-items:center;justify-content:center;gap:8px;
-              width:100%;padding:11px;border-radius:11px;
+              padding:11px 22px;border-radius:11px;margin-top:8px;
               border:1.5px solid rgba(255,96,96,0.25);background:rgba(255,96,96,0.07);
               color:rgba(255,130,130,0.9);font-size:13px;font-weight:600;
               cursor:pointer;font-family:'Segoe UI',sans-serif;transition:all .2s;}}
 .signout-btn:hover{{border-color:rgba(255,96,96,0.5);background:rgba(255,96,96,0.15);}}
-.note{{font-size:10px;color:rgba(200,185,255,0.3);margin-top:10px;line-height:1.6;}}
+.note{{font-size:10px;color:rgba(200,185,255,0.25);line-height:1.6;}}
 </style></head>
 <body>
 <div class="wrap">
-  <div class="slot-badge">Facebook Channel</div>
-  <h2>✓ Connected!</h2>
-  <p class="page-name">{msg}</p>
-
-  <div class="acct-card">
-    <span class="acct-ico">📘</span>
-    <div class="acct-info">
-      <strong>{page_name if pages else 'Facebook Account'}</strong>
-      <small>Facebook Page · connected</small>
-    </div>
-  </div>
-
-  <button class="btn-connect" onclick="confirmConnect()">✓ Use This Account</button>
-  <button class="signout-btn" onclick="doSignOut()">↩ Sign out &amp; use different account</button>
-  <p class="note">Signs you out of Facebook so you can connect a different account</p>
+  <div class="ico">📘✓</div>
+  <h2>Facebook Connected!</h2>
+  <p class="sub">{page_name if pages else 'Account'} connected successfully.<br>Closing window...</p>
+  <button class="signout-btn" onclick="doSignOut()">↩ Wrong account? Sign out &amp; retry</button>
+  <p class="note">Window closes automatically in 2 seconds</p>
 </div>
 <script>
-function confirmConnect() {{
-  window.opener && window.opener.postMessage('channel_connected:facebook:1', '*');
-  window.close();
-}}
+// Auto-notify parent and close
+window.opener && window.opener.postMessage('channel_connected:facebook:1', '*');
+var t = setTimeout(function() {{ window.close(); }}, 2000);
+
 function doSignOut() {{
+  clearTimeout(t);
   sessionStorage.setItem('fb_reauth_url', '{safe_oauth}');
   window.location.href = 'https://www.facebook.com/logout.php?next=' +
     encodeURIComponent(window.location.origin + '/api/auth/facebook/reauth');
