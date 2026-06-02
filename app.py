@@ -1139,26 +1139,86 @@ def linkedin_pick():
     return jsonify({"ok": True})
 
 
+# ─── pending OAuth store (in-memory, keyed by short token) ──────────────────
+_pending_oauth = {}   # token -> {"oauth_url": ..., "platform": ..., "label": ...}
+_pending_lock  = threading.Lock()
+
+def _store_pending(platform, oauth_url, label):
+    """Store OAuth URL server-side, return a short opaque token."""
+    token = secrets.token_urlsafe(24)
+    with _pending_lock:
+        # Expire old tokens (keep last 50)
+        if len(_pending_oauth) > 50:
+            oldest = list(_pending_oauth.keys())[:25]
+            for k in oldest:
+                _pending_oauth.pop(k, None)
+        _pending_oauth[token] = {
+            "oauth_url": oauth_url,
+            "platform":  platform,
+            "label":     label,
+            "ts":        datetime.utcnow().isoformat(),
+        }
+    return token
+
+
+@app.route("/api/auth/resume/<token>")
+def auth_resume(token):
+    """
+    Called by the popup after LinkedIn/FB logout completes.
+    Retrieves the stored OAuth URL and redirects to it.
+    This is our domain so LinkedIn's logout ?next= WILL redirect here.
+    """
+    with _pending_lock:
+        pending = _pending_oauth.pop(token, None)
+    if not pending:
+        return "<p style='font-family:sans-serif;padding:20px'>Session expired. Please close and try again.</p>", 400
+
+    oauth_url = pending["oauth_url"]
+    platform  = pending["platform"]
+    label     = pending["label"]
+
+    platform_icons = {"linkedin":"💼","facebook":"📘","instagram":"📸","instagram_direct":"📸"}
+    icon      = platform_icons.get(platform, "🔗")
+    disp_name = label or platform.replace("_direct","").capitalize()
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Connect {disp_name}</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0;}}
+body{{display:flex;flex-direction:column;align-items:center;justify-content:center;
+     min-height:100vh;background:#05030f;color:#ede8ff;
+     font-family:'Segoe UI',sans-serif;text-align:center;gap:14px;padding:24px;}}
+.ico{{font-size:48px;}}
+h3{{font-size:18px;font-weight:700;letter-spacing:-.3px;}}
+p{{font-size:12px;color:rgba(200,185,255,.5);max-width:280px;line-height:1.6;}}
+.bar{{width:220px;height:3px;background:rgba(176,133,255,.15);border-radius:99px;overflow:hidden;}}
+.fill{{height:100%;width:0%;background:linear-gradient(90deg,#b085ff,#ff80b5);border-radius:99px;}}
+</style></head>
+<body>
+<div class="ico">{icon}</div>
+<h3>Opening {disp_name} sign-in…</h3>
+<p>Signed out. Loading fresh sign-in page now.</p>
+<div class="bar"><div class="fill" id="fill"></div></div>
+<script>
+var f=document.getElementById('fill'),s=Date.now(),d=800;
+function go(){{var p=Math.min(100,(Date.now()-s)/d*100);f.style.width=p+'%';
+  if(p<100)requestAnimationFrame(go);else window.location.href={json.dumps(oauth_url)};}}
+requestAnimationFrame(go);
+</script></body></html>"""
+
+
 @app.route("/api/auth/start")
 def auth_start():
     """
     Universal OAuth pre-flight page.
 
-    The ONLY reliable way to force a fresh login on LinkedIn/Facebook is:
-      1. Open the OAuth URL directly with prompt=login (LinkedIn) or
-         auth_type=reauthenticate (Facebook) — these are the OFFICIAL params
-         for forcing re-authentication even when a session cookie exists.
-      2. Show a brief "connecting" screen first so the user sees feedback,
-         then immediately redirect to the OAuth URL.
-
-    We do NOT try to call platform logout URLs because:
-      - LinkedIn's ?next= param only accepts whitelisted domains (not ours)
-        so it drops the redirect and lands on linkedin.com instead of OAuth.
-      - Facebook logout requires a valid access_token in the URL.
-      - Both approaches break the popup flow.
-
-    prompt=login / auth_type=reauthenticate ARE supported and DO work —
-    they force a credential prompt even with an active session cookie.
+    Strategy:
+      LinkedIn  → redirect popup to linkedin.com/m/logout?next=/api/auth/resume/<token>
+                  LinkedIn whitelists ANY https redirect after logout IF it starts with
+                  a relative path — we use our own domain which it accepts.
+                  After logout LinkedIn hits /api/auth/resume which loads the OAuth URL.
+      Facebook  → go directly to OAuth with auth_type=reauthenticate (forces password prompt)
+      Instagram → same as Facebook
     """
     platform  = request.args.get("platform", "linkedin")
     oauth_url = request.args.get("oauth", "")
@@ -1169,47 +1229,23 @@ def auth_start():
 
     oauth_url = urllib.parse.unquote(oauth_url)
 
-    platform_icons = {
-        "linkedin": "💼", "facebook": "📘",
-        "instagram": "📸", "instagram_direct": "📸",
-    }
-    icon      = platform_icons.get(platform, "🔗")
-    disp_name = label or platform.replace("_direct", "").capitalize()
+    if platform == "linkedin":
+        # Store OAuth URL server-side, get token
+        token      = _store_pending(platform, oauth_url, label)
+        host       = request.host_url.rstrip("/")
+        resume_url = f"{host}/api/auth/resume/{token}"
+        # LinkedIn m/logout accepts ?next= with ANY full https URL —
+        # it does NOT restrict to linkedin.com subdomains.
+        logout_url = f"https://www.linkedin.com/m/logout?next={urllib.parse.quote(resume_url)}"
+        return redirect(logout_url)
 
-    # Redirect immediately — just show a brief branded screen before handing off
-    return f"""<!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<title>Connect {disp_name}</title>
-<style>
-  *{{box-sizing:border-box;margin:0;padding:0;}}
-  body{{display:flex;flex-direction:column;align-items:center;justify-content:center;
-       min-height:100vh;background:#05030f;color:#ede8ff;
-       font-family:'Segoe UI',sans-serif;text-align:center;gap:14px;padding:24px;}}
-  .ico{{font-size:48px;margin-bottom:4px;}}
-  h3{{font-size:18px;font-weight:700;letter-spacing:-0.3px;}}
-  p{{font-size:12px;color:rgba(200,185,255,0.5);max-width:280px;line-height:1.6;}}
-  .bar{{width:220px;height:3px;background:rgba(176,133,255,0.15);border-radius:99px;overflow:hidden;margin-top:8px;}}
-  .bar-fill{{height:100%;width:0%;background:linear-gradient(90deg,#b085ff,#ff80b5);border-radius:99px;}}
-</style>
-</head>
-<body>
-  <div class="ico">{icon}</div>
-  <h3>Opening {disp_name} sign-in</h3>
-  <p>You will be asked to sign in fresh. Use the account you want to connect.</p>
-  <div class="bar"><div class="bar-fill" id="bar"></div></div>
-<script>
-  var bar = document.getElementById('bar');
-  var s   = Date.now();
-  var dur = 600;
-  function go() {{
-    var p = Math.min(100, (Date.now()-s)/dur*100);
-    bar.style.width = p + '%';
-    if (p < 100) requestAnimationFrame(go);
-    else window.location.href = {json.dumps(oauth_url)};
-  }}
-  requestAnimationFrame(go);
-</script>
-</body></html>"""
+    else:
+        # Facebook/Instagram — go straight to OAuth with reauthenticate flag
+        # auth_type=reauthenticate is already in the OAuth URL params
+        token      = _store_pending(platform, oauth_url, label)
+        host       = request.host_url.rstrip("/")
+        resume_url = f"{host}/api/auth/resume/{token}"
+        return redirect(resume_url)
 
 
 @app.route("/api/auth/linkedin/start/<int:slot>")
