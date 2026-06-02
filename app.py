@@ -1178,21 +1178,16 @@ def auth_resume(token):
 @app.route("/api/auth/start")
 def auth_start():
     """
-    Step 1 of the connect flow — entered by the popup.
+    Step 1 of the connect flow.
 
-    For LinkedIn:
-      1. Store OAuth URL server-side → get short token
-      2. Redirect popup to linkedin.com/m/logout?next=.../resume/TOKEN
-      3. LinkedIn logs the user out fully
-      4. LinkedIn redirects to /api/auth/resume/TOKEN  (our domain — accepted by LinkedIn)
-      5. /resume redirects to the real OAuth URL
-      6. User sees BLANK LinkedIn sign-in form ✓
-      7. User signs in, sees Allow button, clicks Allow
-      8. Our callback saves the token → channel connected ✓
+    LinkedIn does NOT redirect ?next= to external domains — it drops it silently.
+    So we cannot use logout+redirect.
 
-    For Facebook/Instagram:
-      auth_type=reauthenticate in the OAuth URL forces Facebook to show
-      a fresh password prompt even with an active session.
+    Real fix: show the user a clear manual sign-out page inside the popup.
+    The page has a button that opens linkedin.com/m/logout in the SAME window,
+    then a "Continue" button appears after 3s that goes to the OAuth URL.
+    This way the user actively clicks logout (full page load, cookies cleared),
+    then clicks Continue to go to OAuth → sees blank sign-in form.
     """
     platform  = request.args.get("platform", "linkedin")
     oauth_url = request.args.get("oauth", "")
@@ -1203,16 +1198,99 @@ def auth_start():
 
     oauth_url = urllib.parse.unquote(oauth_url)
 
-    if platform == "linkedin":
-        token      = _store_pending(platform, oauth_url, label)
-        host       = request.host_url.rstrip("/")
-        resume_url = f"{host}/api/auth/resume/{token}"
-        # LinkedIn m/logout?next= accepts any full HTTPS URL — including Railway domains
-        logout_url = f"https://www.linkedin.com/m/logout?next={urllib.parse.quote(resume_url)}"
-        return redirect(logout_url)
-    else:
-        # Facebook / Instagram — go directly to OAuth (auth_type=reauthenticate already set)
+    if platform != "linkedin":
+        # Facebook / Instagram — go directly to OAuth (auth_type=reauthenticate set)
         return redirect(oauth_url)
+
+    # LinkedIn — show manual sign-out helper page
+    token      = _store_pending(platform, oauth_url, label)
+    host       = request.host_url.rstrip("/")
+    resume_url = f"{host}/api/auth/resume/{token}"
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Connect LinkedIn</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0;}}
+body{{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;
+     flex-direction:column;align-items:center;justify-content:center;
+     font-family:'Segoe UI',sans-serif;text-align:center;padding:28px;gap:0;}}
+.ico{{font-size:52px;margin-bottom:18px;}}
+h2{{font-size:20px;font-weight:800;letter-spacing:-.5px;margin-bottom:10px;}}
+.sub{{font-size:13px;color:rgba(200,185,255,.55);line-height:1.7;max-width:300px;margin-bottom:28px;}}
+.step{{display:flex;align-items:flex-start;gap:12px;background:rgba(255,255,255,.03);
+       border:1px solid rgba(160,120,255,.18);border-radius:14px;padding:14px 16px;
+       margin-bottom:10px;text-align:left;width:100%;max-width:340px;}}
+.step-num{{width:24px;height:24px;border-radius:50%;background:rgba(176,133,255,.2);
+           border:1px solid rgba(176,133,255,.4);color:#b085ff;font-size:11px;
+           display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}}
+.step-text{{font-size:12px;color:rgba(200,185,255,.75);line-height:1.6;}}
+.step-text strong{{color:#ede8ff;display:block;margin-bottom:2px;font-size:13px;}}
+.btn{{margin-top:22px;width:100%;max-width:340px;padding:15px;border-radius:13px;
+      font-size:15px;font-weight:700;cursor:pointer;border:none;transition:all .2s;}}
+.btn-lo{{background:linear-gradient(135deg,#0077b5,#0099cc);color:#fff;
+          box-shadow:0 6px 20px rgba(0,119,181,.35);}}
+.btn-lo:hover{{opacity:.88;transform:translateY(-1px);}}
+.btn-go{{background:linear-gradient(135deg,#b085ff,#ff80b5);color:#fff;
+          box-shadow:0 6px 20px rgba(176,133,255,.35);display:none;margin-top:10px;}}
+.btn-go:hover{{opacity:.88;transform:translateY(-1px);}}
+.note{{font-size:11px;color:rgba(200,185,255,.35);margin-top:14px;max-width:300px;line-height:1.6;}}
+</style></head>
+<body>
+<div class="ico">💼</div>
+<h2>Connect LinkedIn Channel</h2>
+<p class="sub">To connect a different account, sign out of LinkedIn first, then sign in with the account you want.</p>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-text"><strong>Sign out of LinkedIn</strong>Click the button below — LinkedIn will open and sign you out.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-text"><strong>Come back here</strong>After signing out, click "Continue to Sign In" below.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-text"><strong>Sign in &amp; Allow</strong>Sign in with the account you want, then click Allow.</div>
+</div>
+
+<button class="btn btn-lo" id="btnLogout" onclick="doLogout()">
+  Sign Out of LinkedIn
+</button>
+<button class="btn btn-go" id="btnGo" onclick="window.location.href={json.dumps(resume_url)}">
+  ✓ Continue to Sign In →
+</button>
+<p class="note" id="noteText">Click "Sign Out of LinkedIn" first</p>
+
+<script>
+function doLogout() {{
+  // Navigate THIS window to LinkedIn logout — clears session cookie properly
+  document.getElementById('btnLogout').disabled = true;
+  document.getElementById('btnLogout').textContent = 'Signing out…';
+  // Open logout in this tab so the cookie is actually cleared
+  window.location.href = 'https://www.linkedin.com/m/logout';
+  // After navigating away, user presses Back or we detect via focus
+}}
+
+// When user comes back to this page (after LinkedIn logout)
+// they'll see the "Continue" button — but since we navigate away,
+// we instead use sessionStorage to detect second load
+window.addEventListener('load', function() {{
+  if (sessionStorage.getItem('li_logged_out')) {{
+    // User came back after logout
+    sessionStorage.removeItem('li_logged_out');
+    document.getElementById('btnLogout').style.display = 'none';
+    document.getElementById('btnGo').style.display = 'block';
+    document.getElementById('noteText').textContent = '✓ Signed out! Now click Continue to sign in with your chosen account.';
+    document.getElementById('noteText').style.color = 'rgba(61,255,192,.6)';
+  }}
+}});
+
+// Before navigating to logout, mark session
+document.getElementById('btnLogout').addEventListener('click', function() {{
+  sessionStorage.setItem('li_logged_out', '1');
+}}, true);
+</script>
+</body></html>"""
 
 
 @app.route("/api/auth/linkedin/start/<int:slot>")
