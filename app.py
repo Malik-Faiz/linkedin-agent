@@ -520,28 +520,43 @@ def publish_to_all(username, text, image_url=None, is_article=False, article_tit
       - Instagram business
     Returns count of successful publishes.
     """
-    cfg     = load_config(username)
-    success = 0
+    cfg        = load_config(username)
+    ch_enabled = cfg.get("channel_enabled", {})
+    success    = 0
+
+    def is_enabled(platform, slot):
+        key = f"{platform}_{slot}"
+        # Default True (enabled) unless user explicitly turned it off
+        return ch_enabled.get(key, True)
 
     # LinkedIn — up to 3 slots
     for slot in [1, 2, 3]:
         token = cfg.get(f"linkedin_{slot}_access_token", "")
         if token:
+            if not is_enabled("linkedin", slot):
+                add_log(username, f"  → [LinkedIn #{slot}] Skipped (toggled OFF by user)", "info")
+                continue
             ok = publish_to_linkedin_slot(username, slot, text, image_url, is_article)
             if ok:
                 success += 1
 
     # Facebook — articles not supported
     if cfg.get("facebook_access_token") and not is_article:
-        ok = publish_to_facebook(username, text, image_url)
-        if ok:
-            success += 1
+        if not is_enabled("facebook", 1):
+            add_log(username, "  → [Facebook] Skipped (toggled OFF by user)", "info")
+        else:
+            ok = publish_to_facebook(username, text, image_url)
+            if ok:
+                success += 1
 
     # Instagram — articles not supported, image required
     if cfg.get("instagram_access_token") and not is_article:
-        ok = publish_to_instagram(username, text, image_url)
-        if ok:
-            success += 1
+        if not is_enabled("instagram", 1):
+            add_log(username, "  → [Instagram] Skipped (toggled OFF by user)", "info")
+        else:
+            ok = publish_to_instagram(username, text, image_url)
+            if ok:
+                success += 1
 
     any_connected = any([
         cfg.get("linkedin_1_access_token"),
@@ -1122,50 +1137,95 @@ def linkedin_pick():
     return jsonify({"ok": True})
 
 
-@app.route("/api/auth/linkedin/start/<int:slot>")
-def linkedin_start(slot):
+@app.route("/api/auth/start")
+def auth_start():
     """
-    Intermediate page opened in the OAuth popup.
-    Solves the "same account reused" problem:
-      - LinkedIn ignores prompt=login if the user already has a LinkedIn session cookie.
-      - We can't clear linkedin.com cookies from our domain (cross-origin).
-      - Solution: serve an HTML page that opens linkedin.com/m/logout in an invisible
-        iframe, waits 1.5 s for the logout to complete, then navigates to the real
-        OAuth URL. This clears the LinkedIn session before the auth dialog appears,
-        forcing the user to type their credentials again every time.
+    Universal OAuth pre-flight page — opened in the popup for ALL platforms.
+
+    Problem: Every platform (LinkedIn, Facebook, Instagram) silently reuses the
+    browser's existing session cookie, so clicking "Connect" on a second account
+    auto-approves as the first account without showing any login screen.
+
+    Solution per platform:
+      LinkedIn  → load linkedin.com/m/logout in a hidden iframe, wait 2s, redirect
+      Facebook  → load facebook.com/logout.php in a hidden iframe, wait 2s, redirect
+                  (also appended auth_type=reauthenticate to the OAuth URL)
+      Instagram → same as Facebook (uses FB OAuth dialog)
+
+    The logout iframe runs cross-origin but the browser still sends/receives the
+    session cookie for that domain, which clears the active session. After the delay
+    we redirect to the real OAuth URL — now the user sees a fresh sign-in page.
     """
+    platform  = request.args.get("platform", "linkedin")   # linkedin|facebook|instagram
     oauth_url = request.args.get("oauth", "")
+    label     = request.args.get("label", "")               # display label e.g. "Channel 2"
+
     if not oauth_url:
         return "Missing oauth param", 400
 
-    # Decode back to real URL
     oauth_url = urllib.parse.unquote(oauth_url)
+
+    # Pick the logout URL per platform
+    logout_urls = {
+        "linkedin":         "https://www.linkedin.com/m/logout",
+        "facebook":         "https://www.facebook.com/logout.php",
+        "instagram":        "https://www.facebook.com/logout.php",   # IG uses FB session
+        "instagram_direct": "https://www.facebook.com/logout.php",
+    }
+    logout_url = logout_urls.get(platform, "https://www.linkedin.com/m/logout")
+
+    platform_icons = {
+        "linkedin": "💼", "facebook": "📘",
+        "instagram": "📸", "instagram_direct": "📸",
+    }
+    icon      = platform_icons.get(platform, "🔗")
+    disp_name = label or platform.replace("_direct", "").capitalize()
 
     return f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
-<title>Connecting LinkedIn #{slot}...</title>
+<title>Sign in to {disp_name}...</title>
 <style>
-  body{{margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
-       min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',sans-serif;
-       text-align:center;gap:16px;}}
-  .spin{{font-size:32px;animation:sp 1s linear infinite;display:inline-block;}}
-  @keyframes sp{{to{{transform:rotate(360deg);}}}}
-  p{{font-size:13px;color:rgba(200,185,255,0.5);margin:0;}}
+  *{{box-sizing:border-box;margin:0;padding:0;}}
+  body{{display:flex;flex-direction:column;align-items:center;justify-content:center;
+       min-height:100vh;background:#05030f;color:#ede8ff;
+       font-family:'Segoe UI',sans-serif;text-align:center;gap:14px;padding:24px;}}
+  .ico{{font-size:44px;margin-bottom:4px;}}
+  h3{{font-size:17px;font-weight:700;letter-spacing:-0.3px;}}
+  p{{font-size:12px;color:rgba(200,185,255,0.5);max-width:280px;line-height:1.6;}}
+  .bar{{width:220px;height:3px;background:rgba(176,133,255,0.15);border-radius:99px;overflow:hidden;margin-top:8px;}}
+  .bar-fill{{height:100%;width:0%;background:linear-gradient(90deg,#b085ff,#ff80b5);
+             border-radius:99px;transition:width 0.1s linear;}}
   iframe{{display:none;}}
 </style>
 </head>
 <body>
-  <div class="spin">⟳</div>
-  <p>Preparing fresh login for Channel {slot}...</p>
-  <!-- Logout iframe clears LinkedIn session cookie -->
-  <iframe id="logoutFrame" src="https://www.linkedin.com/m/logout"></iframe>
+  <div class="ico">{icon}</div>
+  <h3>Signing out of {disp_name}...</h3>
+  <p>Clearing existing session so you can sign in with a different account.</p>
+  <div class="bar"><div class="bar-fill" id="bar"></div></div>
+  <!-- Logout iframe — clears the platform session cookie -->
+  <iframe src="{logout_url}"></iframe>
 <script>
-  // Give LinkedIn time to process the logout, then redirect to OAuth
-  setTimeout(function() {{
-    window.location.href = {json.dumps(oauth_url)};
-  }}, 1800);
+  // Animate progress bar over 2 seconds then redirect
+  var start = Date.now();
+  var dur   = 2000;
+  var bar   = document.getElementById('bar');
+  function step() {{
+    var pct = Math.min(100, (Date.now() - start) / dur * 100);
+    bar.style.width = pct + '%';
+    if (pct < 100) {{ requestAnimationFrame(step); }}
+    else {{ window.location.href = {json.dumps(oauth_url)}; }}
+  }}
+  requestAnimationFrame(step);
 </script>
 </body></html>"""
+
+
+# Keep old route as alias so existing links still work
+@app.route("/api/auth/linkedin/start/<int:slot>")
+def linkedin_start(slot):
+    oauth_url = request.args.get("oauth", "")
+    return redirect(f"/api/auth/start?platform=linkedin&oauth={urllib.parse.quote(oauth_url)}&label=LinkedIn+%23{slot}")
 
 
 @app.route("/api/auth/linkedin/callback")
@@ -1324,13 +1384,17 @@ def facebook_auth(username):
     # Encode username in state for session-less callback
     state = f"{username}:{state_token}"
     params = {
-        "client_id":    FB_APP_ID,
-        "redirect_uri": FB_REDIRECT_URI,
-        "state":        state,
-        "scope":        "pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish"
+        "client_id":     FB_APP_ID,
+        "redirect_uri":  FB_REDIRECT_URI,
+        "state":         state,
+        "scope":         "pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish",
+        "auth_type":     "reauthenticate",  # forces FB to show login even if session exists
     }
-    url = "https://www.facebook.com/v19.0/dialog/oauth?" + urllib.parse.urlencode(params)
-    return jsonify({"ok": True, "auth_url": url})
+    oauth_url = "https://www.facebook.com/v19.0/dialog/oauth?" + urllib.parse.urlencode(params)
+    # Route through universal start page to force fresh Facebook login
+    host      = request.host_url.rstrip('/')
+    start_url = f"{host}/api/auth/start?platform=facebook&label=Facebook+Page&oauth={urllib.parse.quote(oauth_url)}"
+    return jsonify({"ok": True, "auth_url": start_url})
 
 
 @app.route("/api/auth/facebook/callback")
@@ -1488,8 +1552,11 @@ def instagram_direct_auth(username):
         "state":         state_token,
     }
     # Instagram uses the Facebook OAuth dialog even for standalone IG apps
-    url = "https://www.facebook.com/v19.0/dialog/oauth?" + urllib.parse.urlencode(params)
-    return jsonify({"ok": True, "auth_url": url})
+    oauth_url = "https://www.facebook.com/v19.0/dialog/oauth?" + urllib.parse.urlencode(params)
+    # Route through universal start page — clears FB session so fresh IG login appears
+    host      = request.host_url.rstrip('/')
+    start_url = f"{host}/api/auth/start?platform=instagram_direct&label=Instagram&oauth={urllib.parse.quote(oauth_url)}"
+    return jsonify({"ok": True, "auth_url": start_url})
 
 
 @app.route("/api/auth/instagram_direct/callback")
@@ -1644,6 +1711,30 @@ def instagram_direct_disconnect(username):
 # ════════════════════════════════════════════════════════════════════════════════
 #  STATUS / RUN / SUBJECTS
 # ════════════════════════════════════════════════════════════════════════════════
+@app.route("/api/channel/toggle", methods=["POST"])
+@require_auth
+def channel_toggle(username):
+    """Enable or disable a channel for posting. Does not disconnect — just skips it during publish."""
+    data     = request.get_json()
+    platform = data.get("platform", "")   # "linkedin" | "facebook" | "instagram"
+    slot     = int(data.get("slot", 1))
+    enabled  = bool(data.get("enabled", True))
+
+    if platform not in ("linkedin", "facebook", "instagram"):
+        return jsonify({"ok": False, "message": "Unknown platform"}), 400
+
+    key = f"{platform}_{slot}"
+    cfg = load_config(username)
+    if "channel_enabled" not in cfg:
+        cfg["channel_enabled"] = {}
+    cfg["channel_enabled"][key] = enabled
+    save_config(username, cfg)
+
+    state_word = "enabled" if enabled else "disabled"
+    add_log(username, f"Channel {platform} #{slot} {state_word} for posting", "info")
+    return jsonify({"ok": True, "key": key, "enabled": enabled})
+
+
 @app.route("/api/status")
 @require_auth
 def get_status(username):
@@ -1657,35 +1748,47 @@ def get_status(username):
     cfg    = load_config(username)
     offset = cfg.get("utc_offset_hours", None)
 
-    # Build channels_info for dashboard
+    # Build channels_info for dashboard — includes user-controlled enabled toggle
     channels_info = []
+    ch_enabled = cfg.get("channel_enabled", {})  # dict: "linkedin_1" -> True/False
+
     for slot in [1, 2, 3]:
         tok  = cfg.get(f"linkedin_{slot}_access_token", "")
         name = cfg.get(f"linkedin_{slot}_name", f"LinkedIn #{slot}")
+        key  = f"linkedin_{slot}"
+        # Default: enabled=True when connected (user must explicitly turn off)
+        enabled = ch_enabled.get(key, True) if tok else False
         channels_info.append({
             "slot":     slot,
             "platform": "linkedin",
             "name":     name if tok else f"LinkedIn #{slot}",
             "exists":   bool(tok),
             "active":   bool(tok),
+            "enabled":  enabled,
         })
     # Facebook
-    fb_tok = cfg.get("facebook_access_token", "")
+    fb_tok  = cfg.get("facebook_access_token", "")
+    fb_key  = "facebook_1"
+    fb_ena  = ch_enabled.get(fb_key, True) if fb_tok else False
     channels_info.append({
-        "slot":     4,
+        "slot":     1,
         "platform": "facebook",
         "name":     cfg.get("facebook_page_name", "Facebook Page"),
         "exists":   bool(fb_tok),
         "active":   bool(fb_tok),
+        "enabled":  fb_ena,
     })
     # Instagram
-    ig_tok = cfg.get("instagram_access_token", "")
+    ig_tok  = cfg.get("instagram_access_token", "")
+    ig_key  = "instagram_1"
+    ig_ena  = ch_enabled.get(ig_key, True) if ig_tok else False
     channels_info.append({
-        "slot":         5,
+        "slot":         1,
         "platform":     "instagram",
         "name":         f"@{cfg.get('instagram_username', 'instagram')}" if ig_tok else "Instagram",
         "exists":       bool(ig_tok),
         "active":       bool(ig_tok),
+        "enabled":      ig_ena,
         "via_facebook": cfg.get("instagram_via_facebook", False),
     })
 
