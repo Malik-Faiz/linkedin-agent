@@ -934,7 +934,7 @@ def linkedin_auth(username):
         "client_id":     LI_CLIENT_ID,
         "redirect_uri":  LI_REDIRECT_URI,
         "state":         state_payload,
-        "scope":         "openid profile w_member_social r_organization_social",
+        "scope":         "openid profile w_member_social",
         # ↓ FORCE LinkedIn to show the login screen every time so each slot
         #   gets a genuinely separate account — no silent reuse of existing session
         "prompt":        "login",
@@ -1170,7 +1170,9 @@ def linkedin_callback():
             "LinkedIn User"
         )
 
-        # Fetch organisations (company pages) this user administers
+        # Fetch organisations (company pages) this user administers.
+        # Uses /v2/organizationAcls which works with w_member_social scope.
+        # If the app doesn't have access, we gracefully skip — user still gets personal profile.
         orgs = []
         try:
             org_res = requests.get(
@@ -1180,23 +1182,45 @@ def linkedin_callback():
                     "X-Restli-Protocol-Version": "2.0.0",
                 },
                 params={
-                    "q":              "roleAssignee",
-                    "role":           "ADMINISTRATOR",
-                    "projection":     "(elements*(organizationalTarget~(id,localizedName)))",
-                    "count":          10,
+                    "q":          "roleAssignee",
+                    "role":       "ADMINISTRATOR",
+                    "count":      10,
                 },
                 timeout=10
             ).json()
+
+            # Extract org IDs from ACL response
+            org_ids = []
             for elem in org_res.get("elements", []):
-                org_data = elem.get("organizationalTarget~", {})
-                if org_data.get("id"):
-                    orgs.append({
-                        "id":   str(org_data["id"]),
-                        "name": org_data.get("localizedName", f"Company {org_data['id']}"),
-                    })
+                target = elem.get("organizationalTarget", "")
+                # target looks like "urn:li:organization:12345"
+                if "organization:" in str(target):
+                    org_id = str(target).split("organization:")[-1].strip()
+                    if org_id:
+                        org_ids.append(org_id)
+
+            # Fetch names for each org
+            for org_id in org_ids[:5]:  # max 5
+                try:
+                    org_info = requests.get(
+                        f"https://api.linkedin.com/v2/organizations/{org_id}",
+                        headers={
+                            "Authorization": f"Bearer {access_token}",
+                            "X-Restli-Protocol-Version": "2.0.0",
+                        },
+                        timeout=8
+                    ).json()
+                    org_name = (
+                        org_info.get("localizedName") or
+                        org_info.get("name", {}).get("localized", {}).get("en_US", f"Company {org_id}")
+                    )
+                    orgs.append({"id": org_id, "name": org_name})
+                except Exception:
+                    orgs.append({"id": org_id, "name": f"Company Page {org_id}"})
+
         except Exception as org_err:
-            # org fetch is best-effort — continue without it
-            add_log(username, f"LinkedIn org fetch failed (non-fatal): {org_err}", "warn")
+            # Org fetch is best-effort — user still gets personal profile picker
+            add_log(username, f"LinkedIn org fetch skipped: {org_err}", "warn")
 
         # Store token in session temporarily for /pick endpoint
         token_key = f"li_pending_{username}_{slot}"
