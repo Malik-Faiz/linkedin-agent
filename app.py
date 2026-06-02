@@ -337,15 +337,24 @@ def get_image_url(username, subject):
 # ════════════════════════════════════════════════════════════════════════════════
 
 def publish_to_linkedin_slot(username, slot, text, image_url=None, is_article=False):
-    """Publish to a specific LinkedIn account slot (1, 2, or 3)."""
-    cfg   = load_config(username)
-    token = cfg.get(f"linkedin_{slot}_access_token", "")
-    urn   = cfg.get(f"linkedin_{slot}_urn", "")
-    name  = cfg.get(f"linkedin_{slot}_name", f"Slot {slot}")
+    """Publish to a specific LinkedIn account slot (1, 2, or 3).
+    Supports both personal profiles (urn:li:person:) and company pages (urn:li:organization:).
+    """
+    cfg      = load_config(username)
+    token    = cfg.get(f"linkedin_{slot}_access_token", "")
+    urn      = cfg.get(f"linkedin_{slot}_urn", "")
+    name     = cfg.get(f"linkedin_{slot}_name", f"Slot {slot}")
+    acct_type = cfg.get(f"linkedin_{slot}_account_type", "personal")
 
     if not token or not urn:
         add_log(username, f"  → [LinkedIn #{slot}] Not connected — skipping.", "warn")
         return False
+
+    # Company pages use a different visibility URN
+    if acct_type == "organization":
+        visibility = {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
+    else:
+        visibility = {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
 
     headers = {
         "Authorization": f"Bearer {token}",
@@ -805,11 +814,13 @@ def get_channels():
         t_key  = f"linkedin_{slot}_access_token"
         e_key  = f"linkedin_{slot}_token_expires"
         n_key  = f"linkedin_{slot}_name"
+        a_key  = f"linkedin_{slot}_account_type"
         linkedin[slot] = {
             "connected": bool(cfg.get(t_key)),
             "expired":   token_expired(e_key),
             "name":      cfg.get(n_key, ""),
             "expires":   cfg.get(e_key, ""),
+            "account_type": cfg.get(a_key, "personal"),
             "env_set":   bool(LI_CLIENT_ID and LI_CLIENT_SECRET),
         }
 
@@ -912,11 +923,10 @@ def linkedin_auth(username):
         slot = 1
     slot = max(1, min(3, slot))  # clamp 1-3
 
-    state_token = secrets.token_hex(16)
-    # Encode username + slot into state so callback works even if session cookie
-    # is not forwarded by the popup (common on Railway / cross-origin redirects)
+    state_token   = secrets.token_hex(16)
+    # Encode username + slot into state — popup cookie may not be forwarded on Railway
     state_payload = f"{username}:{slot}:{state_token}"
-    session[f"li_state_{slot}"] = state_token  # still store for double-check
+    session[f"li_state_{slot}"] = state_token
     session["li_active_slot"]   = slot
 
     params = {
@@ -924,10 +934,187 @@ def linkedin_auth(username):
         "client_id":     LI_CLIENT_ID,
         "redirect_uri":  LI_REDIRECT_URI,
         "state":         state_payload,
-        "scope":         "openid profile w_member_social"
+        "scope":         "openid profile w_member_social r_organization_social",
+        # ↓ FORCE LinkedIn to show the login screen every time so each slot
+        #   gets a genuinely separate account — no silent reuse of existing session
+        "prompt":        "login",
     }
     url = "https://www.linkedin.com/oauth/v2/authorization?" + urllib.parse.urlencode(params)
     return jsonify({"ok": True, "auth_url": url})
+
+
+def _li_account_picker_page(username, slot, access_token, expires_in, personal_name, personal_id, orgs):
+    """
+    Renders an in-popup page that lets the user pick:
+      • their personal LinkedIn profile, OR
+      • one of their company pages (organisations)
+    Submits to /api/auth/linkedin/pick to save the chosen account.
+    """
+    org_cards = ""
+    for org in orgs:
+        oid   = org.get("id", "")
+        oname = org.get("name", f"Company {oid}")
+        org_cards += f"""
+        <label class="acct-card" onclick="pick('organization', '{oid}', '{oname.replace("'", "\'")}')">
+          <span class="acct-ico">🏢</span>
+          <span class="acct-info">
+            <strong>{oname}</strong>
+            <small>Company Page</small>
+          </span>
+          <span class="acct-arrow">→</span>
+        </label>"""
+
+    # Store token temporarily for the pick endpoint
+    token_key = f"li_pending_{username}_{slot}"
+    session[token_key] = {
+        "access_token": access_token,
+        "expires_in":   expires_in,
+        "personal_id":  personal_id,
+        "personal_name": personal_name,
+    }
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Choose LinkedIn Account</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0;}}
+body{{min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',sans-serif;
+     display:flex;align-items:center;justify-content:center;padding:24px;}}
+.wrap{{width:100%;max-width:420px;}}
+.hdr{{text-align:center;margin-bottom:28px;}}
+.hdr h2{{font-size:20px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px;}}
+.hdr p{{font-size:12px;color:rgba(200,185,255,0.55);}}
+.slot-badge{{display:inline-block;background:rgba(176,133,255,0.15);border:1px solid rgba(176,133,255,0.3);
+             color:#b085ff;border-radius:20px;padding:4px 14px;font-size:11px;margin-bottom:12px;}}
+.section-label{{font-size:10px;letter-spacing:2px;text-transform:uppercase;
+                color:rgba(200,185,255,0.4);margin-bottom:10px;}}
+.acct-card{{display:flex;align-items:center;gap:14px;padding:14px 16px;
+            border:1.5px solid rgba(160,120,255,0.2);border-radius:14px;
+            background:rgba(255,255,255,0.03);margin-bottom:10px;
+            cursor:pointer;transition:all 0.2s;text-decoration:none;color:inherit;}}
+.acct-card:hover{{border-color:rgba(176,133,255,0.5);background:rgba(176,133,255,0.07);
+                  transform:translateY(-1px);}}
+.acct-ico{{font-size:26px;flex-shrink:0;}}
+.acct-info{{flex:1;min-width:0;}}
+.acct-info strong{{display:block;font-size:14px;font-weight:700;
+                   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}}
+.acct-info small{{display:block;font-size:11px;color:rgba(200,185,255,0.5);margin-top:2px;}}
+.acct-arrow{{color:rgba(176,133,255,0.5);font-size:16px;flex-shrink:0;}}
+.divider{{display:flex;align-items:center;gap:10px;margin:16px 0;}}
+.divider::before,.divider::after{{content:'';flex:1;height:1px;background:rgba(160,120,255,0.15);}}
+.divider span{{font-size:10px;color:rgba(200,185,255,0.35);letter-spacing:1px;}}
+.loading{{display:none;text-align:center;padding:20px;font-size:13px;color:rgba(200,185,255,0.5);}}
+.spin{{display:inline-block;animation:sp 0.8s linear infinite;}}
+@keyframes sp{{to{{transform:rotate(360deg);}}}}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <div class="slot-badge">LinkedIn Channel {slot}</div>
+    <h2>Choose account to connect</h2>
+    <p>Select your personal profile or a company page you manage</p>
+  </div>
+
+  <div class="section-label">Personal Profile</div>
+  <label class="acct-card" onclick="pick('personal', '{personal_id}', '{personal_name.replace("'", "\'")}')">
+    <span class="acct-ico">👤</span>
+    <span class="acct-info">
+      <strong>{personal_name}</strong>
+      <small>Personal LinkedIn Profile</small>
+    </span>
+    <span class="acct-arrow">→</span>
+  </label>
+
+  {'<div class="divider"><span>OR COMPANY PAGE</span></div>' + org_cards if orgs else ''}
+
+  <div class="loading" id="loadingBox">
+    <span class="spin">⟳</span> Connecting...
+  </div>
+</div>
+
+<script>
+async function pick(acct_type, acct_id, acct_name) {{
+  document.querySelectorAll('.acct-card').forEach(c => c.style.pointerEvents='none');
+  document.getElementById('loadingBox').style.display='block';
+  try {{
+    const res = await fetch('/api/auth/linkedin/pick', {{
+      method: 'POST',
+      headers: {{'Content-Type':'application/json'}},
+      body: JSON.stringify({{
+        username: '{username}',
+        slot:     {slot},
+        acct_type: acct_type,
+        acct_id:   acct_id,
+        acct_name: acct_name,
+      }})
+    }});
+    const data = await res.json();
+    if (data.ok) {{
+      window.opener && window.opener.postMessage('channel_connected:linkedin:{slot}', '*');
+      window.close();
+    }} else {{
+      alert('Error: ' + (data.message || 'Unknown error'));
+      document.querySelectorAll('.acct-card').forEach(c => c.style.pointerEvents='');
+      document.getElementById('loadingBox').style.display='none';
+    }}
+  }} catch(e) {{
+    alert('Network error: ' + e.message);
+    document.querySelectorAll('.acct-card').forEach(c => c.style.pointerEvents='');
+    document.getElementById('loadingBox').style.display='none';
+  }}
+}}
+</script>
+</body></html>"""
+
+
+@app.route("/api/auth/linkedin/pick", methods=["POST"])
+def linkedin_pick():
+    """
+    Called from the in-popup picker page.
+    Saves the chosen account (personal or company page) to the slot.
+    """
+    data      = request.get_json()
+    username  = data.get("username", "")
+    slot      = int(data.get("slot", 1))
+    acct_type = data.get("acct_type", "personal")   # "personal" | "organization"
+    acct_id   = data.get("acct_id", "")
+    acct_name = data.get("acct_name", "")
+
+    users = load_users()
+    if username not in users:
+        return jsonify({"ok": False, "message": "Unknown user"}), 400
+
+    token_key = f"li_pending_{username}_{slot}"
+    pending   = session.get(token_key)
+    if not pending:
+        return jsonify({"ok": False, "message": "Session expired — please reconnect"}), 400
+
+    access_token = pending["access_token"]
+    expires_in   = pending["expires_in"]
+
+    cfg = load_config(username)
+
+    if acct_type == "organization":
+        # For company pages, use the organization URN
+        urn = f"urn:li:organization:{acct_id}"
+    else:
+        # Personal profile
+        urn = f"urn:li:person:{acct_id}"
+
+    cfg[f"linkedin_{slot}_access_token"]  = access_token
+    cfg[f"linkedin_{slot}_urn"]           = urn
+    cfg[f"linkedin_{slot}_name"]          = acct_name
+    cfg[f"linkedin_{slot}_account_type"]  = acct_type   # "personal" | "organization"
+    cfg[f"linkedin_{slot}_token_expires"] = (
+        datetime.utcnow() + timedelta(seconds=expires_in)
+    ).isoformat()
+    save_config(username, cfg)
+
+    # Clean up pending token from session
+    session.pop(token_key, None)
+
+    add_log(username, f"LinkedIn slot {slot} → {acct_type} '{acct_name}' connected ✓", "ok")
+    return jsonify({"ok": True})
 
 
 @app.route("/api/auth/linkedin/callback")
@@ -941,25 +1128,23 @@ def linkedin_callback():
         return _callback_page(False, f"LinkedIn denied access: {desc}")
 
     # State format: "username:slot:token"
-    # Username and slot are encoded so we don't rely on the popup session cookie
     try:
         username, slot_str, state_token = state_raw.split(":", 2)
         slot = int(slot_str)
     except Exception:
-        # Fallback to session (local dev)
-        username   = session.get("username", "")
-        slot       = session.get("li_active_slot", 1)
+        username    = session.get("username", "")
+        slot        = session.get("li_active_slot", 1)
         state_token = state_raw
 
     if not username:
         return _callback_page(False, "Session lost — please log in again and retry.")
 
-    # Verify user exists
     users = load_users()
     if username not in users:
         return _callback_page(False, "Unknown user.")
 
     try:
+        # Exchange code for token
         token_res = requests.post(
             "https://www.linkedin.com/oauth/v2/accessToken",
             data={"grant_type": "authorization_code", "code": code,
@@ -970,31 +1155,64 @@ def linkedin_callback():
         access_token = token_res.get("access_token")
         expires_in   = token_res.get("expires_in", 5184000)
         if not access_token:
-            return f"<script>window.close();</script>Token error: {token_res}", 400
+            err = token_res.get("error_description", str(token_res))
+            return _callback_page(False, f"Token exchange failed: {err}")
 
-        profile = requests.get(
+        # Get personal profile
+        profile  = requests.get(
             "https://api.linkedin.com/v2/userinfo",
             headers={"Authorization": f"Bearer {access_token}"}, timeout=10
         ).json()
-        li_id   = profile.get("sub", "")
-        li_name = profile.get("name") or f"{profile.get('given_name','')} {profile.get('family_name','')}".strip()
-
-        cfg = load_config(username)
-        cfg[f"linkedin_{slot}_access_token"]  = access_token
-        cfg[f"linkedin_{slot}_urn"]           = f"urn:li:person:{li_id}"
-        cfg[f"linkedin_{slot}_name"]          = li_name or li_id
-        cfg[f"linkedin_{slot}_token_expires"] = (
-            datetime.utcnow() + timedelta(seconds=expires_in)
-        ).isoformat()
-        save_config(username, cfg)
-        add_log(username, f"LinkedIn slot {slot} connected ✓ — {cfg[f'linkedin_{slot}_name']}", "ok")
-
-        return _callback_page(
-            True,
-            message=f"LinkedIn account {slot} connected!",
-            platform="linkedin",
-            slot=slot
+        li_id    = profile.get("sub", "")
+        li_name  = (
+            profile.get("name") or
+            f"{profile.get('given_name','')} {profile.get('family_name','')}".strip() or
+            "LinkedIn User"
         )
+
+        # Fetch organisations (company pages) this user administers
+        orgs = []
+        try:
+            org_res = requests.get(
+                "https://api.linkedin.com/v2/organizationAcls",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "X-Restli-Protocol-Version": "2.0.0",
+                },
+                params={
+                    "q":              "roleAssignee",
+                    "role":           "ADMINISTRATOR",
+                    "projection":     "(elements*(organizationalTarget~(id,localizedName)))",
+                    "count":          10,
+                },
+                timeout=10
+            ).json()
+            for elem in org_res.get("elements", []):
+                org_data = elem.get("organizationalTarget~", {})
+                if org_data.get("id"):
+                    orgs.append({
+                        "id":   str(org_data["id"]),
+                        "name": org_data.get("localizedName", f"Company {org_data['id']}"),
+                    })
+        except Exception as org_err:
+            # org fetch is best-effort — continue without it
+            add_log(username, f"LinkedIn org fetch failed (non-fatal): {org_err}", "warn")
+
+        # Store token in session temporarily for /pick endpoint
+        token_key = f"li_pending_{username}_{slot}"
+        session[token_key]     = {
+            "access_token":  access_token,
+            "expires_in":    expires_in,
+            "personal_id":   li_id,
+            "personal_name": li_name,
+        }
+        session.modified = True
+
+        # Show account picker in popup
+        return _li_account_picker_page(
+            username, slot, access_token, expires_in, li_name, li_id, orgs
+        )
+
     except Exception as e:
         add_log(username, f"LinkedIn slot {slot} OAuth error: {e}", "error")
         return _callback_page(False, f"Error: {e}")
