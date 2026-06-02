@@ -1399,10 +1399,9 @@ def facebook_auth(username):
         "auth_type":     "reauthenticate",  # forces FB to show login even if session exists
     }
     oauth_url = "https://www.facebook.com/v19.0/dialog/oauth?" + urllib.parse.urlencode(params)
-    # Route through universal start page to force fresh Facebook login
-    host      = request.host_url.rstrip('/')
-    start_url = f"{host}/api/auth/start?platform=facebook&label=Facebook+Page&oauth={urllib.parse.quote(oauth_url)}"
-    return jsonify({"ok": True, "auth_url": start_url})
+    # Store oauth_url in session so signout route can retrieve it
+    session["fb_oauth_url"] = oauth_url
+    return jsonify({"ok": True, "auth_url": oauth_url})
 
 
 @app.route("/api/auth/facebook/callback")
@@ -1486,14 +1485,116 @@ def facebook_callback():
             msg = "Facebook connected (no pages found)"
             add_log(username, "Facebook connected (no pages found)", "warn")
 
-        return (
-            f"<html><body><script>"
-            f"window.opener && window.opener.postMessage('channel_connected:facebook:1','*');"
-            f"window.close();"
-            f"</script><p>{msg} Closing...</p></body></html>"
-        )
+        # Store oauth_url for signout-and-retry
+        oauth_url = session.get("fb_oauth_url", "")
+        safe_oauth = oauth_url.replace("\\", "\\\\").replace("'", "\\'")
+
+        # Show success page with sign-out option
+        return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Facebook Connected</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0;}}
+body{{min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',sans-serif;
+     display:flex;align-items:center;justify-content:center;padding:24px;}}
+.wrap{{width:100%;max-width:400px;text-align:center;}}
+.slot-badge{{display:inline-block;background:rgba(24,119,242,0.15);border:1px solid rgba(24,119,242,0.3);
+             color:#4a90d9;border-radius:20px;padding:4px 14px;font-size:11px;margin-bottom:16px;}}
+h2{{font-size:20px;font-weight:800;letter-spacing:-0.5px;margin-bottom:8px;}}
+.page-name{{font-size:14px;color:rgba(200,185,255,0.7);margin-bottom:24px;font-family:'Segoe UI',sans-serif;}}
+.acct-card{{display:flex;align-items:center;gap:14px;padding:14px 16px;
+            border:1.5px solid rgba(61,255,192,0.3);border-radius:14px;
+            background:rgba(61,255,192,0.04);margin-bottom:20px;text-align:left;}}
+.acct-ico{{font-size:26px;flex-shrink:0;}}
+.acct-info strong{{display:block;font-size:14px;font-weight:700;}}
+.acct-info small{{display:block;font-size:11px;color:rgba(200,185,255,0.5);margin-top:2px;}}
+.btn-connect{{width:100%;padding:14px;border-radius:12px;border:none;
+              background:linear-gradient(135deg,#1877f2,#0866ff);color:#fff;
+              font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;
+              font-family:'Segoe UI',sans-serif;transition:all .2s;}}
+.btn-connect:hover{{opacity:.88;transform:translateY(-1px);}}
+.signout-btn{{display:flex;align-items:center;justify-content:center;gap:8px;
+              width:100%;padding:11px;border-radius:11px;
+              border:1.5px solid rgba(255,96,96,0.25);background:rgba(255,96,96,0.07);
+              color:rgba(255,130,130,0.9);font-size:13px;font-weight:600;
+              cursor:pointer;font-family:'Segoe UI',sans-serif;transition:all .2s;}}
+.signout-btn:hover{{border-color:rgba(255,96,96,0.5);background:rgba(255,96,96,0.15);}}
+.note{{font-size:10px;color:rgba(200,185,255,0.3);margin-top:10px;line-height:1.6;}}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="slot-badge">Facebook Channel</div>
+  <h2>✓ Connected!</h2>
+  <p class="page-name">{msg}</p>
+
+  <div class="acct-card">
+    <span class="acct-ico">📘</span>
+    <div class="acct-info">
+      <strong>{page_name if pages else 'Facebook Account'}</strong>
+      <small>Facebook Page · connected</small>
+    </div>
+  </div>
+
+  <button class="btn-connect" onclick="confirmConnect()">✓ Use This Account</button>
+  <button class="signout-btn" onclick="doSignOut()">↩ Sign out &amp; use different account</button>
+  <p class="note">Signs you out of Facebook so you can connect a different account</p>
+</div>
+<script>
+function confirmConnect() {{
+  window.opener && window.opener.postMessage('channel_connected:facebook:1', '*');
+  window.close();
+}}
+function doSignOut() {{
+  sessionStorage.setItem('fb_reauth_url', '{safe_oauth}');
+  window.location.href = 'https://www.facebook.com/logout.php?next=' +
+    encodeURIComponent(window.location.origin + '/api/auth/facebook/reauth');
+}}
+</script>
+</body></html>"""
     except Exception as e:
         return f"<script>window.close();</script>Error: {e}", 500
+
+
+@app.route("/api/auth/facebook/reauth")
+def facebook_reauth():
+    """
+    Landing page after Facebook logout.
+    Shows a Sign In button pointing back to the OAuth URL stored in sessionStorage.
+    Facebook logout redirects here (facebook.com/logout.php?next=this_url).
+    """
+    return """<!DOCTYPE html>
+<html><head><meta charset='UTF-8'><title>Sign in to Facebook</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;flex-direction:column;
+     align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;
+     text-align:center;padding:28px;gap:16px;}
+h2{font-size:19px;font-weight:800;}
+p{font-size:13px;color:rgba(200,185,255,.55);max-width:300px;line-height:1.7;}
+.btn{padding:14px 28px;border-radius:12px;border:none;
+     background:linear-gradient(135deg,#1877f2,#0866ff);color:#fff;
+     font-size:15px;font-weight:700;cursor:pointer;font-family:'Segoe UI',sans-serif;
+     transition:all .2s;}
+.btn:hover{opacity:.88;transform:translateY(-1px);}
+</style></head>
+<body>
+<h2>✓ Signed out of Facebook</h2>
+<p>Now sign in with the Facebook account you want to connect.</p>
+<button class='btn' id='btn'>Sign In with Facebook →</button>
+<script>
+var u = sessionStorage.getItem('fb_reauth_url');
+document.getElementById('btn').onclick = function() {
+  if (u) {
+    sessionStorage.removeItem('fb_reauth_url');
+    window.location.href = u;
+  } else {
+    window.close();
+  }
+};
+// Auto-click after short delay if URL exists
+if (u) { setTimeout(function(){ document.getElementById('btn').click(); }, 800); }
+</script>
+</body></html>"""
 
 
 @app.route("/api/auth/facebook/disconnect", methods=["POST"])
