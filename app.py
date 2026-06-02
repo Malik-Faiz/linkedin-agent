@@ -1139,86 +1139,60 @@ def linkedin_pick():
     return jsonify({"ok": True})
 
 
-# ─── pending OAuth store (in-memory, keyed by short token) ──────────────────
-_pending_oauth = {}   # token -> {"oauth_url": ..., "platform": ..., "label": ...}
+# ─── pending OAuth store (server-side, survives popup navigation) ────────────
+_pending_oauth = {}
 _pending_lock  = threading.Lock()
 
 def _store_pending(platform, oauth_url, label):
-    """Store OAuth URL server-side, return a short opaque token."""
     token = secrets.token_urlsafe(24)
     with _pending_lock:
-        # Expire old tokens (keep last 50)
-        if len(_pending_oauth) > 50:
-            oldest = list(_pending_oauth.keys())[:25]
+        if len(_pending_oauth) > 100:
+            oldest = list(_pending_oauth.keys())[:50]
             for k in oldest:
                 _pending_oauth.pop(k, None)
-        _pending_oauth[token] = {
-            "oauth_url": oauth_url,
-            "platform":  platform,
-            "label":     label,
-            "ts":        datetime.utcnow().isoformat(),
-        }
+        _pending_oauth[token] = {"oauth_url": oauth_url, "platform": platform, "label": label}
     return token
 
 
 @app.route("/api/auth/resume/<token>")
 def auth_resume(token):
     """
-    Called by the popup after LinkedIn/FB logout completes.
-    Retrieves the stored OAuth URL and redirects to it.
-    This is our domain so LinkedIn's logout ?next= WILL redirect here.
+    Step 2 of the connect flow.
+    LinkedIn logout redirects here → we redirect to the real OAuth URL.
+    The token lets us pass the OAuth URL through LinkedIn's logout redirect
+    without relying on query params that LinkedIn would strip.
     """
     with _pending_lock:
         pending = _pending_oauth.pop(token, None)
     if not pending:
-        return "<p style='font-family:sans-serif;padding:20px'>Session expired. Please close and try again.</p>", 400
+        return """<html><body style='font-family:sans-serif;padding:30px;background:#05030f;color:#ede8ff'>
+        <h3>⚠ Link expired</h3><p>Please close this window and click Connect again.</p>
+        <button onclick='window.close()' style='margin-top:16px;padding:10px 20px;
+        background:#b085ff;border:none;border-radius:8px;color:#fff;cursor:pointer'>Close</button>
+        </body></html>""", 400
 
-    oauth_url = pending["oauth_url"]
-    platform  = pending["platform"]
-    label     = pending["label"]
-
-    platform_icons = {"linkedin":"💼","facebook":"📘","instagram":"📸","instagram_direct":"📸"}
-    icon      = platform_icons.get(platform, "🔗")
-    disp_name = label or platform.replace("_direct","").capitalize()
-
-    return f"""<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Connect {disp_name}</title>
-<style>
-*{{box-sizing:border-box;margin:0;padding:0;}}
-body{{display:flex;flex-direction:column;align-items:center;justify-content:center;
-     min-height:100vh;background:#05030f;color:#ede8ff;
-     font-family:'Segoe UI',sans-serif;text-align:center;gap:14px;padding:24px;}}
-.ico{{font-size:48px;}}
-h3{{font-size:18px;font-weight:700;letter-spacing:-.3px;}}
-p{{font-size:12px;color:rgba(200,185,255,.5);max-width:280px;line-height:1.6;}}
-.bar{{width:220px;height:3px;background:rgba(176,133,255,.15);border-radius:99px;overflow:hidden;}}
-.fill{{height:100%;width:0%;background:linear-gradient(90deg,#b085ff,#ff80b5);border-radius:99px;}}
-</style></head>
-<body>
-<div class="ico">{icon}</div>
-<h3>Opening {disp_name} sign-in…</h3>
-<p>Signed out. Loading fresh sign-in page now.</p>
-<div class="bar"><div class="fill" id="fill"></div></div>
-<script>
-var f=document.getElementById('fill'),s=Date.now(),d=800;
-function go(){{var p=Math.min(100,(Date.now()-s)/d*100);f.style.width=p+'%';
-  if(p<100)requestAnimationFrame(go);else window.location.href={json.dumps(oauth_url)};}}
-requestAnimationFrame(go);
-</script></body></html>"""
+    # Now redirect straight to LinkedIn OAuth — user is logged out, will see sign-in form
+    return redirect(pending["oauth_url"])
 
 
 @app.route("/api/auth/start")
 def auth_start():
     """
-    Universal OAuth pre-flight page.
+    Step 1 of the connect flow — entered by the popup.
 
-    Strategy:
-      LinkedIn  → redirect popup to linkedin.com/m/logout?next=/api/auth/resume/<token>
-                  LinkedIn whitelists ANY https redirect after logout IF it starts with
-                  a relative path — we use our own domain which it accepts.
-                  After logout LinkedIn hits /api/auth/resume which loads the OAuth URL.
-      Facebook  → go directly to OAuth with auth_type=reauthenticate (forces password prompt)
-      Instagram → same as Facebook
+    For LinkedIn:
+      1. Store OAuth URL server-side → get short token
+      2. Redirect popup to linkedin.com/m/logout?next=.../resume/TOKEN
+      3. LinkedIn logs the user out fully
+      4. LinkedIn redirects to /api/auth/resume/TOKEN  (our domain — accepted by LinkedIn)
+      5. /resume redirects to the real OAuth URL
+      6. User sees BLANK LinkedIn sign-in form ✓
+      7. User signs in, sees Allow button, clicks Allow
+      8. Our callback saves the token → channel connected ✓
+
+    For Facebook/Instagram:
+      auth_type=reauthenticate in the OAuth URL forces Facebook to show
+      a fresh password prompt even with an active session.
     """
     platform  = request.args.get("platform", "linkedin")
     oauth_url = request.args.get("oauth", "")
@@ -1230,27 +1204,19 @@ def auth_start():
     oauth_url = urllib.parse.unquote(oauth_url)
 
     if platform == "linkedin":
-        # Store OAuth URL server-side, get token
         token      = _store_pending(platform, oauth_url, label)
         host       = request.host_url.rstrip("/")
         resume_url = f"{host}/api/auth/resume/{token}"
-        # LinkedIn m/logout accepts ?next= with ANY full https URL —
-        # it does NOT restrict to linkedin.com subdomains.
+        # LinkedIn m/logout?next= accepts any full HTTPS URL — including Railway domains
         logout_url = f"https://www.linkedin.com/m/logout?next={urllib.parse.quote(resume_url)}"
         return redirect(logout_url)
-
     else:
-        # Facebook/Instagram — go straight to OAuth with reauthenticate flag
-        # auth_type=reauthenticate is already in the OAuth URL params
-        token      = _store_pending(platform, oauth_url, label)
-        host       = request.host_url.rstrip("/")
-        resume_url = f"{host}/api/auth/resume/{token}"
-        return redirect(resume_url)
+        # Facebook / Instagram — go directly to OAuth (auth_type=reauthenticate already set)
+        return redirect(oauth_url)
 
 
 @app.route("/api/auth/linkedin/start/<int:slot>")
 def linkedin_start(slot):
-    """Kept for backwards compatibility."""
     oauth_url = request.args.get("oauth", "")
     return redirect(
         f"/api/auth/start?platform=linkedin"
