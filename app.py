@@ -48,19 +48,6 @@ IMPORTANT: Your response must be between 2800 and 3000 characters total. Count c
 5. 3 to 5 relevant hashtags.
 Do not exceed 3000 characters. Do not go below 2800 characters."""
 
-SYSTEM_PROMPT_ARTICLE = """You are an expert LinkedIn article writer.
-Write a long-form, in-depth LinkedIn article based on the user's subject.
-IMPORTANT: Your total response must be between 2800 and 3000 characters. Count carefully and stay within this range.
-Structure:
-1. Compelling title on the first line prefixed with TITLE:
-2. A strong introduction paragraph.
-3. 3 to 4 sections with clear headings wrapped in ## markdown.
-4. Each section has 1-2 detailed paragraphs with real insights.
-5. A conclusion with key takeaways.
-6. End with a thought-provoking question for readers.
-Write in a professional yet conversational tone.
-Do not exceed 3000 characters total. Do not go below 2800 characters total."""
-
 # ─── APP SETUP ────────────────────────────────────────────────────────────────
 app = Flask(__name__, static_folder="static")
 app.secret_key = secrets.token_hex(32)
@@ -335,7 +322,7 @@ def validate_image_url(url, timeout=8):
 def generate_post(username, subject):
     cfg      = load_config(username)
     groq_key = cfg.get("groq_api_key", "")
-    clean    = subject.replace("(create image)", "").replace("(article)", "").strip()
+    clean    = subject.replace("(create image)", "").strip()
     try:
         response = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -353,33 +340,6 @@ def generate_post(username, subject):
         add_log(username, f"Groq failure: {e}", "error")
         return None
 
-def generate_article(username, subject):
-    cfg      = load_config(username)
-    groq_key = cfg.get("groq_api_key", "")
-    clean    = subject.replace("(article)", "").strip()
-    try:
-        response = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
-            json={"model": "llama-3.1-8b-instant", "max_tokens": 2000, "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT_ARTICLE},
-                {"role": "user",   "content": f"Write a LinkedIn article about: {clean}"}
-            ]}, timeout=60
-        ).json()
-        if "error" in response:
-            add_log(username, f"Groq Article Error: {response['error']['message']}", "error")
-            return None, None
-        raw   = response["choices"][0]["message"]["content"]
-        lines = raw.strip().split("\n")
-        title = clean
-        body  = raw
-        if lines[0].startswith("TITLE:"):
-            title = lines[0].replace("TITLE:", "").strip()
-            body  = "\n".join(lines[1:]).strip()
-        return title, body
-    except Exception as e:
-        add_log(username, f"Groq article failure: {e}", "error")
-        return None, None
 
 def get_image_url(username, subject):
     cfg      = load_config(username)
@@ -387,7 +347,7 @@ def get_image_url(username, subject):
     if not serp_key:
         add_log(username, "SerpAPI key not set — post sent without image.", "warn")
         return None
-    clean = subject.replace("(create image)", "").replace("(article)", "").strip()
+    clean = subject.replace("(create image)", "").strip()
     try:
         response = requests.get("https://serpapi.com/search.json", params={
             "engine": "google_images", "q": f"{clean} infographic", "api_key": serp_key
@@ -415,7 +375,7 @@ def get_image_url(username, subject):
 #  DIRECT PUBLISHING — LinkedIn (multi-slot), Facebook, Instagram
 # ════════════════════════════════════════════════════════════════════════════════
 
-def publish_to_linkedin_slot(username, slot, text, image_url=None, is_article=False):
+def publish_to_linkedin_slot(username, slot, text, image_url=None):
     """Publish to a specific LinkedIn account slot (1, 2, or 3).
     Supports both personal profiles (urn:li:person:) and company pages (urn:li:organization:).
     """
@@ -441,64 +401,7 @@ def publish_to_linkedin_slot(username, slot, text, image_url=None, is_article=Fa
         "X-Restli-Protocol-Version": "2.0.0"
     }
 
-    if is_article:
-        # Safety truncation to LinkedIn 3000 char limit
-        safe_text = text[:2980].rsplit(" ", 1)[0] if len(text) > 2980 else text
-
-        if image_url:
-            # Article with image
-            reg = requests.post(
-                "https://api.linkedin.com/v2/assets?action=registerUpload",
-                headers=headers,
-                json={"registerUploadRequest": {
-                    "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
-                    "owner": urn,
-                    "serviceRelationships": [{
-                        "relationshipType": "OWNER",
-                        "identifier": "urn:li:userGeneratedContent"
-                    }]
-                }}, timeout=15
-            ).json()
-            upload_url = reg.get("value", {}).get("uploadMechanism", {}).get(
-                "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest", {}).get("uploadUrl")
-            asset = reg.get("value", {}).get("asset")
-            if upload_url and asset:
-                img_data = requests.get(image_url, timeout=15,
-                                        headers={"User-Agent": "Mozilla/5.0"}).content
-                requests.put(upload_url, data=img_data,
-                             headers={"Authorization": f"Bearer {token}"}, timeout=30)
-                payload = {
-                    "author": urn, "lifecycleState": "PUBLISHED",
-                    "specificContent": {"com.linkedin.ugc.ShareContent": {
-                        "shareCommentary": {"text": safe_text},
-                        "shareMediaCategory": "IMAGE",
-                        "media": [{"status": "READY", "media": asset}]
-                    }},
-                    "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
-                }
-            else:
-                payload = {
-                    "author": urn, "lifecycleState": "PUBLISHED",
-                    "specificContent": {"com.linkedin.ugc.ShareContent": {
-                        "shareCommentary": {"text": safe_text},
-                        "shareMediaCategory": "NONE"
-                    }},
-                    "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
-                }
-        else:
-            payload = {
-                "author":         urn,
-                "lifecycleState": "PUBLISHED",
-                "specificContent": {
-                    "com.linkedin.ugc.ShareContent": {
-                        "shareCommentary":    {"text": safe_text},
-                        "shareMediaCategory": "NONE"
-                    }
-                },
-                "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
-            }
-    elif image_url:
-        # Step 1: register image upload
+    if image_url:
         reg = requests.post(
             "https://api.linkedin.com/v2/assets?action=registerUpload",
             headers=headers,
@@ -552,8 +455,7 @@ def publish_to_linkedin_slot(username, slot, text, image_url=None, is_article=Fa
                             headers=headers, json=payload, timeout=20)
         if res.status_code in (200, 201):
             pid   = res.headers.get("x-restli-id", "n/a")
-            label = "article" if is_article else "post"
-            add_log(username, f"  → [LinkedIn #{slot} — {name}] Published {label} ✓ ID: {pid}", "ok")
+            add_log(username, f"  → [LinkedIn #{slot} — {name}] Published post ✓ ID: {pid}", "ok")
             return True
         else:
             add_log(username, f"  → [LinkedIn #{slot}] Failed {res.status_code}: {res.text[:200]}", "error")
@@ -637,7 +539,7 @@ def publish_to_instagram(username, text, image_url=None):
         return False
 
 
-def publish_to_all(username, text, image_url=None, is_article=False, article_title=None):
+def publish_to_all(username, text, image_url=None):
     """
     Publish to ALL connected channels:
       - LinkedIn slots 1, 2, 3 (each is a separate account)
@@ -661,37 +563,28 @@ def publish_to_all(username, text, image_url=None, is_article=False, article_tit
             if not is_enabled("linkedin", slot):
                 add_log(username, f"  → [LinkedIn #{slot}] Skipped (toggled OFF by user)", "info")
                 continue
-            ok = publish_to_linkedin_slot(username, slot, text, image_url, is_article)
+            ok = publish_to_linkedin_slot(username, slot, text, image_url)
             if ok:
                 success += 1
 
-    # Facebook — articles posted as text post with title + summary
+    # Facebook
     if cfg.get("facebook_access_token"):
         if not is_enabled("facebook", 1):
             add_log(username, "  → [Facebook] Skipped (toggled OFF by user)", "info")
         else:
-            # For articles: post title + first 800 chars as Facebook post
-            fb_text = text
-            if is_article and article_title:
-                preview = text[:800].rsplit(" ", 1)[0] + "..."
-                fb_text = f"📄 {article_title}\n\n{preview}"
-            ok = publish_to_facebook(username, fb_text, image_url)
+            ok = publish_to_facebook(username, text, image_url)
             if ok:
                 success += 1
 
-    # Instagram — articles posted as image post with caption (image required)
+    # Instagram — image required
     if cfg.get("instagram_access_token"):
         if not is_enabled("instagram", 1):
             add_log(username, "  → [Instagram] Skipped (toggled OFF by user)", "info")
         else:
-            ig_text = text
-            if is_article and article_title:
-                preview = text[:400].rsplit(" ", 1)[0] + "..."
-                ig_text = f"📄 {article_title}\n\n{preview}"
             if not image_url:
                 add_log(username, "  → [Instagram] Skipped — Instagram requires an image (add (create image) to subject)", "warn")
             else:
-                ok = publish_to_instagram(username, ig_text, image_url)
+                ok = publish_to_instagram(username, text, image_url)
                 if ok:
                     success += 1
 
@@ -741,52 +634,32 @@ def run_batch(username, triggered_by="scheduler"):
     for j, subject in enumerate(batch):
         manual_image_url = None
         base_subject     = subject
-        is_article       = "(article)" in subject.lower()
 
         if "| IMG:" in subject:
             parts            = subject.split("| IMG:")
             base_subject     = parts[0].strip()
             manual_image_url = parts[1].strip()
 
-        add_log(username, f"[{j+1}/{len(batch)}] {'[ARTICLE] ' if is_article else ''}{base_subject[:50]}", "info")
+        add_log(username, f"[{j+1}/{len(batch)}] {base_subject[:50]}", "info")
 
-        if is_article:
-            title, body = generate_article(username, base_subject)
-            if not title or not body:
-                continue
-            add_log(username, f"[{j+1}/{len(batch)}] Article generated ✓ — {title[:40]}", "ok")
+        post_text = generate_post(username, base_subject)
+        if not post_text:
+            continue
+        add_log(username, f"[{j+1}/{len(batch)}] Post generated ✓", "ok")
 
-            # Fetch image for article (for Facebook/Instagram posts)
-            article_image = None
-            if manual_image_url:
-                if validate_image_url(manual_image_url):
-                    article_image = manual_image_url
-                    add_log(username, f"[{j+1}/{len(batch)}] Using uploaded image for article ✓", "ok")
-            elif "(create image)" in base_subject.lower():
-                article_image = get_image_url(username, base_subject)
-                if article_image:
-                    add_log(username, f"[{j+1}/{len(batch)}] Image fetched for article ✓", "ok")
+        image_url = None
+        if manual_image_url:
+            if validate_image_url(manual_image_url):
+                image_url = manual_image_url
+                add_log(username, f"[{j+1}/{len(batch)}] Using uploaded image ✓", "ok")
+            else:
+                add_log(username, f"[{j+1}/{len(batch)}] Uploaded image unreachable — sending without image", "warn")
+        elif "(create image)" in base_subject.lower():
+            image_url = get_image_url(username, base_subject)
+            if image_url:
+                add_log(username, f"[{j+1}/{len(batch)}] Image fetched ✓", "ok")
 
-            sent = publish_to_all(username, body, image_url=article_image, is_article=True, article_title=title)
-        else:
-            post_text = generate_post(username, base_subject)
-            if not post_text:
-                continue
-            add_log(username, f"[{j+1}/{len(batch)}] Post generated ✓", "ok")
-
-            image_url = None
-            if manual_image_url:
-                if validate_image_url(manual_image_url):
-                    image_url = manual_image_url
-                    add_log(username, f"[{j+1}/{len(batch)}] Using uploaded image ✓", "ok")
-                else:
-                    add_log(username, f"[{j+1}/{len(batch)}] Uploaded image unreachable — sending without image", "warn")
-            elif "(create image)" in base_subject.lower():
-                image_url = get_image_url(username, base_subject)
-                if image_url:
-                    add_log(username, f"[{j+1}/{len(batch)}] Image fetched ✓", "ok")
-
-            sent = publish_to_all(username, post_text, image_url)
+        sent = publish_to_all(username, post_text, image_url)
 
         if sent > 0:
             add_log(username, f"[{j+1}/{len(batch)}] Sent to {sent} channel(s) ✓", "ok")
@@ -2295,7 +2168,6 @@ def add_subjects(username):
     image_b64    = data.get("image_base64")
     filename     = data.get("filename", "upload.jpg")
     mode         = data.get("mode", "no_image")
-    content_type = data.get("content_type", "post")
     if not new_subjects:
         return jsonify({"ok": False, "message": "No subjects provided"}), 400
     uploaded_url = None
@@ -2323,14 +2195,12 @@ def add_subjects(username):
     with open(subjects_file, "a", encoding="utf-8") as f:
         for s in new_subjects:
             line = s.strip()
-            if content_type == "article":
-                line = f"{line} (article)"
-            elif mode == "auto_image":
+            if mode == "auto_image":
                 line = f"{line} (create image)"
             elif mode == "manual_image" and uploaded_url:
                 line = f"{line} | IMG: {uploaded_url}"
             f.write(line + "\n")
-    add_log(username, f"Added {len(new_subjects)} subject(s) [{content_type}/{mode}] ✓", "ok")
+    add_log(username, f"Added {len(new_subjects)} subject(s) [{mode}] ✓", "ok")
     return jsonify({"ok": True, "added": len(new_subjects)})
 
 @app.route("/api/subjects/delete", methods=["POST"])
