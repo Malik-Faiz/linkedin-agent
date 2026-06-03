@@ -614,23 +614,35 @@ def publish_to_all(username, text, image_url=None, is_article=False, article_tit
             if ok:
                 success += 1
 
-    # Facebook — articles not supported
-    if cfg.get("facebook_access_token") and not is_article:
+    # Facebook — articles posted as text post with title + summary
+    if cfg.get("facebook_access_token"):
         if not is_enabled("facebook", 1):
             add_log(username, "  → [Facebook] Skipped (toggled OFF by user)", "info")
         else:
-            ok = publish_to_facebook(username, text, image_url)
+            # For articles: post title + first 800 chars as Facebook post
+            fb_text = text
+            if is_article and article_title:
+                preview = text[:800].rsplit(" ", 1)[0] + "..."
+                fb_text = f"📄 {article_title}\n\n{preview}"
+            ok = publish_to_facebook(username, fb_text, image_url)
             if ok:
                 success += 1
 
-    # Instagram — articles not supported, image required
-    if cfg.get("instagram_access_token") and not is_article:
+    # Instagram — articles posted as image post with caption (image required)
+    if cfg.get("instagram_access_token"):
         if not is_enabled("instagram", 1):
             add_log(username, "  → [Instagram] Skipped (toggled OFF by user)", "info")
         else:
-            ok = publish_to_instagram(username, text, image_url)
-            if ok:
-                success += 1
+            ig_text = text
+            if is_article and article_title:
+                preview = text[:400].rsplit(" ", 1)[0] + "..."
+                ig_text = f"📄 {article_title}\n\n{preview}"
+            if not image_url:
+                add_log(username, "  → [Instagram] Skipped — Instagram requires an image (add (create image) to subject)", "warn")
+            else:
+                ok = publish_to_instagram(username, ig_text, image_url)
+                if ok:
+                    success += 1
 
     any_connected = any([
         cfg.get("linkedin_1_access_token"),
@@ -692,7 +704,19 @@ def run_batch(username, triggered_by="scheduler"):
             if not title or not body:
                 continue
             add_log(username, f"[{j+1}/{len(batch)}] Article generated ✓ — {title[:40]}", "ok")
-            sent = publish_to_all(username, body, is_article=True, article_title=title)
+
+            # Fetch image for article (for Facebook/Instagram posts)
+            article_image = None
+            if manual_image_url:
+                if validate_image_url(manual_image_url):
+                    article_image = manual_image_url
+                    add_log(username, f"[{j+1}/{len(batch)}] Using uploaded image for article ✓", "ok")
+            elif "(create image)" in base_subject.lower():
+                article_image = get_image_url(username, base_subject)
+                if article_image:
+                    add_log(username, f"[{j+1}/{len(batch)}] Image fetched for article ✓", "ok")
+
+            sent = publish_to_all(username, body, image_url=article_image, is_article=True, article_title=title)
         else:
             post_text = generate_post(username, base_subject)
             if not post_text:
