@@ -40,21 +40,26 @@ IG_REDIRECT_URI  = os.environ.get("INSTAGRAM_REDIRECT_URI", "")
 # ─── AI PROMPTS ───────────────────────────────────────────────────────────────
 SYSTEM_PROMPT_POST = """You are an expert LinkedIn ghostwriter.
 Write a highly engaging, professional LinkedIn post based on the user's subject.
+IMPORTANT: Your response must be between 2800 and 3000 characters total. Count carefully.
 1. Hook on the first line wrapped in **asterisks**.
-2. Short, punchy sentences.
-3. Call-To-Action (CTA) question at the end.
-4. 3 to 5 relevant hashtags."""
+2. Short, punchy sentences with good spacing between paragraphs.
+3. Include real insights, tips, or a story to fill the length naturally.
+4. Call-To-Action (CTA) question at the end.
+5. 3 to 5 relevant hashtags.
+Do not exceed 3000 characters. Do not go below 2800 characters."""
 
 SYSTEM_PROMPT_ARTICLE = """You are an expert LinkedIn article writer.
 Write a long-form, in-depth LinkedIn article based on the user's subject.
+IMPORTANT: Your total response must be between 2800 and 3000 characters. Count carefully and stay within this range.
 Structure:
 1. Compelling title on the first line prefixed with TITLE:
 2. A strong introduction paragraph.
-3. 4 to 6 sections with clear headings wrapped in ## markdown.
-4. Each section has 2-3 detailed paragraphs with real insights.
-5. A conclusion section with key takeaways.
+3. 3 to 4 sections with clear headings wrapped in ## markdown.
+4. Each section has 1-2 detailed paragraphs with real insights.
+5. A conclusion with key takeaways.
 6. End with a thought-provoking question for readers.
-Write in a professional yet conversational tone. Minimum 600 words."""
+Write in a professional yet conversational tone.
+Do not exceed 3000 characters total. Do not go below 2800 characters total."""
 
 # ─── APP SETUP ────────────────────────────────────────────────────────────────
 app = Flask(__name__, static_folder="static")
@@ -437,17 +442,61 @@ def publish_to_linkedin_slot(username, slot, text, image_url=None, is_article=Fa
     }
 
     if is_article:
-        payload = {
-            "author":         urn,
-            "lifecycleState": "PUBLISHED",
-            "specificContent": {
-                "com.linkedin.ugc.ShareContent": {
-                    "shareCommentary":    {"text": text},
-                    "shareMediaCategory": "NONE"
+        # Safety truncation to LinkedIn 3000 char limit
+        safe_text = text[:2980].rsplit(" ", 1)[0] if len(text) > 2980 else text
+
+        if image_url:
+            # Article with image
+            reg = requests.post(
+                "https://api.linkedin.com/v2/assets?action=registerUpload",
+                headers=headers,
+                json={"registerUploadRequest": {
+                    "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
+                    "owner": urn,
+                    "serviceRelationships": [{
+                        "relationshipType": "OWNER",
+                        "identifier": "urn:li:userGeneratedContent"
+                    }]
+                }}, timeout=15
+            ).json()
+            upload_url = reg.get("value", {}).get("uploadMechanism", {}).get(
+                "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest", {}).get("uploadUrl")
+            asset = reg.get("value", {}).get("asset")
+            if upload_url and asset:
+                img_data = requests.get(image_url, timeout=15,
+                                        headers={"User-Agent": "Mozilla/5.0"}).content
+                requests.put(upload_url, data=img_data,
+                             headers={"Authorization": f"Bearer {token}"}, timeout=30)
+                payload = {
+                    "author": urn, "lifecycleState": "PUBLISHED",
+                    "specificContent": {"com.linkedin.ugc.ShareContent": {
+                        "shareCommentary": {"text": safe_text},
+                        "shareMediaCategory": "IMAGE",
+                        "media": [{"status": "READY", "media": asset}]
+                    }},
+                    "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
                 }
-            },
-            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
-        }
+            else:
+                payload = {
+                    "author": urn, "lifecycleState": "PUBLISHED",
+                    "specificContent": {"com.linkedin.ugc.ShareContent": {
+                        "shareCommentary": {"text": safe_text},
+                        "shareMediaCategory": "NONE"
+                    }},
+                    "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
+                }
+        else:
+            payload = {
+                "author":         urn,
+                "lifecycleState": "PUBLISHED",
+                "specificContent": {
+                    "com.linkedin.ugc.ShareContent": {
+                        "shareCommentary":    {"text": safe_text},
+                        "shareMediaCategory": "NONE"
+                    }
+                },
+                "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
+            }
     elif image_url:
         # Step 1: register image upload
         reg = requests.post(
@@ -488,10 +537,12 @@ def publish_to_linkedin_slot(username, slot, text, image_url=None, is_article=Fa
                 "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
             }
     else:
+        # Truncate to LinkedIn 3000 char limit
+        safe_text = text[:3000].rsplit(" ", 1)[0] if len(text) > 3000 else text
         payload = {
             "author": urn, "lifecycleState": "PUBLISHED",
             "specificContent": {"com.linkedin.ugc.ShareContent": {
-                "shareCommentary": {"text": text}, "shareMediaCategory": "NONE"
+                "shareCommentary": {"text": safe_text}, "shareMediaCategory": "NONE"
             }},
             "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
         }
