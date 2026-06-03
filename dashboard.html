@@ -456,13 +456,10 @@ function setContentType(ct){
   document.getElementById('modeSel').classList.remove('hidden');
   document.getElementById('panelArticle').style.display=ct==='article'?'block':'none';
   if(ct==='article'){
-    document.getElementById('newSubjects').placeholder='The future of AI in marketing
-How to lead remote teams
-Personal branding strategy for 2025';
+  if(ct==='article'){
+    document.getElementById('newSubjects').placeholder='The future of AI in marketing\nHow to lead remote teams\nPersonal branding strategy for 2025';
   } else {
-    document.getElementById('newSubjects').placeholder='AI tools for marketers
-Remote leadership tips
-Personal branding in 2025';
+    document.getElementById('newSubjects').placeholder='AI tools for marketers\nRemote leadership tips\nPersonal branding in 2025';
   }
   // Always apply current mode so image panels show correctly
   setMode(currentMode);
@@ -782,8 +779,8 @@ async function addSubjects(){
   if(!lines.length)return;
   if(currentContentType==='post'&&currentMode==='manual_image'&&!document.getElementById('imgFile').files.length){alert('Please select an image first.');return;}
   const orig=btn.innerHTML;btn.disabled=true;btn.innerHTML='<span class="spin">⟳</span> Processing...';
-  let payload={subjects:lines,mode:currentContentType==='article'?'no_image':currentMode,content_type:currentContentType};
-  if(currentContentType==='post'&&currentMode==='manual_image'){
+  let payload={subjects:lines,mode:currentMode,content_type:currentContentType};
+  if(currentMode==='manual_image'){
     const file=document.getElementById('imgFile').files[0];
     payload.filename=file.name;
     payload.image_base64=await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(file);});
