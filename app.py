@@ -1505,10 +1505,12 @@ def facebook_callback():
             save_config(username, cfg)
             add_log(username, f"Facebook connected ✓ — {page_name}", "ok")
         else:
-            cfg["facebook_access_token"] = user_token
-            save_config(username, cfg)
-            msg = "Facebook connected (no pages found)"
-            add_log(username, "Facebook connected (no pages found)", "warn")
+            # No pages found — show helpful error instead of saving useless token
+            return _callback_page(False,
+                "No Facebook Pages found on this account.<br><br>"
+                "To connect Facebook you need a Facebook Page (not a personal profile).<br><br>"
+                "Go to <strong>facebook.com/pages</strong> → Create a Page → "
+                "then come back and click Connect Facebook again.")
 
         # Store oauth_url for signout-and-retry
         oauth_url = session.get("fb_oauth_url", "")
@@ -1846,13 +1848,13 @@ def instagram_direct_auth(username):
     params = {
         "client_id":     IG_APP_ID,
         "redirect_uri":  IG_REDIRECT_URI,
-        "scope":         "instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement",
+        "scope":         "instagram_business_basic,instagram_business_content_publish",
         "response_type": "code",
         "state":         state_token,
-        "auth_type":     "rerequest",
     }
-    # Use Facebook OAuth dialog — same as Facebook connect flow
-    oauth_url = "https://www.facebook.com/v19.0/dialog/oauth?" + urllib.parse.urlencode(params)
+    # Instagram API with Instagram Login — shows real Instagram login page
+    # Uses www.instagram.com/oauth/authorize endpoint
+    oauth_url = "https://www.instagram.com/oauth/authorize?" + urllib.parse.urlencode(params)
     return jsonify({"ok": True, "auth_url": oauth_url})
 
 
@@ -1879,64 +1881,55 @@ def instagram_direct_callback():
         return "<script>window.close();</script>Invalid state — please try again", 400
 
     try:
-        # Exchange code for token via Facebook endpoint
-        token_res = requests.get(
-            "https://graph.facebook.com/v19.0/oauth/access_token",
-            params={
+        # Step 1: Exchange code for short-lived token via Instagram endpoint
+        token_res = requests.post(
+            "https://api.instagram.com/oauth/access_token",
+            data={
                 "client_id":     IG_APP_ID,
                 "client_secret": IG_APP_SECRET,
+                "grant_type":    "authorization_code",
                 "redirect_uri":  IG_REDIRECT_URI,
                 "code":          code,
             },
             timeout=15
         ).json()
 
-        user_token = token_res.get("access_token")
-        if not user_token:
+        short_token = token_res.get("access_token")
+        ig_id       = str(token_res.get("user_id", ""))
+        if not short_token:
             return _callback_page(False, f"Token exchange failed: {token_res}")
 
-        # Find Instagram Business account via Facebook Pages
-        pages_res = requests.get(
-            "https://graph.facebook.com/v19.0/me/accounts",
-            params={"access_token": user_token},
+        # Step 2: Exchange for long-lived token (60 days)
+        long_res = requests.get(
+            "https://graph.instagram.com/access_token",
+            params={
+                "grant_type":    "ig_exchange_token",
+                "client_secret": IG_APP_SECRET,
+                "access_token":  short_token,
+            },
+            timeout=15
+        ).json()
+        long_token = long_res.get("access_token", short_token)
+        expires_in = long_res.get("expires_in", 5184000)
+
+        # Step 3: Get Instagram username
+        ig_info = requests.get(
+            "https://graph.instagram.com/me",
+            params={"fields": "id,username", "access_token": long_token},
             timeout=10
         ).json()
-        pages = pages_res.get("data", [])
+        ig_username = ig_info.get("username", ig_id)
+        ig_id       = ig_info.get("id", ig_id)
 
-        ig_id = ig_username = None
-        ig_token = user_token
-
-        for page in pages:
-            page_token = page.get("access_token")
-            page_id    = page.get("id")
-            ig_res = requests.get(
-                f"https://graph.facebook.com/v19.0/{page_id}",
-                params={"fields": "instagram_business_account", "access_token": page_token},
-                timeout=10
-            ).json()
-            ig_acct = ig_res.get("instagram_business_account", {})
-            if ig_acct.get("id"):
-                ig_id    = ig_acct["id"]
-                ig_token = page_token
-                ig_info  = requests.get(
-                    f"https://graph.facebook.com/v19.0/{ig_id}",
-                    params={"fields": "username", "access_token": ig_token},
-                    timeout=10
-                ).json()
-                ig_username = ig_info.get("username", ig_id)
-                break
-
-        if not ig_id:
-            return _callback_page(False,
-                "No Instagram Business account found. Make sure your Instagram "
-                "is set to Business/Creator and linked to a Facebook Page.")
-
-        # Save to config
+        # Step 4: Save to config
         cfg = load_config(username)
-        cfg["instagram_access_token"] = ig_token
-        cfg["instagram_account_id"]   = ig_id
-        cfg["instagram_username"]     = ig_username
-        cfg["instagram_via_facebook"] = False
+        cfg["instagram_access_token"]  = long_token
+        cfg["instagram_account_id"]    = ig_id
+        cfg["instagram_username"]      = ig_username
+        cfg["instagram_via_facebook"]  = False
+        cfg["instagram_token_expires"] = (
+            datetime.utcnow() + timedelta(seconds=expires_in)
+        ).isoformat()
         save_config(username, cfg)
         add_log(username, f"Instagram connected ✓ — @{ig_username}", "ok")
 
