@@ -11,7 +11,7 @@
 :root{
   --bg:#05030f;--card:rgba(255,255,255,0.028);--card-h:rgba(255,255,255,0.05);
   --border:rgba(160,120,255,0.13);--border2:rgba(160,120,255,0.25);
-  --text:#ede8ff;--muted:rgba(200,185,255,0.5);--muted2:rgba(200,185,255,0.22);
+  --text:#ede8ff;--muted:rgba(220,210,255,0.75);--muted2:rgba(210,200,255,0.5);
   --p:#b085ff;--p2:#ff80b5;--p3:#7ee8ff;--green:#3dffc0;--red:#ff6060;--amber:#ffcc5c;
   --font:'Syne',sans-serif;--mono:'DM Mono',monospace;
 }
@@ -321,51 +321,33 @@ button:disabled{opacity:0.4;cursor:not-allowed;}
         <div class="plat-icon ig">📸</div>
         <div>
           <div class="plat-name">Instagram Business / Creator</div>
-          <div class="plat-sub">Connect via Facebook Page or directly</div>
+          <div class="plat-sub">Auto-connects when you connect Facebook</div>
         </div>
         <span class="plat-count" id="igCount">0 / 1 connected</span>
       </div>
 
-      <!-- Single Instagram slot — two ways to connect -->
       <div class="ch-slot" id="igSlot1">
         <div class="ch-slot-num" id="igNum1">1</div>
         <div class="live-dot off" id="igDot1"></div>
         <div class="ch-slot-info">
           <div class="ch-slot-name" id="igName1">Instagram Account</div>
-          <div class="ch-slot-status" id="igStatus1">Not connected</div>
+          <div class="ch-slot-status" id="igStatus1">Connect Facebook first ↑</div>
         </div>
-        <div class="ch-slot-actions" id="igActions1">
-          <!-- shown when NOT connected -->
-          <button class="conn-btn ig" id="igDirectBtn" onclick="connectChannel('instagram_direct',1)" style="display:none">🔗 Connect Direct</button>
-          <!-- disconnect -->
+        <div class="ch-slot-actions">
           <button class="disc-btn" id="igDisc1" style="display:none" onclick="disconnectChannel('instagram',1)">✕</button>
         </div>
       </div>
 
-      <!-- Two-path explainer, shown only when not connected -->
-      <div id="igMethodBox" style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <!-- Path A: via Facebook -->
-        <div class="ig-method-card" id="igViaFbCard">
-          <div class="ig-method-icon">📘→📸</div>
-          <div class="ig-method-title">Via Facebook Page</div>
-          <div class="ig-method-desc">Already connected Facebook above? If your Page has an Instagram Business account linked, it auto-connects here.</div>
-          <div class="ig-method-status" id="igViaFbStatus">Connect Facebook first ↑</div>
-        </div>
-        <!-- Path B: direct -->
-        <div class="ig-method-card highlight" id="igDirectCard">
-          <div class="ig-method-icon">📸</div>
-          <div class="ig-method-title">Direct Connection</div>
-          <div class="ig-method-desc">Use your own Instagram Graph API app to connect directly — independent of Facebook.</div>
-          <button class="conn-btn ig" style="margin-top:10px;width:100%;justify-content:center;" onclick="connectChannel('instagram_direct',1)">🔗 Connect Instagram</button>
-          <div class="ig-env-warn" id="igEnvWarn" style="display:none;">⚠ Set <code>INSTAGRAM_APP_ID</code> &amp; <code>INSTAGRAM_APP_SECRET</code> in Railway first.</div>
-        </div>
+      <div class="ig-auto-note">
+        📸 Instagram connects automatically when you connect a Facebook Page that has an Instagram Business or Creator account linked to it.<br>
+        To link: <strong>Instagram app → Settings → Account → Linked Accounts → Facebook</strong>
       </div>
     </div>
 
     <div class="note-box">
       💼 <strong>LinkedIn</strong> — posts &amp; articles published directly to each connected account<br>
       📘 <strong>Facebook</strong> — posts published to your Facebook Page<br>
-      📸 <strong>Instagram</strong> — connect via Facebook Page <em>or</em> directly via Instagram Graph API<br>
+      📸 <strong>Instagram</strong> — auto-connects via Facebook (requires Instagram Business/Creator linked to your Page)<br>
       📄 <strong>Articles</strong> — LinkedIn only · Facebook &amp; Instagram receive posts only
     </div>
   </div>
@@ -482,45 +464,33 @@ function renderFacebookSlot(n, ch) {
 }
 
 function renderInstagramSlot(n, ig, fb) {
-  const slot      = document.getElementById(`igSlot${n}`);
-  const dot       = document.getElementById(`igDot${n}`);
-  const name      = document.getElementById(`igName${n}`);
-  const status    = document.getElementById(`igStatus${n}`);
-  const disc      = document.getElementById(`igDisc${n}`);
-  const methodBox = document.getElementById('igMethodBox');
-  const viaFbSt   = document.getElementById('igViaFbStatus');
-  const envWarn   = document.getElementById('igEnvWarn');
+  const slot   = document.getElementById(`igSlot${n}`);
+  const dot    = document.getElementById(`igDot${n}`);
+  const name   = document.getElementById(`igName${n}`);
+  const status = document.getElementById(`igStatus${n}`);
+  const disc   = document.getElementById(`igDisc${n}`);
 
   if (ig.connected) {
     slot.className     = 'ch-slot connected';
     dot.className      = 'live-dot on';
     name.textContent   = ig.username ? `@${ig.username}` : 'Instagram';
-    const src = ig.via_facebook ? 'via Facebook' : 'direct';
-    status.textContent = `✓ Connected (${src})`;
+    status.textContent = '✓ Connected via Facebook';
     disc.style.display = 'block';
-    if (methodBox) methodBox.style.display = 'none';
+  } else if (fb.connected) {
+    slot.className     = 'ch-slot';
+    dot.className      = 'live-dot warn';
+    name.textContent   = 'Instagram Account';
+    status.textContent = '⚠ No Instagram Business account found linked to your Facebook Page';
+    disc.style.display = 'none';
   } else {
     slot.className     = 'ch-slot';
     dot.className      = 'live-dot off';
     name.textContent   = 'Instagram Account';
-    status.textContent = 'Not connected — choose a method below';
+    status.textContent = 'Connect Facebook first ↑';
     disc.style.display = 'none';
-    if (methodBox) methodBox.style.display = 'grid';
-
-    if (viaFbSt) {
-      if (fb.connected) {
-        viaFbSt.textContent = '⚠ Facebook connected — no linked Instagram Business account found';
-        viaFbSt.className   = 'ig-method-status';
-      } else {
-        viaFbSt.textContent = 'Connect Facebook first ↑';
-        viaFbSt.className   = 'ig-method-status';
-      }
-    }
-    if (envWarn) {
-      envWarn.style.display = (ig.direct_env_set === false) ? 'block' : 'none';
-    }
   }
 }
+
 
 // ══════════════════════════════════════════
 // CONNECT A CHANNEL VIA OAUTH POPUP
