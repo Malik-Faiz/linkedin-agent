@@ -1,702 +1,1946 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LinkedIn Agent · Setup</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-<style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-:root{
-  --bg:#05030f;--card:rgba(255,255,255,0.028);--card-h:rgba(255,255,255,0.05);
-  --border:rgba(160,120,255,0.13);--border2:rgba(160,120,255,0.25);
-  --text:#ede8ff;--muted:rgba(200,185,255,0.5);--muted2:rgba(200,185,255,0.22);
-  --p:#b085ff;--p2:#ff80b5;--p3:#7ee8ff;--green:#3dffc0;--red:#ff6060;--amber:#ffcc5c;
-  --font:'Syne',sans-serif;--mono:'DM Mono',monospace;
+import requests
+import time
+import re
+import warnings
+import os
+import threading
+import json
+import hashlib
+import secrets
+import base64
+import urllib.parse
+from datetime import datetime, timedelta
+from flask import Flask, jsonify, request, session, redirect
+from flask_cors import CORS
+
+warnings.filterwarnings('ignore', category=DeprecationWarning)
+
+# ─── PATHS ───────────────────────────────────────────────────────────────────
+_DATA_ROOT    = "/data" if os.path.isdir("/data") else "."
+USERS_FILE    = os.path.join(_DATA_ROOT, "users.json")
+USER_DATA_DIR = os.path.join(_DATA_ROOT, "user_data")
+
+BATCH_SIZE  = 2
+TARGET_HOUR = 8
+
+# ─── OAUTH APP CREDENTIALS (set in Railway env vars) ─────────────────────────
+LI_CLIENT_ID     = os.environ.get("LINKEDIN_CLIENT_ID", "")
+LI_CLIENT_SECRET = os.environ.get("LINKEDIN_CLIENT_SECRET", "")
+LI_REDIRECT_URI  = os.environ.get("LINKEDIN_REDIRECT_URI", "")
+
+FB_APP_ID        = os.environ.get("FACEBOOK_APP_ID", "")
+FB_APP_SECRET    = os.environ.get("FACEBOOK_APP_SECRET", "")
+FB_REDIRECT_URI  = os.environ.get("FACEBOOK_REDIRECT_URI", "")
+
+IG_APP_ID        = os.environ.get("INSTAGRAM_APP_ID", "")
+IG_APP_SECRET    = os.environ.get("INSTAGRAM_APP_SECRET", "")
+IG_REDIRECT_URI  = os.environ.get("INSTAGRAM_REDIRECT_URI", "")
+
+# ─── AI PROMPTS ───────────────────────────────────────────────────────────────
+SYSTEM_PROMPT_POST = """You are an expert LinkedIn ghostwriter.
+Write a highly engaging, professional LinkedIn post based on the user's subject.
+1. Hook on the first line wrapped in **asterisks**.
+2. Short, punchy sentences.
+3. Call-To-Action (CTA) question at the end.
+4. 3 to 5 relevant hashtags."""
+
+SYSTEM_PROMPT_ARTICLE = """You are an expert LinkedIn article writer.
+Write a long-form, in-depth LinkedIn article based on the user's subject.
+Structure:
+1. Compelling title on the first line prefixed with TITLE:
+2. A strong introduction paragraph.
+3. 4 to 6 sections with clear headings wrapped in ## markdown.
+4. Each section has 2-3 detailed paragraphs with real insights.
+5. A conclusion section with key takeaways.
+6. End with a thought-provoking question for readers.
+Write in a professional yet conversational tone. Minimum 600 words."""
+
+# ─── APP SETUP ────────────────────────────────────────────────────────────────
+app = Flask(__name__, static_folder="static")
+app.secret_key = secrets.token_hex(32)
+CORS(app, supports_credentials=True)
+os.makedirs(USER_DATA_DIR, exist_ok=True)
+
+# ─── HTML LOADER ──────────────────────────────────────────────────────────────
+def load_html(name):
+    path = os.path.join(os.path.dirname(__file__), name)
+    if os.path.exists(path):
+        return open(path, encoding="utf-8").read()
+    return f"<h1>{name} not found</h1>"
+
+# ─── ENCRYPTION ───────────────────────────────────────────────────────────────
+SENSITIVE_FIELDS = {
+    "groq_api_key", "serpapi_key",
+    "linkedin_1_access_token", "linkedin_2_access_token", "linkedin_3_access_token",
+    "facebook_access_token", "instagram_access_token",
 }
-html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:var(--font);overflow-x:hidden;}
-body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;opacity:0.022;background:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");}
-.grid-bg{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(160,120,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(160,120,255,0.04) 1px,transparent 1px);background-size:68px 68px;mask-image:radial-gradient(ellipse 100% 50% at 50% 0%,black 20%,transparent 100%);}
-.orb{position:fixed;border-radius:50%;filter:blur(110px);pointer-events:none;z-index:0;}
-.o1{width:700px;height:700px;top:-25%;right:-18%;background:radial-gradient(circle,rgba(176,133,255,0.2),transparent 65%);}
-.o2{width:500px;height:500px;bottom:-18%;left:-12%;background:radial-gradient(circle,rgba(255,128,181,0.14),transparent 65%);}
-.wrapper{position:relative;z-index:10;max-width:680px;margin:0 auto;padding:44px 24px 80px;}
-.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:44px;}
-.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;}
-.brand-icon{width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,var(--p),var(--p2));display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;box-shadow:0 6px 20px rgba(176,133,255,0.38);}
-.brand-name{font-size:16px;font-weight:700;letter-spacing:-0.3px;}
-.skip-btn{font-size:12px;font-family:var(--mono);color:var(--muted);padding:8px 16px;border:1px solid var(--border2);border-radius:10px;cursor:pointer;background:none;transition:all 0.2s;}
-.skip-btn:hover{color:var(--text);border-color:var(--p);background:rgba(176,133,255,0.06);}
-.steps{display:flex;align-items:center;justify-content:center;margin-bottom:36px;}
-.step{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted2);}
-.step.active{color:var(--p);}.step.done{color:var(--green);}
-.step-num{width:26px;height:26px;border-radius:50%;border:1.5px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:11px;}
-.step-line{width:40px;height:1px;background:var(--border);margin:0 8px;}
-.page-hdr{margin-bottom:36px;}
-.step-label{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-family:var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--p);background:rgba(176,133,255,0.1);border:1px solid rgba(176,133,255,0.2);border-radius:20px;padding:5px 14px;margin-bottom:16px;}
-.page-title{font-size:clamp(28px,5vw,38px);font-weight:800;letter-spacing:-1.5px;margin-bottom:10px;}
-.page-sub{font-size:15px;color:var(--muted);line-height:1.65;}
-.alert{display:none;align-items:center;gap:10px;border-radius:14px;padding:14px 16px;font-size:13px;font-family:var(--mono);margin-bottom:22px;line-height:1.5;}
-.alert.show{display:flex;}
-.alert.err{background:rgba(255,96,96,0.07);border:1px solid rgba(255,96,96,0.2);color:var(--red);}
-.alert.ok{background:rgba(61,255,192,0.06);border:1px solid rgba(61,255,192,0.2);color:var(--green);}
 
-/* ── CARDS ── */
-.card{background:var(--card);border:1px solid var(--border2);border-radius:20px;padding:28px;margin-bottom:14px;position:relative;overflow:hidden;transition:border-color 0.2s;}
-.card::before{content:'';position:absolute;inset:0;border-radius:20px;background:linear-gradient(135deg,rgba(255,255,255,0.015),transparent);pointer-events:none;}
-.card-head{display:flex;align-items:center;gap:14px;margin-bottom:22px;}
-.card-badge{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;font-family:var(--mono);flex-shrink:0;}
-.bg-g{background:rgba(176,133,255,0.15);color:var(--p);border:1px solid rgba(176,133,255,0.2);}
-.bg-s{background:rgba(255,204,92,0.12);color:var(--amber);border:1px solid rgba(255,204,92,0.2);}
-.card-head-info h3{font-size:16px;font-weight:700;margin-bottom:3px;}
-.card-head-info p{font-size:11px;color:var(--muted);font-family:var(--mono);}
-.field{margin-bottom:16px;}
-.field label{display:block;font-size:10px;font-family:var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
-.inp-w{position:relative;}
-.inp-ico{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted2);pointer-events:none;}
-.field input{width:100%;background:rgba(0,0,0,0.35);border:1px solid rgba(176,133,255,0.15);border-radius:12px;padding:13px 14px 13px 44px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;transition:all 0.2s;}
-.field input:focus{border-color:rgba(176,133,255,0.4);background:rgba(176,133,255,0.04);box-shadow:0 0 0 3px rgba(176,133,255,0.08);}
-.field input::placeholder{color:var(--muted2);}
+def _get_fernet():
+    key = os.environ.get("ENCRYPTION_KEY", "").strip()
+    if not key:
+        return None
+    try:
+        from cryptography.fernet import Fernet
+        return Fernet(key.encode())
+    except Exception:
+        return None
 
-/* ── ORIGINAL SOCIAL CONNECT CARDS (kept for reference only, hidden) ── */
-.social-card{border-radius:16px;padding:20px 22px;margin-bottom:12px;border:1.5px solid var(--border);background:rgba(0,0,0,0.2);transition:all 0.25s;position:relative;}
-.social-card.connected{border-color:rgba(61,255,192,0.3);background:rgba(61,255,192,0.04);}
-.social-card.expired{border-color:rgba(255,204,92,0.3);background:rgba(255,204,92,0.04);}
-.social-card-inner{display:flex;align-items:center;gap:14px;}
-.social-icon{width:46px;height:46px;border-radius:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px;}
-.si-li{background:rgba(0,119,181,0.15);border:1px solid rgba(0,119,181,0.25);}
-.si-fb{background:rgba(24,119,242,0.15);border:1px solid rgba(24,119,242,0.25);}
-.si-ig{background:rgba(225,48,108,0.15);border:1px solid rgba(225,48,108,0.25);}
-.social-info{flex:1;min-width:0;}
-.social-info h4{font-size:14px;font-weight:700;letter-spacing:-0.3px;margin-bottom:3px;}
-.social-info p{font-size:11px;color:var(--muted);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.social-info p.ok{color:var(--green);}
-.social-info p.warn{color:var(--amber);}
-.social-actions{display:flex;gap:8px;flex-shrink:0;}
-.btn-li{background:linear-gradient(135deg,#0077b5,#0099cc);border:none;color:#fff;padding:10px 18px;border-radius:11px;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s;white-space:nowrap;display:flex;align-items:center;gap:7px;}
-.btn-li:hover:not(:disabled){opacity:0.88;transform:translateY(-1px);}
-.btn-fb{background:linear-gradient(135deg,#1877f2,#0866ff);border:none;color:#fff;padding:10px 18px;border-radius:11px;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s;white-space:nowrap;display:flex;align-items:center;gap:7px;}
-.btn-fb:hover:not(:disabled){opacity:0.88;transform:translateY(-1px);}
-.btn-ig{background:linear-gradient(135deg,#e1306c,#833ab4);border:none;color:#fff;padding:10px 18px;border-radius:11px;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s;white-space:nowrap;display:flex;align-items:center;gap:7px;}
-.btn-ig:hover:not(:disabled){opacity:0.88;transform:translateY(-1px);}
-.btn-disconnect{background:rgba(255,96,96,0.08);border:1px solid rgba(255,96,96,0.2);color:var(--red);padding:9px 14px;border-radius:11px;font-family:var(--mono);font-size:11px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
-.btn-disconnect:hover{background:rgba(255,96,96,0.18);}
-button:disabled{opacity:0.4;cursor:not-allowed;}
-.sdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:2px;}
-.sdot.live{background:var(--green);box-shadow:0 0 0 3px rgba(61,255,192,0.2);animation:sdp 2s infinite;}
-.sdot.off{background:var(--muted2);}
-.sdot.warn{background:var(--amber);}
-@keyframes sdp{0%,100%{box-shadow:0 0 0 3px rgba(61,255,192,0.2);}50%{box-shadow:0 0 0 6px rgba(61,255,192,0.04);}}
-.env-warn{margin-top:12px;padding:11px 14px;border-radius:10px;background:rgba(255,96,96,0.07);border:1px solid rgba(255,96,96,0.2);font-size:11px;color:var(--red);font-family:var(--mono);line-height:1.75;display:none;}
-.env-warn code{display:block;margin-top:4px;opacity:0.85;}
-.note-box{padding:12px 14px;border-radius:11px;background:rgba(176,133,255,0.06);border:1px solid rgba(176,133,255,0.15);font-size:11px;color:var(--muted);font-family:var(--mono);line-height:1.75;margin-top:16px;}
+def _encrypt(value):
+    f = _get_fernet()
+    if not f or not isinstance(value, str):
+        return value
+    return "ENC:" + f.encrypt(value.encode()).decode()
 
-/* ══════════════════════════════════════════
-   NEW: MULTI-ACCOUNT CHANNELS SECTION
-══════════════════════════════════════════ */
-.section-divider{display:flex;align-items:center;gap:14px;margin:30px 0 18px;}
-.section-divider span{font-size:11px;font-family:var(--mono);letter-spacing:3px;text-transform:uppercase;color:var(--p);white-space:nowrap;}
-.section-divider::before,.section-divider::after{content:'';flex:1;height:1px;background:var(--border2);}
+def _decrypt(value):
+    if not isinstance(value, str) or not value.startswith("ENC:"):
+        return value
+    f = _get_fernet()
+    if not f:
+        return value
+    try:
+        return f.decrypt(value[4:].encode()).decode()
+    except Exception:
+        return value
 
-/* Channel platform group */
-.platform-group{margin-bottom:18px;}
-.platform-group-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
-.plat-icon{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
-.plat-icon.li{background:rgba(0,119,181,0.18);border:1px solid rgba(0,119,181,0.3);}
-.plat-icon.fb{background:rgba(24,119,242,0.18);border:1px solid rgba(24,119,242,0.3);}
-.plat-icon.ig{background:rgba(225,48,108,0.18);border:1px solid rgba(225,48,108,0.25);}
-.plat-name{font-size:14px;font-weight:700;letter-spacing:-0.2px;}
-.plat-sub{font-size:11px;color:var(--muted);font-family:var(--mono);}
-.plat-count{margin-left:auto;font-size:11px;font-family:var(--mono);background:var(--card);border:1px solid var(--border2);border-radius:7px;padding:3px 10px;color:var(--muted);}
+def _encrypt_cfg(cfg):
+    out = {}
+    for k, v in cfg.items():
+        if k in SENSITIVE_FIELDS and isinstance(v, str) and v and not v.startswith("ENC:"):
+            out[k] = _encrypt(v)
+        else:
+            out[k] = v
+    return out
 
-/* Individual channel slot */
-.ch-slot{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:14px;border:1.5px solid var(--border);background:rgba(0,0,0,0.18);margin-bottom:8px;transition:all 0.25s;position:relative;}
-.ch-slot.connected{border-color:rgba(61,255,192,0.32);background:rgba(61,255,192,0.035);}
-.ch-slot.expired{border-color:rgba(255,204,92,0.32);background:rgba(255,204,92,0.04);}
-.ch-slot-num{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,0.04);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:11px;font-family:var(--mono);color:var(--muted2);flex-shrink:0;}
-.ch-slot.connected .ch-slot-num{background:rgba(61,255,192,0.1);border-color:rgba(61,255,192,0.25);color:var(--green);}
-.ch-slot-info{flex:1;min-width:0;}
-.ch-slot-name{font-size:13px;font-weight:700;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.ch-slot-status{font-size:11px;font-family:var(--mono);color:var(--muted2);}
-.ch-slot.connected .ch-slot-status{color:var(--green);}
-.ch-slot.expired .ch-slot-status{color:var(--amber);}
-.ch-slot-actions{display:flex;gap:7px;flex-shrink:0;}
+def _decrypt_cfg(cfg):
+    out = {}
+    for k, v in cfg.items():
+        if k in SENSITIVE_FIELDS and isinstance(v, str) and v.startswith("ENC:"):
+            out[k] = _decrypt(v)
+        else:
+            out[k] = v
+    return out
 
-/* Connect buttons per platform */
-.conn-btn{display:flex;align-items:center;gap:7px;padding:9px 16px;border-radius:10px;border:none;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
-.conn-btn:hover:not(:disabled){opacity:0.85;transform:translateY(-1px);}
-.conn-btn.li{background:linear-gradient(135deg,#0077b5,#0099cc);color:#fff;}
-.conn-btn.fb{background:linear-gradient(135deg,#1877f2,#0866ff);color:#fff;}
-.conn-btn.ig{background:linear-gradient(135deg,#e1306c,#833ab4);color:#fff;}
-.disc-btn{padding:8px 12px;border-radius:10px;background:rgba(255,96,96,0.08);border:1px solid rgba(255,96,96,0.2);color:var(--red);font-family:var(--mono);font-size:11px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
-.disc-btn:hover{background:rgba(255,96,96,0.18);}
+# ─── USER HELPERS ─────────────────────────────────────────────────────────────
+def load_users():
+    if not os.path.exists(USERS_FILE):
+        return {}
+    with open(USERS_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
 
-/* Live dot inside slot */
-.live-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
-.live-dot.on{background:var(--green);box-shadow:0 0 0 3px rgba(61,255,192,0.18);animation:ldp 2s infinite;}
-.live-dot.off{background:var(--muted2);}
-.live-dot.warn{background:var(--amber);}
-@keyframes ldp{0%,100%{box-shadow:0 0 0 3px rgba(61,255,192,0.18);}50%{box-shadow:0 0 0 6px rgba(61,255,192,0.04);}}
+def save_users(users):
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(users, f, indent=2)
 
-/* Instagram auto-note */
-.ig-auto-note{padding:10px 14px;border-radius:10px;background:rgba(225,48,108,0.06);border:1px solid rgba(225,48,108,0.18);font-size:11px;color:rgba(255,150,180,0.8);font-family:var(--mono);line-height:1.75;margin-top:4px;}
+def hash_password(password, salt=None):
+    if salt is None:
+        salt = secrets.token_hex(16)
+    h = hashlib.sha256((salt + password).encode()).hexdigest()
+    return h, salt
 
-/* Instagram two-path method cards */
-.ig-method-card{border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;background:rgba(0,0,0,0.15);display:flex;flex-direction:column;gap:6px;}
-.ig-method-card.highlight{border-color:rgba(225,48,108,0.3);background:rgba(225,48,108,0.04);}
-.ig-method-icon{font-size:20px;}
-.ig-method-title{font-size:13px;font-weight:700;letter-spacing:-0.2px;}
-.ig-method-desc{font-size:11px;color:var(--muted);font-family:var(--mono);line-height:1.65;}
-.ig-method-status{font-size:11px;font-family:var(--mono);color:var(--amber);}
-.ig-method-status.ok{color:var(--green);}
-.ig-env-warn{margin-top:6px;padding:8px 10px;border-radius:8px;background:rgba(255,96,96,0.07);border:1px solid rgba(255,96,96,0.2);font-size:10px;color:var(--red);font-family:var(--mono);line-height:1.75;}
-.ig-env-warn code{font-family:var(--mono);}
+def verify_password(password, stored_hash, salt):
+    h, _ = hash_password(password, salt)
+    return h == stored_hash
 
-/* Channels card wrapper */
-.channels-card{background:var(--card);border:1px solid var(--border2);border-radius:20px;padding:28px;margin-bottom:14px;position:relative;overflow:hidden;}
-.channels-card::before{content:'';position:absolute;inset:0;border-radius:20px;background:linear-gradient(135deg,rgba(255,255,255,0.015),transparent);pointer-events:none;}
+def user_dir(username):
+    d = os.path.join(USER_DATA_DIR, username)
+    os.makedirs(d, exist_ok=True)
+    return d
 
-/* ── SUBMIT ── */
-.submit-area{margin-top:26px;display:flex;flex-direction:column;gap:10px;}
-.btn-primary{width:100%;padding:17px;background:linear-gradient(135deg,var(--p),#d060f0,var(--p2));border:none;border-radius:14px;color:#fff;font-family:var(--font);font-size:16px;font-weight:700;cursor:pointer;position:relative;overflow:hidden;box-shadow:0 10px 30px rgba(176,133,255,0.3);transition:opacity 0.2s,transform 0.15s;}
-.btn-primary::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,0.15),transparent);}
-.btn-primary:hover:not(:disabled){opacity:0.9;transform:translateY(-1px);}
-.btn-primary:disabled{opacity:0.4;cursor:not-allowed;}
-.btn-ghost{width:100%;padding:14px;background:var(--card);border:1px solid var(--border2);border-radius:14px;color:var(--muted);font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;}
-.btn-ghost:hover{border-color:rgba(176,133,255,0.3);color:var(--text);}
-.footnote{text-align:center;font-size:11px;color:var(--muted2);font-family:var(--mono);margin-top:16px;line-height:1.8;}
-.spin{animation:sp 0.8s linear infinite;display:inline-block;}
-@keyframes sp{to{transform:rotate(360deg);}}
-@media(max-width:600px){.wrapper{padding:28px 16px 60px;}.ch-slot{flex-wrap:wrap;}.ch-slot-actions{width:100%;}}
-</style>
-</head>
+def user_config_path(username):
+    return os.path.join(user_dir(username), "config.json")
+
+def user_subjects_path(username):
+    return os.path.join(user_dir(username), "subjects.txt")
+
+def user_state_path(username):
+    return os.path.join(user_dir(username), "state.json")
+
+def load_config(username):
+    p = user_config_path(username)
+    if not os.path.exists(p):
+        return {}
+    with open(p, "r", encoding="utf-8") as f:
+        raw = json.load(f)
+    return _decrypt_cfg(raw)
+
+def save_config(username, cfg):
+    encrypted = _encrypt_cfg(cfg)
+    with open(user_config_path(username), "w", encoding="utf-8") as f:
+        json.dump(encrypted, f, indent=2)
+
+def load_state(username):
+    p = user_state_path(username)
+    default = {"status": "waiting", "logs": [], "today_count": 0,
+                "total_run": 0, "last_run": None, "running": False}
+    if not os.path.exists(p):
+        return default
+    with open(p, "r", encoding="utf-8") as f:
+        s = json.load(f)
+    s["running"] = False
+    return s
+
+def save_state(username, state):
+    with open(user_state_path(username), "w", encoding="utf-8") as f:
+        json.dump(state, f, indent=2)
+
+_states = {}
+_state_lock = threading.Lock()
+
+def get_state(username):
+    with _state_lock:
+        if username not in _states:
+            _states[username] = load_state(username)
+        return _states[username]
+
+def add_log(username, msg, level="info"):
+    state  = get_state(username)
+    cfg    = load_config(username)
+    offset = cfg.get("utc_offset_hours", 0)
+    user_now = datetime.utcnow() + timedelta(hours=offset)
+    entry = {"time": user_now.strftime("%H:%M:%S"), "msg": msg, "level": level}
+    state["logs"].append(entry)
+    if len(state["logs"]) > 100:
+        state["logs"] = state["logs"][-100:]
+    print(f"[{username}][{entry['time']}][{level.upper()}] {msg}")
+
+# ─── AUTH DECORATOR ───────────────────────────────────────────────────────────
+def require_auth(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        username = session.get("username")
+        if not username:
+            return jsonify({"ok": False, "message": "Not authenticated"}), 401
+        return f(*args, username=username, **kwargs)
+    return decorated
+
+# ─── HELPERS ──────────────────────────────────────────────────────────────────
+def to_unicode_bold(text):
+    normal  = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    b_chars = "𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭𝗮𝗯𝗰𝗱𝗲𝗳𝗴𝗵𝗶𝗷𝗸𝗹𝗺𝗻𝗼𝗽𝗾𝗿𝘀𝘁𝘂𝘃𝘄𝘅𝘆𝘇𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵"
+    return text.translate(str.maketrans(normal, b_chars))
+
+def format_linkedin_bold(text):
+    return re.sub(r'\*\*(.*?)\*\*', lambda m: to_unicode_bold(m.group(1)), text)
+
+def get_next_run_time_for_user(username):
+    cfg    = load_config(username)
+    offset = cfg.get("utc_offset_hours", 0)
+    now_utc  = datetime.utcnow()
+    user_now = now_utc + timedelta(hours=offset)
+    target_local = user_now.replace(hour=TARGET_HOUR, minute=0, second=0, microsecond=0)
+    if user_now >= target_local:
+        target_local += timedelta(days=1)
+    return target_local - timedelta(hours=offset)
+
+def validate_image_url(url, timeout=8):
+    try:
+        r = requests.head(url, timeout=timeout, allow_redirects=True,
+                          headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code == 200 and "image" in r.headers.get("content-type", ""):
+            return True
+        if r.status_code in (405, 403, 0):
+            r2 = requests.get(url, timeout=timeout, stream=True,
+                              headers={"User-Agent": "Mozilla/5.0"})
+            if r2.status_code == 200 and "image" in r2.headers.get("content-type", ""):
+                r2.close()
+                return True
+        return False
+    except Exception:
+        return False
+
+# ─── AI FUNCTIONS ─────────────────────────────────────────────────────────────
+def generate_post(username, subject):
+    cfg      = load_config(username)
+    groq_key = cfg.get("groq_api_key", "")
+    clean    = subject.replace("(create image)", "").replace("(article)", "").strip()
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+            json={"model": "llama-3.1-8b-instant", "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT_POST},
+                {"role": "user",   "content": f"Write a post about: {clean}"}
+            ]}, timeout=30
+        ).json()
+        if "error" in response:
+            add_log(username, f"Groq Error: {response['error']['message']}", "error")
+            return None
+        return format_linkedin_bold(response["choices"][0]["message"]["content"])
+    except Exception as e:
+        add_log(username, f"Groq failure: {e}", "error")
+        return None
+
+def generate_article(username, subject):
+    cfg      = load_config(username)
+    groq_key = cfg.get("groq_api_key", "")
+    clean    = subject.replace("(article)", "").strip()
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+            json={"model": "llama-3.1-8b-instant", "max_tokens": 2000, "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT_ARTICLE},
+                {"role": "user",   "content": f"Write a LinkedIn article about: {clean}"}
+            ]}, timeout=60
+        ).json()
+        if "error" in response:
+            add_log(username, f"Groq Article Error: {response['error']['message']}", "error")
+            return None, None
+        raw   = response["choices"][0]["message"]["content"]
+        lines = raw.strip().split("\n")
+        title = clean
+        body  = raw
+        if lines[0].startswith("TITLE:"):
+            title = lines[0].replace("TITLE:", "").strip()
+            body  = "\n".join(lines[1:]).strip()
+        return title, body
+    except Exception as e:
+        add_log(username, f"Groq article failure: {e}", "error")
+        return None, None
+
+def get_image_url(username, subject):
+    cfg      = load_config(username)
+    serp_key = cfg.get("serpapi_key", "").strip()
+    if not serp_key:
+        add_log(username, "SerpAPI key not set — post sent without image.", "warn")
+        return None
+    clean = subject.replace("(create image)", "").replace("(article)", "").strip()
+    try:
+        response = requests.get("https://serpapi.com/search.json", params={
+            "engine": "google_images", "q": f"{clean} infographic", "api_key": serp_key
+        }, timeout=20).json()
+        results = response.get("images_results", [])
+        if not results:
+            add_log(username, "SerpAPI returned no images.", "warn")
+            return None
+        for i, img in enumerate(results[:5]):
+            url = img.get("original", "")
+            if not url:
+                continue
+            add_log(username, f"Checking image {i+1}/5...", "info")
+            if validate_image_url(url):
+                add_log(username, f"Image {i+1} reachable ✓", "ok")
+                return url
+            add_log(username, f"Image {i+1} unreachable — trying next", "warn")
+        add_log(username, "All candidate images unreachable — post sent without image.", "warn")
+        return None
+    except Exception as e:
+        add_log(username, f"SerpAPI Error: {e}", "error")
+        return None
+
+# ════════════════════════════════════════════════════════════════════════════════
+#  PUBLISHING
+# ════════════════════════════════════════════════════════════════════════════════
+
+def publish_to_linkedin_slot(username, slot, text, image_url=None, is_article=False):
+    cfg      = load_config(username)
+    token    = cfg.get(f"linkedin_{slot}_access_token", "")
+    urn      = cfg.get(f"linkedin_{slot}_urn", "")
+    name     = cfg.get(f"linkedin_{slot}_name", f"Slot {slot}")
+
+    if not token or not urn:
+        add_log(username, f"  → [LinkedIn #{slot}] Not connected — skipping.", "warn")
+        return False
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type":  "application/json",
+        "X-Restli-Protocol-Version": "2.0.0"
+    }
+
+    if is_article:
+        payload = {
+            "author":         urn,
+            "lifecycleState": "PUBLISHED",
+            "specificContent": {
+                "com.linkedin.ugc.ShareContent": {
+                    "shareCommentary":    {"text": text},
+                    "shareMediaCategory": "NONE"
+                }
+            },
+            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
+        }
+    elif image_url:
+        reg = requests.post(
+            "https://api.linkedin.com/v2/assets?action=registerUpload",
+            headers=headers,
+            json={"registerUploadRequest": {
+                "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
+                "owner": urn,
+                "serviceRelationships": [{
+                    "relationshipType": "OWNER",
+                    "identifier": "urn:li:userGeneratedContent"
+                }]
+            }}, timeout=15
+        ).json()
+        upload_url = reg.get("value", {}).get("uploadMechanism", {}).get(
+            "com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest", {}).get("uploadUrl")
+        asset = reg.get("value", {}).get("asset")
+        if upload_url and asset:
+            img_data = requests.get(image_url, timeout=15,
+                                    headers={"User-Agent": "Mozilla/5.0"}).content
+            requests.put(upload_url, data=img_data,
+                         headers={"Authorization": f"Bearer {token}"}, timeout=30)
+            payload = {
+                "author": urn, "lifecycleState": "PUBLISHED",
+                "specificContent": {"com.linkedin.ugc.ShareContent": {
+                    "shareCommentary": {"text": text},
+                    "shareMediaCategory": "IMAGE",
+                    "media": [{"status": "READY", "media": asset}]
+                }},
+                "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
+            }
+        else:
+            payload = {
+                "author": urn, "lifecycleState": "PUBLISHED",
+                "specificContent": {"com.linkedin.ugc.ShareContent": {
+                    "shareCommentary": {"text": text}, "shareMediaCategory": "NONE"
+                }},
+                "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
+            }
+    else:
+        payload = {
+            "author": urn, "lifecycleState": "PUBLISHED",
+            "specificContent": {"com.linkedin.ugc.ShareContent": {
+                "shareCommentary": {"text": text}, "shareMediaCategory": "NONE"
+            }},
+            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
+        }
+
+    try:
+        res = requests.post("https://api.linkedin.com/v2/ugcPosts",
+                            headers=headers, json=payload, timeout=20)
+        if res.status_code in (200, 201):
+            pid   = res.headers.get("x-restli-id", "n/a")
+            label = "article" if is_article else "post"
+            add_log(username, f"  → [LinkedIn #{slot} — {name}] Published {label} ✓ ID: {pid}", "ok")
+            return True
+        else:
+            add_log(username, f"  → [LinkedIn #{slot}] Failed {res.status_code}: {res.text[:200]}", "error")
+            return False
+    except Exception as e:
+        add_log(username, f"  → [LinkedIn #{slot}] Exception: {e}", "error")
+        return False
+
+
+def publish_to_facebook(username, text, image_url=None):
+    cfg      = load_config(username)
+    token    = cfg.get("facebook_access_token", "")
+    page_id  = cfg.get("facebook_page_id", "")
+    if not token or not page_id:
+        add_log(username, "  → [Facebook] Not connected — skipping.", "warn")
+        return False
+    try:
+        if image_url:
+            res = requests.post(
+                f"https://graph.facebook.com/v19.0/{page_id}/photos",
+                params={"access_token": token},
+                data={"url": image_url, "caption": text},
+                timeout=20
+            )
+        else:
+            res = requests.post(
+                f"https://graph.facebook.com/v19.0/{page_id}/feed",
+                params={"access_token": token},
+                data={"message": text},
+                timeout=20
+            )
+        result = res.json()
+        if "id" in result:
+            add_log(username, f"  → [Facebook] Published ✓ ID: {result['id']}", "ok")
+            return True
+        else:
+            add_log(username, f"  → [Facebook] Failed: {result.get('error', {}).get('message', str(result))}", "error")
+            return False
+    except Exception as e:
+        add_log(username, f"  → [Facebook] Exception: {e}", "error")
+        return False
+
+
+def publish_to_instagram(username, text, image_url=None):
+    cfg     = load_config(username)
+    token   = cfg.get("instagram_access_token", "")
+    ig_id   = cfg.get("instagram_account_id", "")
+    if not token or not ig_id:
+        add_log(username, "  → [Instagram] Not connected — skipping.", "warn")
+        return False
+    if not image_url:
+        add_log(username, "  → [Instagram] Skipped — Instagram requires an image.", "warn")
+        return False
+    try:
+        container = requests.post(
+            f"https://graph.facebook.com/v19.0/{ig_id}/media",
+            params={"access_token": token},
+            data={"image_url": image_url, "caption": text},
+            timeout=20
+        ).json()
+        container_id = container.get("id")
+        if not container_id:
+            add_log(username, f"  → [Instagram] Container failed: {container.get('error', {}).get('message', str(container))}", "error")
+            return False
+        pub = requests.post(
+            f"https://graph.facebook.com/v19.0/{ig_id}/media_publish",
+            params={"access_token": token},
+            data={"creation_id": container_id},
+            timeout=20
+        ).json()
+        if "id" in pub:
+            add_log(username, f"  → [Instagram] Published ✓ ID: {pub['id']}", "ok")
+            return True
+        else:
+            add_log(username, f"  → [Instagram] Publish failed: {pub.get('error', {}).get('message', str(pub))}", "error")
+            return False
+    except Exception as e:
+        add_log(username, f"  → [Instagram] Exception: {e}", "error")
+        return False
+
+
+def publish_to_all(username, text, image_url=None, is_article=False, article_title=None):
+    cfg        = load_config(username)
+    ch_enabled = cfg.get("channel_enabled", {})
+    success    = 0
+
+    def is_enabled(platform, slot):
+        key = f"{platform}_{slot}"
+        return ch_enabled.get(key, True)
+
+    for slot in [1, 2, 3]:
+        token = cfg.get(f"linkedin_{slot}_access_token", "")
+        if token:
+            if not is_enabled("linkedin", slot):
+                add_log(username, f"  → [LinkedIn #{slot}] Skipped (toggled OFF by user)", "info")
+                continue
+            ok = publish_to_linkedin_slot(username, slot, text, image_url, is_article)
+            if ok:
+                success += 1
+
+    if cfg.get("facebook_access_token") and not is_article:
+        if not is_enabled("facebook", 1):
+            add_log(username, "  → [Facebook] Skipped (toggled OFF by user)", "info")
+        else:
+            ok = publish_to_facebook(username, text, image_url)
+            if ok:
+                success += 1
+
+    if cfg.get("instagram_access_token") and not is_article:
+        if not is_enabled("instagram", 1):
+            add_log(username, "  → [Instagram] Skipped (toggled OFF by user)", "info")
+        else:
+            ok = publish_to_instagram(username, text, image_url)
+            if ok:
+                success += 1
+
+    any_connected = any([
+        cfg.get("linkedin_1_access_token"),
+        cfg.get("linkedin_2_access_token"),
+        cfg.get("linkedin_3_access_token"),
+        cfg.get("facebook_access_token"),
+        cfg.get("instagram_access_token"),
+    ])
+    if success == 0 and not any_connected:
+        add_log(username, "No channels connected — go to Setup to connect accounts.", "error")
+
+    return success
+
+# ─── BATCH ENGINE ─────────────────────────────────────────────────────────────
+def run_batch(username, triggered_by="scheduler"):
+    state = get_state(username)
+    if state["running"]:
+        add_log(username, "Batch already running.", "warn")
+        return
+
+    state["running"]     = True
+    state["status"]      = "running"
+    state["today_count"] = 0
+    add_log(username, f"Batch started (trigger: {triggered_by})", "info")
+
+    subjects_file = user_subjects_path(username)
+    if not os.path.exists(subjects_file):
+        add_log(username, "Queue is empty! Add subjects from dashboard.", "warn")
+        state["running"] = False; state["status"] = "waiting"; return
+
+    with open(subjects_file, "r", encoding="utf-8") as f:
+        all_subjects = [l.strip() for l in f if l.strip()]
+
+    if not all_subjects:
+        add_log(username, "Queue is empty!", "warn")
+        state["running"] = False; state["status"] = "waiting"; return
+
+    batch = all_subjects[:BATCH_SIZE]
+    with open(subjects_file, "w", encoding="utf-8") as f:
+        f.write("\n".join(all_subjects[BATCH_SIZE:]))
+
+    add_log(username, f"Processing {len(batch)} subjects. {len(all_subjects)-len(batch)} remaining.", "info")
+
+    for j, subject in enumerate(batch):
+        manual_image_url = None
+        base_subject     = subject
+        is_article       = "(article)" in subject.lower()
+
+        if "| IMG:" in subject:
+            parts            = subject.split("| IMG:")
+            base_subject     = parts[0].strip()
+            manual_image_url = parts[1].strip()
+
+        add_log(username, f"[{j+1}/{len(batch)}] {'[ARTICLE] ' if is_article else ''}{base_subject[:50]}", "info")
+
+        if is_article:
+            title, body = generate_article(username, base_subject)
+            if not title or not body:
+                continue
+            add_log(username, f"[{j+1}/{len(batch)}] Article generated ✓ — {title[:40]}", "ok")
+            sent = publish_to_all(username, body, is_article=True, article_title=title)
+        else:
+            post_text = generate_post(username, base_subject)
+            if not post_text:
+                continue
+            add_log(username, f"[{j+1}/{len(batch)}] Post generated ✓", "ok")
+
+            image_url = None
+            if manual_image_url:
+                if validate_image_url(manual_image_url):
+                    image_url = manual_image_url
+                    add_log(username, f"[{j+1}/{len(batch)}] Using uploaded image ✓", "ok")
+                else:
+                    add_log(username, f"[{j+1}/{len(batch)}] Uploaded image unreachable — sending without image", "warn")
+            elif "(create image)" in base_subject.lower():
+                image_url = get_image_url(username, base_subject)
+                if image_url:
+                    add_log(username, f"[{j+1}/{len(batch)}] Image fetched ✓", "ok")
+
+            sent = publish_to_all(username, post_text, image_url)
+
+        if sent > 0:
+            add_log(username, f"[{j+1}/{len(batch)}] Sent to {sent} channel(s) ✓", "ok")
+            state["today_count"] += 1
+            state["total_run"]   += sent
+        else:
+            add_log(username, f"[{j+1}/{len(batch)}] All channels failed.", "error")
+        time.sleep(10)
+
+    state["last_run"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    state["running"]  = False
+    state["status"]   = "waiting"
+    add_log(username, f"Batch complete! {state['today_count']} posts sent.", "ok")
+    save_state(username, state)
+
+# ─── SCHEDULER ────────────────────────────────────────────────────────────────
+def scheduler_loop():
+    print("[SCHEDULER] Started — fires at 08:00 local time per user")
+    fired_today = set()
+    while True:
+        now_utc = datetime.utcnow()
+        for uname in load_users():
+            cfg      = load_config(uname)
+            offset   = cfg.get("utc_offset_hours", 0)
+            user_now = now_utc + timedelta(hours=offset)
+            fire_key = (uname, user_now.date())
+            if (user_now.hour == TARGET_HOUR and user_now.minute == 0
+                    and user_now.second < 5 and fire_key not in fired_today):
+                fired_today.add(fire_key)
+                add_log(uname, f"Scheduler fired at local 08:00 (UTC{offset:+.1f}h)", "info")
+                threading.Thread(target=run_batch, args=(uname, "scheduler"), daemon=True).start()
+        fired_today = {k for k in fired_today if k[1] >= now_utc.date()}
+        time.sleep(1)
+
+def keep_alive_loop():
+    time.sleep(30)
+    while True:
+        try:
+            railway = os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+            render  = os.environ.get("RENDER_EXTERNAL_URL")
+            port    = os.environ.get("PORT", 5000)
+            url = f"https://{railway}" if railway else (render if render else f"http://localhost:{port}")
+            requests.get(f"{url}/ping", timeout=10)
+        except Exception:
+            pass
+        time.sleep(600)
+
+# ════════════════════════════════════════════════════════════════════════════════
+#  PAGE ROUTES
+# ════════════════════════════════════════════════════════════════════════════════
+@app.route("/")
+def page_login():     return load_html("login.html")
+@app.route("/setup")
+def page_setup():     return load_html("setup.html")
+@app.route("/dashboard")
+def page_dashboard(): return load_html("dashboard.html")
+
+@app.route("/privacy")
+def privacy():
+    return load_html("privacy.html")
+
+@app.route("/ping")
+def ping():
+    utc_now = datetime.utcnow()
+    return jsonify({"status": "alive", "utc_time": utc_now.strftime("%H:%M:%S"),
+                    "utc_iso": utc_now.isoformat() + "Z"})
+
+# ════════════════════════════════════════════════════════════════════════════════
+#  AUTH ROUTES
+# ════════════════════════════════════════════════════════════════════════════════
+@app.route("/api/register", methods=["POST"])
+def register():
+    data     = request.get_json()
+    username = (data.get("username") or "").strip().lower()
+    password = data.get("password") or ""
+    if not username or not password:
+        return jsonify({"ok": False, "message": "Username and password required."}), 400
+    if len(username) < 3:
+        return jsonify({"ok": False, "message": "Username must be at least 3 characters."}), 400
+    if len(password) < 6:
+        return jsonify({"ok": False, "message": "Password must be at least 6 characters."}), 400
+    if not re.match(r'^[a-z0-9_]+$', username):
+        return jsonify({"ok": False, "message": "Username: letters, numbers, underscores only."}), 400
+    users = load_users()
+    if username in users:
+        return jsonify({"ok": False, "message": "Username already taken."}), 409
+    h, salt = hash_password(password)
+    users[username] = {"password_hash": h, "salt": salt, "created_at": datetime.now().isoformat()}
+    save_users(users)
+    os.makedirs(user_dir(username), exist_ok=True)
+    utc_offset = data.get("utc_offset_hours")
+    if utc_offset is not None:
+        cfg = load_config(username)
+        cfg["utc_offset_hours"] = float(utc_offset)
+        save_config(username, cfg)
+    session["username"] = username
+    session.permanent   = True
+    cfg = load_config(username)
+    has_config = bool(cfg.get("groq_api_key"))
+    return jsonify({"ok": True, "username": username, "has_config": has_config, "message": "Account created!"})
+
+@app.route("/api/login", methods=["POST"])
+def login():
+    data     = request.get_json()
+    username = (data.get("username") or "").strip().lower()
+    password = data.get("password") or ""
+    users = load_users()
+    if username not in users:
+        return jsonify({"ok": False, "message": "Invalid username or password."}), 401
+    u = users[username]
+    if not verify_password(password, u["password_hash"], u["salt"]):
+        return jsonify({"ok": False, "message": "Invalid username or password."}), 401
+    utc_offset = data.get("utc_offset_hours")
+    if utc_offset is not None:
+        cfg = load_config(username)
+        cfg["utc_offset_hours"] = float(utc_offset)
+        save_config(username, cfg)
+    session["username"] = username
+    session.permanent   = True
+    cfg = load_config(username)
+    has_config = bool(cfg.get("groq_api_key"))
+    return jsonify({"ok": True, "username": username, "has_config": has_config})
+
+@app.route("/api/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+@app.route("/api/me")
+def me():
+    username = session.get("username")
+    if not username:
+        return jsonify({"ok": False, "authenticated": False})
+    cfg = load_config(username)
+    has_config = bool(cfg.get("groq_api_key"))
+    return jsonify({"ok": True, "authenticated": True, "username": username, "has_config": has_config})
+
+# ════════════════════════════════════════════════════════════════════════════════
+#  CONFIG ROUTES
+# ════════════════════════════════════════════════════════════════════════════════
+@app.route("/api/config", methods=["GET"])
+@require_auth
+def get_config(username):
+    cfg = load_config(username)
+    masked = {}
+    token_keys = {
+        "linkedin_1_access_token", "linkedin_2_access_token", "linkedin_3_access_token",
+        "facebook_access_token", "instagram_access_token",
+    }
+    for k, v in cfg.items():
+        if k in token_keys:
+            masked[k] = "connected" if v else ""
+        elif isinstance(v, str) and v and len(v) > 8 and k in SENSITIVE_FIELDS:
+            masked[k] = "*" * (len(v) - 4) + v[-4:]
+        else:
+            masked[k] = v
+    return jsonify({"ok": True, "config": masked})
+
+@app.route("/api/config", methods=["POST"])
+@require_auth
+def save_config_route(username):
+    data = request.get_json()
+    cfg  = load_config(username)
+    for field in ["groq_api_key", "serpapi_key"]:
+        val = (data.get(field) or "").strip()
+        if val and "*" not in val:
+            cfg[field] = val
+    save_config(username, cfg)
+    add_log(username, "Config updated ✓", "ok")
+    return jsonify({"ok": True, "message": "Configuration saved!"})
+
+# ════════════════════════════════════════════════════════════════════════════════
+#  CHANNELS STATUS
+# ════════════════════════════════════════════════════════════════════════════════
+@app.route("/api/channels")
+def get_channels():
+    username = session.get("username")
+    if not username:
+        return jsonify({"ok": False, "authenticated": False}), 401
+    cfg = load_config(username)
+
+    def token_expired(exp_key):
+        exp = cfg.get(exp_key)
+        if not exp:
+            return False
+        try:
+            return datetime.utcnow() > datetime.fromisoformat(exp)
+        except Exception:
+            return False
+
+    linkedin = {}
+    for slot in [1, 2, 3]:
+        t_key  = f"linkedin_{slot}_access_token"
+        e_key  = f"linkedin_{slot}_token_expires"
+        n_key  = f"linkedin_{slot}_name"
+        a_key  = f"linkedin_{slot}_account_type"
+        linkedin[slot] = {
+            "connected": bool(cfg.get(t_key)),
+            "expired":   token_expired(e_key),
+            "name":      cfg.get(n_key, ""),
+            "expires":   cfg.get(e_key, ""),
+            "account_type": cfg.get(a_key, "personal"),
+            "env_set":   bool(LI_CLIENT_ID and LI_CLIENT_SECRET),
+        }
+
+    facebook = {
+        1: {
+            "connected": bool(cfg.get("facebook_access_token")),
+            "page_name": cfg.get("facebook_page_name", ""),
+            "page_id":   cfg.get("facebook_page_id", ""),
+            "env_set":   bool(FB_APP_ID and FB_APP_SECRET),
+        }
+    }
+
+    instagram = {
+        1: {
+            "connected":      bool(cfg.get("instagram_access_token")),
+            "username":       cfg.get("instagram_username", ""),
+            "via_facebook":   cfg.get("instagram_via_facebook", False),
+            "env_set":        bool(FB_APP_ID and FB_APP_SECRET),
+            "direct_env_set": bool(IG_APP_ID and IG_APP_SECRET),
+        }
+    }
+
+    return jsonify({
+        "ok":        True,
+        "linkedin":  linkedin,
+        "facebook":  facebook,
+        "instagram": instagram,
+    })
+
+# ════════════════════════════════════════════════════════════════════════════════
+#  OAUTH CALLBACK HELPER
+# ════════════════════════════════════════════════════════════════════════════════
+
+def _callback_page(success, message="", msg_key="", platform="linkedin", slot=1):
+    if success:
+        event = msg_key or f"channel_connected:{platform}:{slot}"
+        return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+  body{{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;
+       background:#05030f;color:#3dffc0;font-family:'Segoe UI',sans-serif;text-align:center;}}
+  .box{{padding:40px;border:1px solid rgba(61,255,192,0.3);border-radius:20px;background:rgba(61,255,192,0.05);}}
+  .ico{{font-size:48px;margin-bottom:16px;}}
+  h2{{font-size:20px;margin-bottom:8px;}}
+  p{{font-size:13px;color:rgba(200,185,255,0.6);}}
+</style></head>
+<body><div class="box">
+  <div class="ico">✓</div>
+  <h2>{message or 'Connected!'}</h2>
+  <p>This window will close automatically...</p>
+</div>
+<script>
+  try {{ window.opener && window.opener.postMessage('{event}', '*'); }} catch(e) {{}}
+  setTimeout(function(){{ window.close(); }}, 1200);
+</script>
+</body></html>"""
+    else:
+        return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+  body{{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;
+       background:#05030f;color:#ff6060;font-family:'Segoe UI',sans-serif;text-align:center;}}
+  .box{{padding:40px;border:1px solid rgba(255,96,96,0.3);border-radius:20px;background:rgba(255,96,96,0.05);max-width:420px;}}
+  .ico{{font-size:48px;margin-bottom:16px;}}
+  h2{{font-size:18px;margin-bottom:8px;}}
+  p{{font-size:12px;color:rgba(200,185,255,0.5);margin-top:16px;}}
+  button{{margin-top:20px;padding:10px 24px;background:rgba(255,96,96,0.15);border:1px solid rgba(255,96,96,0.3);
+          color:#ff6060;border-radius:10px;cursor:pointer;font-size:13px;}}
+</style></head>
+<body><div class="box">
+  <div class="ico">✕</div>
+  <h2>Connection Failed</h2>
+  <div style="font-size:12px;color:rgba(255,150,150,0.8);margin-top:8px;">{message}</div>
+  <p>You can close this window and try again.</p>
+  <button onclick="window.close()">Close</button>
+</div>
+</body></html>""", 400
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+#  LINKEDIN OAUTH
+# ════════════════════════════════════════════════════════════════════════════════
+@app.route("/api/auth/linkedin")
+@require_auth
+def linkedin_auth(username):
+    if not LI_CLIENT_ID:
+        return jsonify({"ok": False, "message": "LINKEDIN_CLIENT_ID not set in environment"}), 400
+
+    slot = request.args.get("slot", "1")
+    try:
+        slot = int(slot)
+    except ValueError:
+        slot = 1
+    slot = max(1, min(3, slot))
+
+    state_token   = secrets.token_hex(16)
+    state_payload = f"{username}:{slot}:{state_token}"
+    session[f"li_state_{slot}"] = state_token
+    session["li_active_slot"]   = slot
+
+    params = {
+        "response_type": "code",
+        "client_id":     LI_CLIENT_ID,
+        "redirect_uri":  LI_REDIRECT_URI,
+        "state":         state_payload,
+        "scope":         "openid profile w_member_social",
+        "prompt":        "login",
+        "login_hint":    "",
+    }
+    oauth_url = "https://www.linkedin.com/oauth/v2/authorization?" + urllib.parse.urlencode(params)
+    return jsonify({"ok": True, "auth_url": oauth_url})
+
+
+def _li_account_picker_page(username, slot, access_token, expires_in, personal_name, personal_id, orgs, oauth_url=''):
+    org_cards = ""
+    for org in orgs:
+        oid   = org.get("id", "")
+        oname = org.get("name", f"Company {oid}")
+        org_cards += f"""
+        <label class="acct-card" onclick="pick('organization', '{oid}', '{oname.replace("'", "\\'")}')">
+          <span class="acct-ico">🏢</span>
+          <span class="acct-info">
+            <strong>{oname}</strong>
+            <small>Company Page</small>
+          </span>
+          <span class="acct-arrow">→</span>
+        </label>"""
+
+    token_key = f"li_pending_{username}_{slot}"
+    session[token_key] = {
+        "access_token": access_token,
+        "expires_in":   expires_in,
+        "personal_id":  personal_id,
+        "personal_name": personal_name,
+    }
+
+    token_key2 = f"li_oauth_{username}_{slot}"
+    session[token_key2] = oauth_url
+
+    safe_name = personal_name.replace("'", "\\'")
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Choose LinkedIn Account</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0;}}
+body{{min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',sans-serif;
+     display:flex;align-items:center;justify-content:center;padding:24px;}}
+.wrap{{width:100%;max-width:420px;}}
+.hdr{{text-align:center;margin-bottom:24px;}}
+.hdr h2{{font-size:20px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px;}}
+.hdr p{{font-size:12px;color:rgba(200,185,255,0.55);}}
+.slot-badge{{display:inline-block;background:rgba(176,133,255,0.15);border:1px solid rgba(176,133,255,0.3);
+             color:#b085ff;border-radius:20px;padding:4px 14px;font-size:11px;margin-bottom:12px;}}
+.section-label{{font-size:10px;letter-spacing:2px;text-transform:uppercase;
+                color:rgba(200,185,255,0.4);margin-bottom:10px;}}
+.acct-card{{display:flex;align-items:center;gap:14px;padding:14px 16px;
+            border:1.5px solid rgba(160,120,255,0.2);border-radius:14px;
+            background:rgba(255,255,255,0.03);margin-bottom:10px;
+            cursor:pointer;transition:all 0.2s;text-decoration:none;color:inherit;}}
+.acct-card:hover{{border-color:rgba(176,133,255,0.5);background:rgba(176,133,255,0.07);
+                  transform:translateY(-1px);}}
+.acct-ico{{font-size:26px;flex-shrink:0;}}
+.acct-info{{flex:1;min-width:0;}}
+.acct-info strong{{display:block;font-size:14px;font-weight:700;
+                   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}}
+.acct-info small{{display:block;font-size:11px;color:rgba(200,185,255,0.5);margin-top:2px;}}
+.acct-arrow{{color:rgba(176,133,255,0.5);font-size:16px;flex-shrink:0;}}
+.divider{{display:flex;align-items:center;gap:10px;margin:16px 0;}}
+.divider::before,.divider::after{{content:'';flex:1;height:1px;background:rgba(160,120,255,0.15);}}
+.divider span{{font-size:10px;color:rgba(200,185,255,0.35);letter-spacing:1px;}}
+.loading{{display:none;text-align:center;padding:20px;font-size:13px;color:rgba(200,185,255,0.5);}}
+.spin{{display:inline-block;animation:sp 0.8s linear infinite;}}
+@keyframes sp{{to{{transform:rotate(360deg);}}}}
+.signout-row{{display:flex;align-items:center;justify-content:center;margin-top:24px;}}
+.signout-btn{{display:flex;align-items:center;gap:8px;padding:11px 22px;border-radius:11px;
+              border:1.5px solid rgba(255,96,96,0.25);background:rgba(255,96,96,0.07);
+              color:rgba(255,130,130,0.9);font-size:13px;font-weight:600;
+              cursor:pointer;transition:all 0.2s;font-family:'Segoe UI',sans-serif;}}
+.signout-btn:hover{{border-color:rgba(255,96,96,0.5);background:rgba(255,96,96,0.15);
+                    transform:translateY(-1px);}}
+.signout-note{{font-size:10px;color:rgba(200,185,255,0.3);text-align:center;
+               margin-top:8px;line-height:1.6;}}
+</style></head>
 <body>
-<div class="grid-bg"></div>
-<div class="orb o1"></div><div class="orb o2"></div>
-
-<div class="wrapper">
-  <div class="topbar">
-    <a class="brand" href="/"><div class="brand-icon">Li</div><span class="brand-name">LinkedIn Agent</span></a>
-    <button class="skip-btn" onclick="goToDash()">Skip for now →</button>
+<div class="wrap">
+  <div class="hdr">
+    <div class="slot-badge">LinkedIn Channel {slot}</div>
+    <h2>Choose account to connect</h2>
+    <p>Select your personal profile or a company page you manage</p>
   </div>
 
-  <div class="steps">
-    <div class="step done"><div class="step-num">✓</div>Account</div>
-    <div class="step-line"></div>
-    <div class="step active"><div class="step-num">2</div>Setup</div>
-    <div class="step-line"></div>
-    <div class="step"><div class="step-num">3</div>Dashboard</div>
+  <div class="section-label">Personal Profile</div>
+  <label class="acct-card" onclick="pick('personal', '{personal_id}', '{safe_name}')">
+    <span class="acct-ico">👤</span>
+    <span class="acct-info">
+      <strong>{personal_name}</strong>
+      <small>Personal LinkedIn Profile</small>
+    </span>
+    <span class="acct-arrow">→</span>
+  </label>
+
+  {'<div class="divider"><span>OR COMPANY PAGE</span></div>' + org_cards if orgs else ''}
+
+  <div class="loading" id="loadingBox">
+    <span class="spin">⟳</span> Connecting...
   </div>
 
-  <div class="page-hdr">
-    <div class="step-label">⚙ Configuration</div>
-    <h1 class="page-title">Connect your accounts</h1>
-    <p class="page-sub">Connect your social accounts and API keys. Click a platform button — login page opens — you log in — done.</p>
-  </div>
-
-  <div class="alert err" id="errBox"><span style="font-size:15px;flex-shrink:0">⚠</span><span id="errMsg"></span></div>
-  <div class="alert ok"  id="okBox"><span style="font-size:15px;flex-shrink:0">✓</span><span id="okMsg"></span></div>
-
-  <!-- ═══ GROQ ═══ -->
-  <div class="card">
-    <div class="card-head">
-      <div class="card-badge bg-g">G</div>
-      <div class="card-head-info"><h3>Groq API Key</h3><p>AI post & article generation · groq.com/keys</p></div>
-    </div>
-    <div class="field">
-      <label>API Key</label>
-      <div class="inp-w"><span class="inp-ico">🔑</span><input type="password" id="cfgGroq" placeholder="gsk_••••••••••••••••••••••••"></div>
-    </div>
-  </div>
-
-  <!-- ═══ SERPAPI ═══ -->
-  <div class="card">
-    <div class="card-head">
-      <div class="card-badge bg-s">S</div>
-      <div class="card-head-info"><h3>SerpAPI Key</h3><p>auto image search · optional · serpapi.com</p></div>
-    </div>
-    <div class="field">
-      <label>API Key</label>
-      <div class="inp-w"><span class="inp-ico">🔑</span><input type="password" id="cfgSerp" placeholder="77b4••••••••••••••••••••"></div>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════════════════════
-       NEW: MULTI-ACCOUNT CHANNELS
-  ════════════════════════════════════════════════════════ -->
-  <div class="section-divider"><span>📡 Connect Channels</span></div>
-
-  <div class="channels-card">
-    <div class="card-head" style="margin-bottom:8px;">
-      <div class="card-badge" style="background:linear-gradient(135deg,rgba(0,119,181,0.2),rgba(225,48,108,0.2));border:1px solid rgba(176,133,255,0.2);font-size:18px;">📱</div>
-      <div class="card-head-info">
-        <h3>Social Channels</h3>
-        <p>connect multiple accounts · each publishes independently</p>
-      </div>
-    </div>
-
-    <!-- ── LINKEDIN GROUP ── -->
-    <div class="platform-group">
-      <div class="platform-group-hdr">
-        <div class="plat-icon li">💼</div>
-        <div>
-          <div class="plat-name">LinkedIn Accounts</div>
-          <div class="plat-sub">Up to 3 separate LinkedIn accounts</div>
-        </div>
-        <span class="plat-count" id="liCount">0 / 3 connected</span>
-      </div>
-
-      <!-- Slot LI-1 -->
-      <div class="ch-slot" id="liSlot1">
-        <div class="ch-slot-num" id="liNum1">1</div>
-        <div class="live-dot off" id="liDot1"></div>
-        <div class="ch-slot-info">
-          <div class="ch-slot-name" id="liName1">LinkedIn Account 1</div>
-          <div class="ch-slot-status" id="liStatus1">Not connected</div>
-        </div>
-        <div class="ch-slot-actions">
-          <button class="conn-btn li" id="liBtn1" onclick="connectChannel('linkedin',1)">🔗 Connect</button>
-          <button class="disc-btn" id="liDisc1" style="display:none" onclick="disconnectChannel('linkedin',1)">✕</button>
-        </div>
-      </div>
-
-      <!-- Slot LI-2 -->
-      <div class="ch-slot" id="liSlot2">
-        <div class="ch-slot-num" id="liNum2">2</div>
-        <div class="live-dot off" id="liDot2"></div>
-        <div class="ch-slot-info">
-          <div class="ch-slot-name" id="liName2">LinkedIn Account 2</div>
-          <div class="ch-slot-status" id="liStatus2">Not connected</div>
-        </div>
-        <div class="ch-slot-actions">
-          <button class="conn-btn li" id="liBtn2" onclick="connectChannel('linkedin',2)">🔗 Connect</button>
-          <button class="disc-btn" id="liDisc2" style="display:none" onclick="disconnectChannel('linkedin',2)">✕</button>
-        </div>
-      </div>
-
-      <!-- Slot LI-3 -->
-      <div class="ch-slot" id="liSlot3">
-        <div class="ch-slot-num" id="liNum3">3</div>
-        <div class="live-dot off" id="liDot3"></div>
-        <div class="ch-slot-info">
-          <div class="ch-slot-name" id="liName3">LinkedIn Account 3</div>
-          <div class="ch-slot-status" id="liStatus3">Not connected</div>
-        </div>
-        <div class="ch-slot-actions">
-          <button class="conn-btn li" id="liBtn3" onclick="connectChannel('linkedin',3)">🔗 Connect</button>
-          <button class="disc-btn" id="liDisc3" style="display:none" onclick="disconnectChannel('linkedin',3)">✕</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── FACEBOOK GROUP ── -->
-    <div class="platform-group">
-      <div class="platform-group-hdr">
-        <div class="plat-icon fb">📘</div>
-        <div>
-          <div class="plat-name">Facebook Page</div>
-          <div class="plat-sub">Connects to your Facebook Page</div>
-        </div>
-        <span class="plat-count" id="fbCount">0 / 1 connected</span>
-      </div>
-
-      <div class="ch-slot" id="fbSlot1">
-        <div class="ch-slot-num" id="fbNum1">1</div>
-        <div class="live-dot off" id="fbDot1"></div>
-        <div class="ch-slot-info">
-          <div class="ch-slot-name" id="fbName1">Facebook Page</div>
-          <div class="ch-slot-status" id="fbStatus1">Not connected</div>
-        </div>
-        <div class="ch-slot-actions">
-          <button class="conn-btn fb" id="fbBtn1" onclick="connectChannel('facebook',1)">🔗 Connect</button>
-          <button class="disc-btn" id="fbDisc1" style="display:none" onclick="disconnectChannel('facebook',1)">✕</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── INSTAGRAM GROUP ── -->
-    <div class="platform-group">
-      <div class="platform-group-hdr">
-        <div class="plat-icon ig">📸</div>
-        <div>
-          <div class="plat-name">Instagram Business / Creator</div>
-          <div class="plat-sub">Connect via Facebook Page or directly</div>
-        </div>
-        <span class="plat-count" id="igCount">0 / 1 connected</span>
-      </div>
-
-      <!-- Single Instagram slot — two ways to connect -->
-      <div class="ch-slot" id="igSlot1">
-        <div class="ch-slot-num" id="igNum1">1</div>
-        <div class="live-dot off" id="igDot1"></div>
-        <div class="ch-slot-info">
-          <div class="ch-slot-name" id="igName1">Instagram Account</div>
-          <div class="ch-slot-status" id="igStatus1">Not connected</div>
-        </div>
-        <div class="ch-slot-actions" id="igActions1">
-          <!-- shown when NOT connected -->
-          <button class="conn-btn ig" id="igDirectBtn" onclick="connectChannel('instagram_direct',1)" style="display:none">🔗 Connect Direct</button>
-          <!-- disconnect -->
-          <button class="disc-btn" id="igDisc1" style="display:none" onclick="disconnectChannel('instagram',1)">✕</button>
-        </div>
-      </div>
-
-      <!-- Two-path explainer, shown only when not connected -->
-      <div id="igMethodBox" style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <!-- Path A: via Facebook -->
-        <div class="ig-method-card" id="igViaFbCard">
-          <div class="ig-method-icon">📘→📸</div>
-          <div class="ig-method-title">Via Facebook Page</div>
-          <div class="ig-method-desc">Already connected Facebook above? If your Page has an Instagram Business account linked, it auto-connects here.</div>
-          <div class="ig-method-status" id="igViaFbStatus">Connect Facebook first ↑</div>
-        </div>
-        <!-- Path B: direct -->
-        <div class="ig-method-card highlight" id="igDirectCard">
-          <div class="ig-method-icon">📸</div>
-          <div class="ig-method-title">Direct Connection</div>
-          <div class="ig-method-desc">Use your own Instagram Graph API app to connect directly — independent of Facebook.</div>
-          <button class="conn-btn ig" style="margin-top:10px;width:100%;justify-content:center;" onclick="connectChannel('instagram_direct',1)">🔗 Connect Instagram</button>
-          <div class="ig-env-warn" id="igEnvWarn" style="display:none;">⚠ Set <code>INSTAGRAM_APP_ID</code> &amp; <code>INSTAGRAM_APP_SECRET</code> in Railway first.</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="note-box">
-      💼 <strong>LinkedIn</strong> — posts &amp; articles published directly to each connected account<br>
-      📘 <strong>Facebook</strong> — posts published to your Facebook Page<br>
-      📸 <strong>Instagram</strong> — connect via Facebook Page <em>or</em> directly via Instagram Graph API<br>
-      📄 <strong>Articles</strong> — LinkedIn only · Facebook &amp; Instagram receive posts only
-    </div>
-  </div>
-
-  <div class="submit-area">
-    <button class="btn-primary" id="saveBtn" onclick="saveConfig()">
-      <span id="saveBtnLabel">Save &amp; Continue →</span>
+  <div class="signout-row">
+    <button class="signout-btn" onclick="doSignOut()">
+      ↩ Sign out &amp; use a different account
     </button>
-    <button class="btn-ghost" onclick="goToDash()">Skip — go to Dashboard</button>
   </div>
-  <div class="footnote">API keys encrypted at rest · OAuth tokens stored per account · no passwords stored</div>
+  <p class="signout-note">Signs you out of LinkedIn so you can connect a different account</p>
 </div>
 
 <script>
-const API = window.location.origin + '/api';
-let savedGroq = false;
-
-// ══════════════════════════════════════════
-// LOAD ALL CHANNEL STATUSES
-// ══════════════════════════════════════════
-async function loadChannels() {
-  try {
-    const res  = await fetch(`${API}/channels`, { credentials: 'include' });
+async function pick(acct_type, acct_id, acct_name) {{
+  document.querySelectorAll('.acct-card').forEach(c => c.style.pointerEvents='none');
+  document.getElementById('loadingBox').style.display='block';
+  try {{
+    const res = await fetch('/api/auth/linkedin/pick', {{
+      method: 'POST',
+      headers: {{'Content-Type':'application/json'}},
+      body: JSON.stringify({{
+        username:  '{username}',
+        slot:      {slot},
+        acct_type: acct_type,
+        acct_id:   acct_id,
+        acct_name: acct_name,
+      }})
+    }});
     const data = await res.json();
-    if (!data.ok) return;
+    if (data.ok) {{
+      window.opener && window.opener.postMessage('channel_connected:linkedin:{slot}', '*');
+      window.close();
+    }} else {{
+      alert('Error: ' + (data.message || 'Unknown error'));
+      document.querySelectorAll('.acct-card').forEach(c => c.style.pointerEvents='');
+      document.getElementById('loadingBox').style.display='none';
+    }}
+  }} catch(e) {{
+    alert('Network error: ' + e.message);
+    document.querySelectorAll('.acct-card').forEach(c => c.style.pointerEvents='');
+    document.getElementById('loadingBox').style.display='none';
+  }}
+}}
 
-    // LinkedIn slots 1-3
-    for (let i = 1; i <= 3; i++) {
-      const ch = data.linkedin[i] || {};
-      renderLinkedInSlot(i, ch);
-    }
-    // Facebook slot 1
-    renderFacebookSlot(1, data.facebook[1] || {});
-    // Instagram slot 1
-    renderInstagramSlot(1, data.instagram[1] || {}, data.facebook[1] || {});
-
-    // Update counts
-    const liConn = [1,2,3].filter(i => (data.linkedin[i]||{}).connected).length;
-    document.getElementById('liCount').textContent = `${liConn} / 3 connected`;
-    document.getElementById('liCount').style.color = liConn > 0 ? 'var(--green)' : 'var(--muted)';
-
-    const fbConn = (data.facebook[1]||{}).connected ? 1 : 0;
-    document.getElementById('fbCount').textContent = `${fbConn} / 1 connected`;
-    document.getElementById('fbCount').style.color = fbConn ? 'var(--green)' : 'var(--muted)';
-
-    const igConn = (data.instagram[1]||{}).connected ? 1 : 0;
-    document.getElementById('igCount').textContent = `${igConn} / 1 connected`;
-    document.getElementById('igCount').style.color = igConn ? 'var(--green)' : 'var(--muted)';
-
-  } catch(e) { console.error(e); }
-}
-
-function renderLinkedInSlot(n, ch) {
-  const slot   = document.getElementById(`liSlot${n}`);
-  const dot    = document.getElementById(`liDot${n}`);
-  const name   = document.getElementById(`liName${n}`);
-  const status = document.getElementById(`liStatus${n}`);
-  const btn    = document.getElementById(`liBtn${n}`);
-  const disc   = document.getElementById(`liDisc${n}`);
-  const num    = document.getElementById(`liNum${n}`);
-
-  if (ch.connected) {
-    slot.className   = 'ch-slot connected';
-    dot.className    = 'live-dot on';
-    const typeIcon   = ch.account_type === 'organization' ? '🏢' : '👤';
-    const typeLabel  = ch.account_type === 'organization' ? 'Company Page' : 'Personal';
-    name.textContent = `${typeIcon} ${ch.name || 'LinkedIn Account ' + n}`;
-    status.textContent = `✓ ${typeLabel}${ch.expires ? ' · expires ' + new Date(ch.expires).toLocaleDateString() : ''}`;
-    btn.style.display  = 'none';
-    disc.style.display = 'block';
-    num.style.color    = 'var(--green)';
-  } else if (ch.expired) {
-    slot.className   = 'ch-slot expired';
-    dot.className    = 'live-dot warn';
-    name.textContent = ch.name || `LinkedIn Account ${n}`;
-    status.textContent = '⚠ Session expired — reconnect';
-    btn.innerHTML      = '🔄 Reconnect';
-    btn.style.display  = 'flex';
-    disc.style.display = 'none';
-  } else {
-    slot.className   = 'ch-slot';
-    dot.className    = 'live-dot off';
-    name.textContent = `LinkedIn Account ${n}`;
-    status.textContent = 'Not connected — click Connect to choose personal or company page';
-    btn.innerHTML      = '🔗 Connect';
-    btn.style.display  = 'flex';
-    disc.style.display = 'none';
-  }
-}
-
-function renderFacebookSlot(n, ch) {
-  const slot   = document.getElementById(`fbSlot${n}`);
-  const dot    = document.getElementById(`fbDot${n}`);
-  const name   = document.getElementById(`fbName${n}`);
-  const status = document.getElementById(`fbStatus${n}`);
-  const btn    = document.getElementById(`fbBtn${n}`);
-  const disc   = document.getElementById(`fbDisc${n}`);
-
-  if (ch.connected) {
-    slot.className   = 'ch-slot connected';
-    dot.className    = 'live-dot on';
-    name.textContent = ch.page_name || 'Facebook Page';
-    status.textContent = `✓ ${ch.page_name || 'Page connected'}`;
-    btn.style.display  = 'none';
-    disc.style.display = 'block';
-  } else {
-    slot.className   = 'ch-slot';
-    dot.className    = 'live-dot off';
-    name.textContent = 'Facebook Page';
-    status.textContent = 'Not connected';
-    btn.style.display  = 'flex';
-    disc.style.display = 'none';
-  }
-}
-
-function renderInstagramSlot(n, ig, fb) {
-  const slot      = document.getElementById(`igSlot${n}`);
-  const dot       = document.getElementById(`igDot${n}`);
-  const name      = document.getElementById(`igName${n}`);
-  const status    = document.getElementById(`igStatus${n}`);
-  const disc      = document.getElementById(`igDisc${n}`);
-  const methodBox = document.getElementById('igMethodBox');
-  const viaFbSt   = document.getElementById('igViaFbStatus');
-  const envWarn   = document.getElementById('igEnvWarn');
-
-  if (ig.connected) {
-    slot.className     = 'ch-slot connected';
-    dot.className      = 'live-dot on';
-    name.textContent   = ig.username ? `@${ig.username}` : 'Instagram';
-    const src = ig.via_facebook ? 'via Facebook' : 'direct';
-    status.textContent = `✓ Connected (${src})`;
-    disc.style.display = 'block';
-    if (methodBox) methodBox.style.display = 'none';
-  } else {
-    slot.className     = 'ch-slot';
-    dot.className      = 'live-dot off';
-    name.textContent   = 'Instagram Account';
-    status.textContent = 'Not connected — choose a method below';
-    disc.style.display = 'none';
-    if (methodBox) methodBox.style.display = 'grid';
-
-    if (viaFbSt) {
-      if (fb.connected) {
-        viaFbSt.textContent = '⚠ Facebook connected — no linked Instagram Business account found';
-        viaFbSt.className   = 'ig-method-status';
-      } else {
-        viaFbSt.textContent = 'Connect Facebook first ↑';
-        viaFbSt.className   = 'ig-method-status';
-      }
-    }
-    if (envWarn) {
-      envWarn.style.display = (ig.direct_env_set === false) ? 'block' : 'none';
-    }
-  }
-}
-
-// ══════════════════════════════════════════
-// CONNECT A CHANNEL VIA OAUTH POPUP
-// ══════════════════════════════════════════
-async function connectChannel(platform, slot) {
-  // instagram_direct uses a different button (inside method card)
-  const prefix = platform === 'linkedin' ? 'li' : platform === 'facebook' ? 'fb' : 'ig';
-  // For instagram_direct the button is inside igDirectCard — find it
-  let btnEl;
-  if (platform === 'instagram_direct') {
-    btnEl = document.querySelector('#igDirectCard .conn-btn');
-  } else {
-    btnEl = document.getElementById(`${prefix}Btn${slot}`);
-  }
-  if (!btnEl) return;
-  const origHTML = btnEl.innerHTML;
-  btnEl.disabled = true;
-  btnEl.innerHTML = '<span class="spin">⟳</span>';
-
-  try {
-    // Map instagram_direct -> api route instagram_direct
-    const apiPlatform = platform;
-    const res  = await fetch(`${API}/auth/${apiPlatform}?slot=${slot}`, { credentials: 'include' });
-    if (!res.ok) {
-      const txt = await res.text();
-      showErr(`Error ${res.status}: ${txt.slice(0, 200)}`);
-      btnEl.disabled = false; btnEl.innerHTML = origHTML; return;
-    }
-    const data = await res.json();
-    btnEl.disabled = false; btnEl.innerHTML = origHTML;
-    if (!data.ok) { showErr(data.message || 'Could not start OAuth.'); return; }
-
-    // Open popup — use noopener to ensure fresh session context
-    const w = 660, h = 740;
-    const left = Math.round((screen.width - w) / 2);
-    const top  = Math.round((screen.height - h) / 2);
-    const popup = window.open(data.auth_url, `Connect ${platform} #${slot}`,
-      `width=${w},height=${h},left=${left},top=${top},scrollbars=yes,noopener=yes`);
-    if (!popup) { showErr('Popup blocked! Allow popups for this site.'); return; }
-
-    // Listen for success message from popup
-    const handler = (e) => {
-      if (typeof e.data === 'string' && e.data.startsWith('channel_connected:')) {
-        window.removeEventListener('message', handler);
-        clearInterval(timer);
-        // Reload channels immediately and again after 1s to ensure saved data is reflected
-        loadChannels();
-        setTimeout(loadChannels, 1000);
-        showOk('Channel connected successfully!');
-      }
-    };
-    window.addEventListener('message', handler);
-
-    // Poll for popup close as fallback
-    const timer = setInterval(() => {
-      try {
-        if (popup.closed) {
-          clearInterval(timer);
-          window.removeEventListener('message', handler);
-          loadChannels();
-          setTimeout(loadChannels, 1000);
-        }
-      } catch(e) { clearInterval(timer); loadChannels(); }
-    }, 800);
-
-  } catch(e) {
-    btnEl.disabled = false; btnEl.innerHTML = origHTML;
-    showErr('Failed: ' + e.message);
-  }
-}
-
-// ══════════════════════════════════════════
-// DISCONNECT A CHANNEL
-// ══════════════════════════════════════════
-async function disconnectChannel(platform, slot) {
-  const names = { linkedin: 'LinkedIn', facebook: 'Facebook', instagram: 'Instagram' };
-  if (!confirm(`Disconnect ${names[platform]} Account ${slot}?`)) return;
-  try {
-    await fetch(`${API}/auth/${platform}/disconnect?slot=${slot}`,
-      { method: 'POST', credentials: 'include' });
-    loadChannels();
-  } catch(e) { showErr('Error: ' + e.message); }
-}
-
-// ══════════════════════════════════════════
-// SAVE GROQ / SERP KEYS
-// ══════════════════════════════════════════
-async function saveConfig() {
-  const btn  = document.getElementById('saveBtn');
-  const lbl  = document.getElementById('saveBtnLabel');
-  hideAlerts();
-
-  const groq = document.getElementById('cfgGroq').value.trim();
-  const serp = document.getElementById('cfgSerp').value.trim();
-
-  if (!groq && !savedGroq) {
-    showErr('Groq API key is required to generate posts.');
-    return;
-  }
-
-  btn.disabled = true; lbl.innerHTML = '<span class="spin">⟳</span> Saving...';
-  try {
-    const payload = {};
-    if (groq) payload.groq_api_key = groq;
-    if (serp) payload.serpapi_key  = serp;
-
-    const res  = await fetch(`${API}/config`, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-    if (data.ok) {
-      showOk('Saved! Redirecting to dashboard...');
-      setTimeout(goToDash, 900);
-    } else {
-      showErr(data.message || 'Save failed.');
-      btn.disabled = false; lbl.textContent = 'Save & Continue →';
-    }
-  } catch(e) {
-    showErr('Cannot reach server.');
-    btn.disabled = false; lbl.textContent = 'Save & Continue →';
-  }
-}
-
-// ══════════════════════════════════════════
-// HELPERS
-// ══════════════════════════════════════════
-function showErr(msg) {
-  document.getElementById('errMsg').textContent = msg;
-  document.getElementById('errBox').classList.add('show');
-  document.getElementById('okBox').classList.remove('show');
-}
-function showOk(msg) {
-  document.getElementById('okMsg').textContent = msg;
-  document.getElementById('okBox').classList.add('show');
-  document.getElementById('errBox').classList.remove('show');
-}
-function hideAlerts() {
-  document.getElementById('errBox').classList.remove('show');
-  document.getElementById('okBox').classList.remove('show');
-}
-function goToDash() { window.location.href = '/dashboard'; }
-
-// ── PREFILL SAVED KEYS ──
-(async function prefill() {
-  try {
-    const res  = await fetch(`${API}/config`, { credentials: 'include' });
-    const data = await res.json();
-    if (!data.ok) return;
-    const c = data.config;
-    if (c.groq_api_key) {
-      savedGroq = true;
-      const el = document.getElementById('cfgGroq');
-      if (el) el.placeholder = 'already saved — leave blank to keep';
-    }
-    if (c.serpapi_key) {
-      const el = document.getElementById('cfgSerp');
-      if (el) el.placeholder = 'already saved — leave blank to keep';
-    }
-    if (savedGroq) document.getElementById('saveBtnLabel').textContent = 'Update & Continue →';
-  } catch(e) {}
-})();
-
-// ── AUTH CHECK ──
-(async function authCheck() {
-  try {
-    const res  = await fetch(`${API}/me`, { credentials: 'include' });
-    const data = await res.json();
-    if (!data.authenticated) window.location.href = '/';
-  } catch(e) {}
-})();
-
-// Load channels on open + poll every 3s to catch any updates
-loadChannels();
-setInterval(loadChannels, 3000);
+function doSignOut() {{
+  window.location.href = '/api/auth/linkedin/signout/{username}/{slot}';
+}}
 </script>
-</body>
-</html>
+</body></html>"""
+
+
+@app.route("/api/auth/linkedin/signout/<username>/<int:slot>")
+def linkedin_signout(username, slot):
+    token_key = f"li_oauth_{username}_{slot}"
+    oauth_url = session.get(token_key, "")
+    if not oauth_url:
+        return redirect("/setup")
+    safe_oauth = oauth_url.replace("\\", "\\\\").replace("'", "\\'")
+    return f"""<!DOCTYPE html>
+<html><head><meta charset='UTF-8'><title>Signing out...</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0;}}
+body{{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;flex-direction:column;
+     align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;
+     text-align:center;padding:28px;gap:16px;}}
+h2{{font-size:19px;font-weight:800;}}
+p{{font-size:13px;color:rgba(200,185,255,.55);max-width:300px;line-height:1.7;}}
+.spin{{font-size:36px;animation:sp 1s linear infinite;display:inline-block;}}
+@keyframes sp{{to{{transform:rotate(360deg);}}}}
+</style></head>
+<body>
+<div class='spin'>⟳</div>
+<h2>Signing out of LinkedIn...</h2>
+<p>Please wait, signing you out so you can connect a different account.</p>
+<script>
+  sessionStorage.setItem('li_reauth_url', '{safe_oauth}');
+  setTimeout(function() {{
+    window.location.href = 'https://www.linkedin.com/m/logout';
+  }}, 800);
+</script>
+</body></html>"""
+
+
+@app.route("/api/auth/linkedin/reauth")
+def linkedin_reauth():
+    return """<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Sign in</title>
+<style>*{box-sizing:border-box;margin:0;padding:0;}body{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;text-align:center;padding:28px;gap:16px;}h2{font-size:19px;font-weight:800;}p{font-size:13px;color:rgba(200,185,255,.55);max-width:300px;line-height:1.7;}.btn{padding:14px 28px;border-radius:12px;border:none;background:linear-gradient(135deg,#0077b5,#0099cc);color:#fff;font-size:15px;font-weight:700;cursor:pointer;}</style></head>
+<body><h2>✓ Signed out of LinkedIn</h2><p>Now sign in with the account you want to connect.</p><button class='btn' id='btn'>Sign In with LinkedIn →</button>
+<script>var u=sessionStorage.getItem('li_reauth_url');document.getElementById('btn').onclick=function(){if(u){sessionStorage.removeItem('li_reauth_url');window.location.href=u;}else{window.close();}};</script>
+</body></html>"""
+
+
+@app.route("/api/auth/linkedin/pick", methods=["POST"])
+def linkedin_pick():
+    data      = request.get_json()
+    username  = data.get("username", "")
+    slot      = int(data.get("slot", 1))
+    acct_type = data.get("acct_type", "personal")
+    acct_id   = data.get("acct_id", "")
+    acct_name = data.get("acct_name", "")
+
+    users = load_users()
+    if username not in users:
+        return jsonify({"ok": False, "message": "Unknown user"}), 400
+
+    token_key = f"li_pending_{username}_{slot}"
+    pending   = session.get(token_key)
+    if not pending:
+        return jsonify({"ok": False, "message": "Session expired — please reconnect"}), 400
+
+    access_token = pending["access_token"]
+    expires_in   = pending["expires_in"]
+
+    cfg = load_config(username)
+
+    if acct_type == "organization":
+        urn = f"urn:li:organization:{acct_id}"
+    else:
+        urn = f"urn:li:person:{acct_id}"
+
+    cfg[f"linkedin_{slot}_access_token"]  = access_token
+    cfg[f"linkedin_{slot}_urn"]           = urn
+    cfg[f"linkedin_{slot}_name"]          = acct_name
+    cfg[f"linkedin_{slot}_account_type"]  = acct_type
+    cfg[f"linkedin_{slot}_token_expires"] = (
+        datetime.utcnow() + timedelta(seconds=expires_in)
+    ).isoformat()
+    save_config(username, cfg)
+
+    session.pop(token_key, None)
+
+    add_log(username, f"LinkedIn slot {slot} → {acct_type} '{acct_name}' connected ✓", "ok")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/auth/start")
+def auth_start():
+    oauth_url = request.args.get("oauth", "")
+    if not oauth_url:
+        return "Missing oauth param", 400
+    return redirect(urllib.parse.unquote(oauth_url))
+
+
+@app.route("/api/auth/linkedin/start/<int:slot>")
+def linkedin_start(slot):
+    oauth_url = request.args.get("oauth", "")
+    return redirect(
+        f"/api/auth/start?platform=linkedin"
+        f"&oauth={urllib.parse.quote(oauth_url)}"
+        f"&label=LinkedIn+%23{slot}"
+    )
+
+
+@app.route("/api/auth/linkedin/callback")
+def linkedin_callback():
+    code      = request.args.get("code", "")
+    state_raw = request.args.get("state", "")
+    error     = request.args.get("error", "")
+
+    if error:
+        desc = request.args.get("error_description", error)
+        return _callback_page(False, f"LinkedIn denied access: {desc}")
+
+    try:
+        username, slot_str, state_token = state_raw.split(":", 2)
+        slot = int(slot_str)
+    except Exception:
+        username    = session.get("username", "")
+        slot        = session.get("li_active_slot", 1)
+        state_token = state_raw
+
+    if not username:
+        return _callback_page(False, "Session lost — please log in again and retry.")
+
+    users = load_users()
+    if username not in users:
+        return _callback_page(False, "Unknown user.")
+
+    try:
+        token_res = requests.post(
+            "https://www.linkedin.com/oauth/v2/accessToken",
+            data={"grant_type": "authorization_code", "code": code,
+                  "redirect_uri": LI_REDIRECT_URI,
+                  "client_id": LI_CLIENT_ID, "client_secret": LI_CLIENT_SECRET},
+            headers={"Content-Type": "application/x-www-form-urlencoded"}, timeout=15
+        ).json()
+        access_token = token_res.get("access_token")
+        expires_in   = token_res.get("expires_in", 5184000)
+        if not access_token:
+            err = token_res.get("error_description", str(token_res))
+            return _callback_page(False, f"Token exchange failed: {err}")
+
+        profile  = requests.get(
+            "https://api.linkedin.com/v2/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"}, timeout=10
+        ).json()
+        li_id    = profile.get("sub", "")
+        li_name  = (
+            profile.get("name") or
+            f"{profile.get('given_name','')} {profile.get('family_name','')}".strip() or
+            "LinkedIn User"
+        )
+
+        orgs = []
+        try:
+            org_res = requests.get(
+                "https://api.linkedin.com/v2/organizationAcls",
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "X-Restli-Protocol-Version": "2.0.0",
+                },
+                params={"q": "roleAssignee", "role": "ADMINISTRATOR", "count": 10},
+                timeout=10
+            ).json()
+
+            org_ids = []
+            for elem in org_res.get("elements", []):
+                target = elem.get("organizationalTarget", "")
+                if "organization:" in str(target):
+                    org_id = str(target).split("organization:")[-1].strip()
+                    if org_id:
+                        org_ids.append(org_id)
+
+            for org_id in org_ids[:5]:
+                try:
+                    org_info = requests.get(
+                        f"https://api.linkedin.com/v2/organizations/{org_id}",
+                        headers={
+                            "Authorization": f"Bearer {access_token}",
+                            "X-Restli-Protocol-Version": "2.0.0",
+                        },
+                        timeout=8
+                    ).json()
+                    org_name = (
+                        org_info.get("localizedName") or
+                        org_info.get("name", {}).get("localized", {}).get("en_US", f"Company {org_id}")
+                    )
+                    orgs.append({"id": org_id, "name": org_name})
+                except Exception:
+                    orgs.append({"id": org_id, "name": f"Company Page {org_id}"})
+
+        except Exception as org_err:
+            add_log(username, f"LinkedIn org fetch skipped: {org_err}", "warn")
+
+        token_key = f"li_pending_{username}_{slot}"
+        session[token_key]     = {
+            "access_token":  access_token,
+            "expires_in":    expires_in,
+            "personal_id":   li_id,
+            "personal_name": li_name,
+        }
+        session.modified = True
+
+        _oauth_url = "https://www.linkedin.com/oauth/v2/authorization?" + urllib.parse.urlencode({
+            "response_type": "code",
+            "client_id":     LI_CLIENT_ID,
+            "redirect_uri":  LI_REDIRECT_URI,
+            "state":         state_raw,
+            "scope":         "openid profile w_member_social",
+            "prompt":        "login",
+        })
+        return _li_account_picker_page(
+            username, slot, access_token, expires_in, li_name, li_id, orgs,
+            oauth_url=_oauth_url
+        )
+
+    except Exception as e:
+        add_log(username, f"LinkedIn slot {slot} OAuth error: {e}", "error")
+        return _callback_page(False, f"Error: {e}")
+
+
+@app.route("/api/auth/linkedin/disconnect", methods=["POST"])
+@require_auth
+def linkedin_disconnect(username):
+    slot = request.args.get("slot", "1")
+    try:
+        slot = int(slot)
+    except ValueError:
+        slot = 1
+    slot = max(1, min(3, slot))
+
+    cfg = load_config(username)
+    for k in [f"linkedin_{slot}_access_token", f"linkedin_{slot}_urn",
+              f"linkedin_{slot}_name", f"linkedin_{slot}_token_expires"]:
+        cfg.pop(k, None)
+    save_config(username, cfg)
+    add_log(username, f"LinkedIn slot {slot} disconnected", "warn")
+    return jsonify({"ok": True})
+
+# ════════════════════════════════════════════════════════════════════════════════
+#  FACEBOOK OAUTH
+# ════════════════════════════════════════════════════════════════════════════════
+@app.route("/api/auth/facebook")
+@require_auth
+def facebook_auth(username):
+    if not FB_APP_ID:
+        return jsonify({"ok": False, "message": "FACEBOOK_APP_ID not set in environment"}), 400
+    state_token = secrets.token_hex(16)
+    session["fb_state"] = state_token
+    state = f"{username}:{state_token}"
+    params = {
+        "client_id":    FB_APP_ID,
+        "redirect_uri": FB_REDIRECT_URI,
+        "state":        state,
+        "scope":        "pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish",
+        "auth_type":    "rerequest",
+    }
+    oauth_url = "https://www.facebook.com/v19.0/dialog/oauth?" + urllib.parse.urlencode(params)
+    session["fb_oauth_url"]     = oauth_url
+    session["fb_reauth_target"] = oauth_url
+    return jsonify({"ok": True, "auth_url": oauth_url})
+
+
+@app.route("/api/auth/facebook/callback")
+def facebook_callback():
+    code  = request.args.get("code", "")
+    state = request.args.get("state", "")
+    error = request.args.get("error", "")
+
+    if error:
+        desc = request.args.get("error_description", error)
+        return _callback_page(False, f"Facebook denied access: {desc}")
+
+    try:
+        username, state_token = state.split(":", 1)
+    except Exception:
+        username    = session.get("username", "")
+        state_token = state
+
+    if not username:
+        return _callback_page(False, "Session lost — please log in again and retry.")
+
+    users = load_users()
+    if username not in users:
+        return _callback_page(False, "Unknown user.")
+
+    try:
+        token_res = requests.get(
+            "https://graph.facebook.com/v19.0/oauth/access_token",
+            params={"client_id": FB_APP_ID, "client_secret": FB_APP_SECRET,
+                    "redirect_uri": FB_REDIRECT_URI, "code": code}, timeout=15
+        ).json()
+        user_token = token_res.get("access_token")
+        if not user_token:
+            return f"<script>window.close();</script>Token error: {token_res}", 400
+
+        pages_res = requests.get(
+            "https://graph.facebook.com/v19.0/me/accounts",
+            params={"access_token": user_token}, timeout=10
+        ).json()
+        pages = pages_res.get("data", [])
+        cfg   = load_config(username)
+        msg   = ""
+
+        if pages:
+            page       = pages[0]
+            page_token = page.get("access_token")
+            page_id    = page.get("id")
+            page_name  = page.get("name", "Facebook Page")
+            cfg["facebook_access_token"] = page_token
+            cfg["facebook_page_id"]      = page_id
+            cfg["facebook_page_name"]    = page_name
+
+            ig_res = requests.get(
+                f"https://graph.facebook.com/v19.0/{page_id}",
+                params={"fields": "instagram_business_account", "access_token": page_token},
+                timeout=10
+            ).json()
+            ig_account = ig_res.get("instagram_business_account", {})
+            ig_id = ig_account.get("id")
+            if ig_id:
+                ig_info = requests.get(
+                    f"https://graph.facebook.com/v19.0/{ig_id}",
+                    params={"fields": "username", "access_token": page_token}, timeout=10
+                ).json()
+                cfg["instagram_access_token"] = page_token
+                cfg["instagram_account_id"]   = ig_id
+                cfg["instagram_username"]     = ig_info.get("username", ig_id)
+                cfg["instagram_via_facebook"]  = True
+                add_log(username, f"Instagram connected ✓ — @{cfg['instagram_username']}", "ok")
+                msg = f"Facebook '{page_name}' + Instagram @{cfg['instagram_username']} connected!"
+            else:
+                msg = f"Facebook page '{page_name}' connected! (No Instagram Business account found)"
+
+            save_config(username, cfg)
+            add_log(username, f"Facebook connected ✓ — {page_name}", "ok")
+        else:
+            cfg["facebook_access_token"] = user_token
+            save_config(username, cfg)
+            msg = "Facebook connected (no pages found)"
+            add_log(username, "Facebook connected (no pages found)", "warn")
+
+        oauth_url    = session.get("fb_oauth_url", "")
+        safe_oauth   = oauth_url.replace("'", "\\'")
+        display_name = page_name if pages else 'Facebook Account'
+
+        return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>Facebook Connected</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0;}}
+body{{min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',sans-serif;
+     display:flex;align-items:center;justify-content:center;padding:24px;}}
+.wrap{{width:100%;max-width:380px;text-align:center;display:flex;flex-direction:column;
+       align-items:center;gap:14px;}}
+.ico{{font-size:52px;}}
+h2{{font-size:20px;font-weight:800;letter-spacing:-0.5px;}}
+.sub{{font-size:13px;color:rgba(200,185,255,.6);line-height:1.6;}}
+.signout-btn{{padding:11px 22px;border-radius:11px;
+              border:1.5px solid rgba(255,96,96,.25);background:rgba(255,96,96,.07);
+              color:rgba(255,130,130,.9);font-size:13px;font-weight:600;
+              cursor:pointer;font-family:'Segoe UI',sans-serif;transition:all .2s;}}
+.signout-btn:hover{{border-color:rgba(255,96,96,.5);background:rgba(255,96,96,.15);}}
+.note{{font-size:10px;color:rgba(200,185,255,.25);}}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="ico">📘✓</div>
+  <h2>Facebook Connected!</h2>
+  <p class="sub">{display_name} connected.<br>Closing in 2 seconds...</p>
+  <button class="signout-btn" onclick="doSignOut()">↩ Wrong account? Sign out &amp; use different</button>
+  <p class="note">Signs you out so you can connect a different account</p>
+</div>
+<script>
+window.opener && window.opener.postMessage('channel_connected:facebook:1', '*');
+var t = setTimeout(function() {{ window.close(); }}, 2000);
+function doSignOut() {{
+  clearTimeout(t);
+  sessionStorage.setItem('fb_oauth_url', '{safe_oauth}');
+  window.location.href = '/api/auth/facebook/signout';
+}}
+</script>
+</body></html>"""
+    except Exception as e:
+        return f"<script>window.close();</script>Error: {e}", 500
+
+
+@app.route("/api/auth/facebook/signout")
+def facebook_signout():
+    oauth_url = session.get("fb_oauth_url", "")
+    if not oauth_url:
+        return redirect("/setup")
+
+    safe_oauth = oauth_url.replace("'", "\\'")
+    host = request.host_url.rstrip("/")
+    reauth_url = f"{host}/api/auth/facebook/reauth"
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connect Facebook</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0;}}
+body{{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;flex-direction:column;
+     align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;
+     text-align:center;padding:28px;gap:0;}}
+.ico{{font-size:52px;margin-bottom:18px;}}
+h2{{font-size:20px;font-weight:800;letter-spacing:-.5px;margin-bottom:10px;}}
+.sub{{font-size:13px;color:rgba(200,185,255,.55);line-height:1.7;max-width:300px;margin-bottom:28px;}}
+.step{{display:flex;align-items:flex-start;gap:12px;background:rgba(255,255,255,.03);
+       border:1px solid rgba(160,120,255,.18);border-radius:14px;padding:14px 16px;
+       margin-bottom:10px;text-align:left;width:100%;max-width:340px;}}
+.step-num{{width:24px;height:24px;border-radius:50%;background:rgba(24,119,242,.2);
+           border:1px solid rgba(24,119,242,.4);color:#4a90d9;font-size:11px;
+           display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}}
+.step-text{{font-size:12px;color:rgba(200,185,255,.75);line-height:1.6;}}
+.step-text strong{{color:#ede8ff;display:block;margin-bottom:2px;font-size:13px;}}
+.btn{{margin-top:22px;width:100%;max-width:340px;padding:15px;border-radius:13px;
+      font-size:15px;font-weight:700;cursor:pointer;border:none;transition:all .2s;
+      font-family:'Segoe UI',sans-serif;}}
+.btn-lo{{background:linear-gradient(135deg,#1877f2,#0866ff);color:#fff;
+          box-shadow:0 6px 20px rgba(24,119,242,.35);}}
+.btn-lo:hover{{opacity:.88;transform:translateY(-1px);}}
+.btn-go{{background:linear-gradient(135deg,#b085ff,#ff80b5);color:#fff;
+          box-shadow:0 6px 20px rgba(176,133,255,.35);display:none;margin-top:10px;}}
+.btn-go:hover{{opacity:.88;transform:translateY(-1px);}}
+.note{{font-size:11px;color:rgba(200,185,255,.35);margin-top:14px;max-width:300px;line-height:1.6;}}
+</style></head>
+<body>
+<div class="ico">📘</div>
+<h2>Switch Facebook Account</h2>
+<p class="sub">Sign out of Facebook first, then sign in with a different account.</p>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-text"><strong>Sign out of Facebook</strong>Click below to sign out of your current account.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-text"><strong>Come back here</strong>After signing out, click "Continue to Sign In".</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-text"><strong>Sign in &amp; Allow</strong>Sign in with the new account, then click Allow.</div>
+</div>
+
+<button class="btn btn-lo" id="btnLogout" onclick="doLogout()">Sign Out of Facebook</button>
+<button class="btn btn-go" id="btnGo" onclick="window.location.href='{reauth_url}'">✓ Continue to Sign In →</button>
+<p class="note" id="noteText">Click "Sign Out of Facebook" first</p>
+
+<script>
+window.addEventListener('load', function() {{
+  if (sessionStorage.getItem('fb_logged_out')) {{
+    sessionStorage.removeItem('fb_logged_out');
+    document.getElementById('btnLogout').style.display = 'none';
+    document.getElementById('btnGo').style.display     = 'block';
+    document.getElementById('noteText').textContent    = '✓ Signed out! Click Continue to sign in.';
+    document.getElementById('noteText').style.color    = 'rgba(61,255,192,.6)';
+  }}
+}});
+document.getElementById('btnLogout').addEventListener('click', function() {{
+  sessionStorage.setItem('fb_logged_out', '1');
+}}, true);
+function doLogout() {{
+  document.getElementById('btnLogout').disabled    = true;
+  document.getElementById('btnLogout').textContent = 'Signing out...';
+  window.location.href = 'https://www.facebook.com';
+  setTimeout(function() {{
+    window.location.href = 'https://m.facebook.com/logout.php';
+  }}, 100);
+}}
+</script>
+</body></html>"""
+
+
+@app.route("/api/auth/facebook/reauth")
+def facebook_reauth():
+    return """<!DOCTYPE html>
+<html><head><meta charset='UTF-8'><title>Sign in to Facebook</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;flex-direction:column;
+     align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;
+     text-align:center;padding:28px;gap:16px;}
+.ico{font-size:48px;}
+h2{font-size:19px;font-weight:800;}
+p{font-size:13px;color:rgba(200,185,255,.55);max-width:300px;line-height:1.7;}
+.btn{padding:14px 32px;border-radius:12px;border:none;
+     background:linear-gradient(135deg,#1877f2,#0866ff);color:#fff;
+     font-size:15px;font-weight:700;cursor:pointer;font-family:'Segoe UI',sans-serif;
+     transition:all .2s;box-shadow:0 6px 20px rgba(24,119,242,.35);}
+.btn:hover{opacity:.88;transform:translateY(-1px);}
+</style></head>
+<body>
+<div class="ico">📘</div>
+<h2>✓ Signed out of Facebook</h2>
+<p>Now sign in with the account you want to connect to your AI agent.</p>
+<button class='btn' id='btn'>Sign In with Facebook →</button>
+<script>
+var u = sessionStorage.getItem('fb_oauth_url');
+if (u) {
+  sessionStorage.removeItem('fb_oauth_url');
+  setTimeout(function() { window.location.href = u; }, 800);
+  document.getElementById('btn').onclick = function() { window.location.href = u; };
+} else {
+  document.getElementById('btn').onclick = function() { window.close(); };
+  document.querySelector('p').textContent = 'Please close this window and click Connect again.';
+}
+</script>
+</body></html>"""
+
+
+@app.route("/api/auth/facebook/disconnect", methods=["POST"])
+@require_auth
+def facebook_disconnect(username):
+    cfg = load_config(username)
+    for k in ["facebook_access_token", "facebook_page_id", "facebook_page_name"]:
+        cfg.pop(k, None)
+    save_config(username, cfg)
+    add_log(username, "Facebook disconnected", "warn")
+    return jsonify({"ok": True})
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+#  INSTAGRAM DIRECT OAUTH  ← FIXED
+# ════════════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/auth/instagram_direct")
+@require_auth
+def instagram_direct_auth(username):
+    """Start standalone Instagram OAuth. Username is encoded in state so the
+    callback works even when the popup session cookie is lost (Railway/Render)."""
+    if not IG_APP_ID:
+        return jsonify({
+            "ok":      False,
+            "message": "INSTAGRAM_APP_ID not set. Add INSTAGRAM_APP_ID, "
+                       "INSTAGRAM_APP_SECRET and INSTAGRAM_REDIRECT_URI to env vars."
+        }), 400
+
+    state_token   = secrets.token_hex(16)
+    # Encode username into state exactly like LinkedIn does
+    state_payload = f"{username}:{state_token}"
+    session["ig_direct_state"] = state_token
+
+    params = {
+        "client_id":     IG_APP_ID,
+        "redirect_uri":  IG_REDIRECT_URI,
+        "scope":         "instagram_business_basic,instagram_business_content_publish,"
+                         "instagram_business_manage_messages,instagram_business_manage_comments",
+        "response_type": "code",
+        "state":         state_payload,
+    }
+    oauth_url = "https://www.instagram.com/oauth/authorize?" + urllib.parse.urlencode(params)
+    return jsonify({"ok": True, "auth_url": oauth_url})
+
+
+@app.route("/api/auth/instagram_direct/callback")
+def instagram_direct_callback():
+    """Handle callback from standalone Instagram OAuth.
+    Extracts username from state param — no session cookie required."""
+    code      = request.args.get("code", "")
+    state_raw = request.args.get("state", "")
+    error     = request.args.get("error", "")
+
+    if error:
+        err_desc = request.args.get("error_description", error)
+        return _callback_page(False, f"Instagram denied access: {err_desc}")
+
+    # Extract username from state — same pattern as LinkedIn/Facebook
+    try:
+        username, state_token = state_raw.split(":", 1)
+    except Exception:
+        username    = session.get("username", "")
+        state_token = state_raw
+
+    if not username:
+        return _callback_page(False, "Session lost — please log in again and retry.")
+
+    users = load_users()
+    if username not in users:
+        return _callback_page(False, "Unknown user.")
+
+    try:
+        # Step 1: Exchange code for short-lived token
+        token_res = requests.post(
+            "https://api.instagram.com/oauth/access_token",
+            data={
+                "client_id":     IG_APP_ID,
+                "client_secret": IG_APP_SECRET,
+                "grant_type":    "authorization_code",
+                "redirect_uri":  IG_REDIRECT_URI,
+                "code":          code,
+            },
+            timeout=15
+        ).json()
+
+        short_token = token_res.get("access_token")
+        ig_id       = str(token_res.get("user_id", ""))
+
+        if not short_token:
+            err = token_res.get("error_message", str(token_res))
+            return _callback_page(False, f"Token exchange failed: {err}")
+
+        # Step 2: Exchange for long-lived token (60 days)
+        long_res = requests.get(
+            "https://graph.instagram.com/access_token",
+            params={
+                "grant_type":    "ig_exchange_token",
+                "client_secret": IG_APP_SECRET,
+                "access_token":  short_token,
+            },
+            timeout=15
+        ).json()
+        long_token = long_res.get("access_token", short_token)
+        expires_in = long_res.get("expires_in", 5184000)
+
+        # Step 3: Get Instagram username
+        ig_info = requests.get(
+            "https://graph.instagram.com/me",
+            params={"fields": "id,username", "access_token": long_token},
+            timeout=10
+        ).json()
+        ig_username = ig_info.get("username", ig_id)
+        ig_id       = ig_info.get("id", ig_id)
+
+        # Step 4: Save to config
+        cfg = load_config(username)
+        cfg["instagram_access_token"]  = long_token
+        cfg["instagram_account_id"]    = ig_id
+        cfg["instagram_username"]      = ig_username
+        cfg["instagram_via_facebook"]  = False
+        cfg["instagram_token_expires"] = (
+            datetime.utcnow() + timedelta(seconds=expires_in)
+        ).isoformat()
+        save_config(username, cfg)
+        add_log(username, f"Instagram (direct) connected ✓ — @{ig_username}", "ok")
+
+        # Use the shared _callback_page helper so the popup closes and
+        # sends the postMessage that setup.html listens for
+        return _callback_page(
+            True,
+            f"@{ig_username} connected!",
+            msg_key="channel_connected:instagram:1",
+            platform="instagram",
+            slot=1
+        )
+
+    except Exception as e:
+        add_log(username, f"Instagram direct OAuth error: {e}", "error")
+        return _callback_page(False, f"Error: {e}")
+
+
+@app.route("/api/auth/instagram_direct/disconnect", methods=["POST"])
+@require_auth
+def instagram_direct_disconnect(username):
+    cfg = load_config(username)
+    for k in ["instagram_access_token", "instagram_account_id",
+              "instagram_username", "instagram_via_facebook", "instagram_token_expires"]:
+        cfg.pop(k, None)
+    save_config(username, cfg)
+    add_log(username, "Instagram (direct) disconnected", "warn")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/auth/instagram/disconnect", methods=["POST"])
+@require_auth
+def instagram_disconnect(username):
+    """Shared disconnect for both via-Facebook and direct Instagram connections."""
+    cfg = load_config(username)
+    for k in ["instagram_access_token", "instagram_account_id",
+              "instagram_username", "instagram_via_facebook", "instagram_token_expires"]:
+        cfg.pop(k, None)
+    save_config(username, cfg)
+    add_log(username, "Instagram disconnected", "warn")
+    return jsonify({"ok": True})
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+#  CHANNEL TOGGLE / STATUS / RUN / SUBJECTS
+# ════════════════════════════════════════════════════════════════════════════════
+@app.route("/api/channel/toggle", methods=["POST"])
+@require_auth
+def channel_toggle(username):
+    data     = request.get_json()
+    platform = data.get("platform", "")
+    slot     = int(data.get("slot", 1))
+    enabled  = bool(data.get("enabled", True))
+
+    if platform not in ("linkedin", "facebook", "instagram"):
+        return jsonify({"ok": False, "message": "Unknown platform"}), 400
+
+    key = f"{platform}_{slot}"
+    cfg = load_config(username)
+    if "channel_enabled" not in cfg:
+        cfg["channel_enabled"] = {}
+    cfg["channel_enabled"][key] = enabled
+    save_config(username, cfg)
+
+    state_word = "enabled" if enabled else "disabled"
+    add_log(username, f"Channel {platform} #{slot} {state_word} for posting", "info")
+    return jsonify({"ok": True, "key": key, "enabled": enabled})
+
+
+@app.route("/api/status")
+@require_auth
+def get_status(username):
+    state    = get_state(username)
+    next_run = get_next_run_time_for_user(username)
+    subjects_file = user_subjects_path(username)
+    subjects = []
+    if os.path.exists(subjects_file):
+        with open(subjects_file, "r", encoding="utf-8") as f:
+            subjects = [l.strip() for l in f if l.strip()]
+    cfg    = load_config(username)
+    offset = cfg.get("utc_offset_hours", None)
+
+    channels_info = []
+    ch_enabled = cfg.get("channel_enabled", {})
+
+    for slot in [1, 2, 3]:
+        tok  = cfg.get(f"linkedin_{slot}_access_token", "")
+        name = cfg.get(f"linkedin_{slot}_name", f"LinkedIn #{slot}")
+        key  = f"linkedin_{slot}"
+        enabled = ch_enabled.get(key, True) if tok else False
+        channels_info.append({
+            "slot":     slot,
+            "platform": "linkedin",
+            "name":     name if tok else f"LinkedIn #{slot}",
+            "exists":   bool(tok),
+            "active":   bool(tok),
+            "enabled":  enabled,
+        })
+
+    fb_tok  = cfg.get("facebook_access_token", "")
+    fb_key  = "facebook_1"
+    fb_ena  = ch_enabled.get(fb_key, True) if fb_tok else False
+    channels_info.append({
+        "slot":     1,
+        "platform": "facebook",
+        "name":     cfg.get("facebook_page_name", "Facebook Page"),
+        "exists":   bool(fb_tok),
+        "active":   bool(fb_tok),
+        "enabled":  fb_ena,
+    })
+
+    ig_tok  = cfg.get("instagram_access_token", "")
+    ig_key  = "instagram_1"
+    ig_ena  = ch_enabled.get(ig_key, True) if ig_tok else False
+    channels_info.append({
+        "slot":         1,
+        "platform":     "instagram",
+        "name":         f"@{cfg.get('instagram_username', 'instagram')}" if ig_tok else "Instagram",
+        "exists":       bool(ig_tok),
+        "active":       bool(ig_tok),
+        "enabled":      ig_ena,
+        "via_facebook": cfg.get("instagram_via_facebook", False),
+    })
+
+    return jsonify({
+        "status":        state["status"],
+        "running":       state["running"],
+        "today_count":   state["today_count"],
+        "total_run":     state["total_run"],
+        "last_run":      state["last_run"],
+        "next_run_iso":  next_run.isoformat() + "Z",
+        "seconds_left":  max(0, int((next_run - datetime.utcnow()).total_seconds())),
+        "subjects":      subjects,
+        "logs":          state["logs"][-30:],
+        "utc_offset":    offset,
+        "config":        cfg,
+        "channels_info": channels_info,
+        "accounts": {
+            "linkedin_1":  bool(cfg.get("linkedin_1_access_token")),
+            "linkedin_2":  bool(cfg.get("linkedin_2_access_token")),
+            "linkedin_3":  bool(cfg.get("linkedin_3_access_token")),
+            "facebook":    bool(cfg.get("facebook_access_token")),
+            "instagram":   bool(cfg.get("instagram_access_token")),
+        }
+    })
+
+
+@app.route("/api/run", methods=["POST"])
+@require_auth
+def manual_run(username):
+    state = get_state(username)
+    if state["running"]:
+        return jsonify({"ok": False, "message": "Already running"}), 409
+    threading.Thread(target=run_batch, args=(username, "manual"), daemon=True).start()
+    return jsonify({"ok": True, "message": "Batch triggered!"})
+
+
+@app.route("/api/subjects", methods=["GET"])
+@require_auth
+def get_subjects(username):
+    subjects_file = user_subjects_path(username)
+    subjects = []
+    if os.path.exists(subjects_file):
+        with open(subjects_file, "r", encoding="utf-8") as f:
+            subjects = [l.strip() for l in f if l.strip()]
+    return jsonify({"subjects": subjects})
+
+
+@app.route("/api/subjects", methods=["POST"])
+@require_auth
+def add_subjects(username):
+    data         = request.get_json()
+    new_subjects = data.get("subjects", [])
+    image_b64    = data.get("image_base64")
+    filename     = data.get("filename", "upload.jpg")
+    mode         = data.get("mode", "no_image")
+    content_type = data.get("content_type", "post")
+    if not new_subjects:
+        return jsonify({"ok": False, "message": "No subjects provided"}), 400
+    uploaded_url = None
+    if mode == "manual_image" and image_b64:
+        try:
+            if "," in image_b64:
+                image_b64 = image_b64.split(",")[1]
+            add_log(username, f"Uploading '{filename}'...", "info")
+            res = requests.post("https://freeimage.host/api/1/upload", data={
+                "key": "6d207e02198a847aa98d0a2a901485a5",
+                "action": "upload", "source": image_b64, "format": "json"
+            }, timeout=30)
+            if res.status_code == 200:
+                rj = res.json()
+                if "image" in rj:
+                    uploaded_url = rj["image"]["url"]
+                    add_log(username, f"Upload OK: {uploaded_url}", "ok")
+                else:
+                    add_log(username, f"Upload failed: {res.text}", "error")
+            else:
+                add_log(username, f"Upload HTTP {res.status_code}", "error")
+        except Exception as e:
+            add_log(username, f"Upload error: {e}", "error")
+    subjects_file = user_subjects_path(username)
+    with open(subjects_file, "a", encoding="utf-8") as f:
+        for s in new_subjects:
+            line = s.strip()
+            if content_type == "article":
+                line = f"{line} (article)"
+            elif mode == "auto_image":
+                line = f"{line} (create image)"
+            elif mode == "manual_image" and uploaded_url:
+                line = f"{line} | IMG: {uploaded_url}"
+            f.write(line + "\n")
+    add_log(username, f"Added {len(new_subjects)} subject(s) [{content_type}/{mode}] ✓", "ok")
+    return jsonify({"ok": True, "added": len(new_subjects)})
+
+
+@app.route("/api/subjects/delete", methods=["POST"])
+@require_auth
+def delete_subject(username):
+    data  = request.get_json()
+    index = data.get("index")
+    subjects_file = user_subjects_path(username)
+    if not os.path.exists(subjects_file):
+        return jsonify({"ok": False, "message": "No subjects"}), 404
+    with open(subjects_file, "r", encoding="utf-8") as f:
+        subjects = [l.strip() for l in f if l.strip()]
+    if index is None or index < 0 or index >= len(subjects):
+        return jsonify({"ok": False, "message": "Invalid index"}), 400
+    subjects.pop(index)
+    with open(subjects_file, "w", encoding="utf-8") as f:
+        f.write("\n".join(subjects))
+    return jsonify({"ok": True})
+
+
+# ─── STARTUP ──────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    threading.Thread(target=scheduler_loop, daemon=True).start()
+    threading.Thread(target=keep_alive_loop, daemon=True).start()
+    port = int(os.environ.get("PORT", 5000))
+    print(f"[STARTUP] LinkedIn Agent on port {port}")
+    print(f"[STARTUP] Users: {USERS_FILE}")
+    print(f"[STARTUP] Data:  {USER_DATA_DIR}/")
+    print(f"[STARTUP] LinkedIn OAuth: {'✓ configured' if LI_CLIENT_ID else '✗ LINKEDIN_CLIENT_ID not set'}")
+    print(f"[STARTUP] Facebook OAuth: {'✓ configured' if FB_APP_ID else '✗ FACEBOOK_APP_ID not set'}")
+    print(f"[STARTUP] Instagram OAuth: {'✓ configured' if IG_APP_ID else '✗ INSTAGRAM_APP_ID not set (optional)'}")
+    app.run(host="0.0.0.0", port=port, debug=False)
