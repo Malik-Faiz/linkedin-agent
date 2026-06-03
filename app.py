@@ -1531,9 +1531,10 @@ window.opener && window.opener.postMessage('channel_connected:facebook:1', '*');
 var t = setTimeout(function() {{ window.close(); }}, 2000);
 function doSignOut() {{
   clearTimeout(t);
-  // Navigate to Facebook logout then come back to OAuth
   sessionStorage.setItem('fb_oauth_url', '{safe_oauth}');
-  window.location.href = 'https://www.facebook.com/logout.php';
+  // Open Facebook logout in same window — after logout user lands on facebook.com
+  // Then they manually come back OR we detect via our reauth page
+  window.location.href = '/api/auth/facebook/signout';
 }}
 </script>
 </body></html>"""
@@ -1629,6 +1630,99 @@ function doLogout() {{
   document.getElementById('btnLogout').disabled     = true;
   document.getElementById('btnLogout').textContent  = 'Signing out...';
   window.location.href = 'https://www.facebook.com/logout.php';
+}}
+</script>
+</body></html>"""
+
+
+@app.route("/api/auth/facebook/signout")
+def facebook_signout():
+    """
+    Shows a manual signout page for Facebook — same proven pattern as LinkedIn.
+    User clicks Sign Out button → Facebook logs out → Continue button appears → OAuth URL → Allow.
+    """
+    oauth_url = session.get("fb_oauth_url", "")
+    if not oauth_url:
+        return redirect("/setup")
+
+    safe_oauth = oauth_url.replace("'", "\'")
+    host = request.host_url.rstrip("/")
+    reauth_url = f"{host}/api/auth/facebook/reauth"
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connect Facebook</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0;}}
+body{{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;flex-direction:column;
+     align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;
+     text-align:center;padding:28px;gap:0;}}
+.ico{{font-size:52px;margin-bottom:18px;}}
+h2{{font-size:20px;font-weight:800;letter-spacing:-.5px;margin-bottom:10px;}}
+.sub{{font-size:13px;color:rgba(200,185,255,.55);line-height:1.7;max-width:300px;margin-bottom:28px;}}
+.step{{display:flex;align-items:flex-start;gap:12px;background:rgba(255,255,255,.03);
+       border:1px solid rgba(160,120,255,.18);border-radius:14px;padding:14px 16px;
+       margin-bottom:10px;text-align:left;width:100%;max-width:340px;}}
+.step-num{{width:24px;height:24px;border-radius:50%;background:rgba(24,119,242,.2);
+           border:1px solid rgba(24,119,242,.4);color:#4a90d9;font-size:11px;
+           display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}}
+.step-text{{font-size:12px;color:rgba(200,185,255,.75);line-height:1.6;}}
+.step-text strong{{color:#ede8ff;display:block;margin-bottom:2px;font-size:13px;}}
+.btn{{margin-top:22px;width:100%;max-width:340px;padding:15px;border-radius:13px;
+      font-size:15px;font-weight:700;cursor:pointer;border:none;transition:all .2s;
+      font-family:'Segoe UI',sans-serif;}}
+.btn-lo{{background:linear-gradient(135deg,#1877f2,#0866ff);color:#fff;
+          box-shadow:0 6px 20px rgba(24,119,242,.35);}}
+.btn-lo:hover{{opacity:.88;transform:translateY(-1px);}}
+.btn-go{{background:linear-gradient(135deg,#b085ff,#ff80b5);color:#fff;
+          box-shadow:0 6px 20px rgba(176,133,255,.35);display:none;margin-top:10px;}}
+.btn-go:hover{{opacity:.88;transform:translateY(-1px);}}
+.note{{font-size:11px;color:rgba(200,185,255,.35);margin-top:14px;max-width:300px;line-height:1.6;}}
+</style></head>
+<body>
+<div class="ico">📘</div>
+<h2>Switch Facebook Account</h2>
+<p class="sub">Sign out of Facebook first, then sign in with a different account.</p>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-text"><strong>Sign out of Facebook</strong>Click below to sign out of your current account.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-text"><strong>Come back here</strong>After signing out, click "Continue to Sign In".</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-text"><strong>Sign in &amp; Allow</strong>Sign in with the new account, then click Allow.</div>
+</div>
+
+<button class="btn btn-lo" id="btnLogout" onclick="doLogout()">Sign Out of Facebook</button>
+<button class="btn btn-go" id="btnGo" onclick="window.location.href='{reauth_url}'">✓ Continue to Sign In →</button>
+<p class="note" id="noteText">Click "Sign Out of Facebook" first</p>
+
+<script>
+window.addEventListener('load', function() {{
+  if (sessionStorage.getItem('fb_logged_out')) {{
+    sessionStorage.removeItem('fb_logged_out');
+    document.getElementById('btnLogout').style.display = 'none';
+    document.getElementById('btnGo').style.display     = 'block';
+    document.getElementById('noteText').textContent    = '✓ Signed out! Click Continue to sign in.';
+    document.getElementById('noteText').style.color    = 'rgba(61,255,192,.6)';
+  }}
+}});
+
+document.getElementById('btnLogout').addEventListener('click', function() {{
+  sessionStorage.setItem('fb_logged_out', '1');
+}}, true);
+
+function doLogout() {{
+  document.getElementById('btnLogout').disabled    = true;
+  document.getElementById('btnLogout').textContent = 'Signing out...';
+  window.location.href = 'https://www.facebook.com';
+  setTimeout(function() {{
+    window.location.href = 'https://m.facebook.com/logout.php';
+  }}, 100);
 }}
 </script>
 </body></html>"""
