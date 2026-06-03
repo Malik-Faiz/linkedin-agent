@@ -374,6 +374,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
         <button class="ct-btn" id="ctArt" onclick="setContentType('article')">📄 LinkedIn Article</button>
       </div>
 
+      <!-- Image mode — shown for BOTH post and article -->
       <div class="mode-sel" id="modeSel">
         <button class="mode-opt sel-t" id="modeText"   onclick="setMode('no_image')"><span class="mi">Aa</span>Text Only</button>
         <button class="mode-opt"       id="modeAuto"   onclick="setMode('auto_image')"><span class="mi">✨</span>Auto Image</button>
@@ -395,7 +396,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
         <input type="file" id="imgFile" accept="image/*" style="display:none" onchange="onFileChange()">
       </div>
       <div class="mode-panel" id="panelArticle" style="display:none">
-        <div class="art-note">📄 Article mode: generates a full long-form article (600+ words). Publishes to LinkedIn as article. Facebook &amp; Instagram receive a post with title + preview. Add <strong>(create image)</strong> to subject for auto image on FB/IG.</div>
+        <div class="art-note">📄 Article mode: generates a 2800–3000 character article published to all channels. Use the image buttons above to add an image — it will appear on LinkedIn, Facebook &amp; Instagram.</div>
       </div>
 
       <button class="add-btn" id="addBtn" onclick="addSubjects()">
@@ -451,17 +452,20 @@ function setContentType(ct){
   currentContentType=ct;
   document.getElementById('ctPost').className='ct-btn'+(ct==='post'?' sel-post':'');
   document.getElementById('ctArt').className='ct-btn'+(ct==='article'?' sel-art':'');
-  document.getElementById('modeSel').classList.toggle('hidden',ct==='article');
+  // Show mode buttons for BOTH post and article
+  document.getElementById('modeSel').classList.remove('hidden');
   document.getElementById('panelArticle').style.display=ct==='article'?'block':'none';
   if(ct==='article'){
-    document.getElementById('panelAuto').classList.remove('show');
-    document.getElementById('panelManual').classList.remove('show');
-    document.getElementById('newSubjects').placeholder='The future of AI in marketing\nHow to lead remote teams\nPersonal branding strategy for 2025';
-    document.getElementById('addLabel').textContent='+ Add Articles to Queue';
+    document.getElementById('newSubjects').placeholder='The future of AI in marketing
+How to lead remote teams
+Personal branding strategy for 2025';
   } else {
-    document.getElementById('newSubjects').placeholder='AI tools for marketers\nRemote leadership tips\nPersonal branding in 2025';
-    setMode(currentMode);
+    document.getElementById('newSubjects').placeholder='AI tools for marketers
+Remote leadership tips
+Personal branding in 2025';
   }
+  // Always apply current mode so image panels show correctly
+  setMode(currentMode);
 }
 function setMode(m){
   currentMode=m;
@@ -470,7 +474,12 @@ function setMode(m){
   document.getElementById('modeManual').className='mode-opt'+(m==='manual_image'?' sel-m':'');
   document.getElementById('panelAuto').classList.toggle('show',m==='auto_image');
   document.getElementById('panelManual').classList.toggle('show',m==='manual_image');
-  const labels={no_image:'+ Add to Queue',auto_image:'+ Add — Auto Image',manual_image:'+ Add — With Image'};
+  const isArt = currentContentType === 'article';
+  const labels={
+    no_image:    isArt ? '+ Add Articles to Queue'      : '+ Add to Queue',
+    auto_image:  isArt ? '+ Add Articles — Auto Image'  : '+ Add — Auto Image',
+    manual_image:isArt ? '+ Add Articles — With Image'  : '+ Add — With Image'
+  };
   document.getElementById('addLabel').textContent=labels[m];
   if(m==='auto_image')checkSerpKey();else document.getElementById('serpWarn').style.display='none';
 }
