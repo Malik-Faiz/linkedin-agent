@@ -561,20 +561,29 @@ async function connectChannel(platform, slot) {
       `width=${w},height=${h},left=${left},top=${top},scrollbars=yes,noopener=yes`);
     if (!popup) { showErr('Popup blocked! Allow popups for this site.'); return; }
 
-    // Listen for success message
+    // Listen for success message from popup
     const handler = (e) => {
       if (typeof e.data === 'string' && e.data.startsWith('channel_connected:')) {
         window.removeEventListener('message', handler);
+        clearInterval(timer);
+        // Reload channels immediately and again after 1s to ensure saved data is reflected
         loadChannels();
-        showOk(`Channel connected successfully!`);
+        setTimeout(loadChannels, 1000);
+        showOk('Channel connected successfully!');
       }
     };
     window.addEventListener('message', handler);
 
-    // Fallback: poll for popup close
+    // Poll for popup close as fallback
     const timer = setInterval(() => {
-      try { if (popup.closed) { clearInterval(timer); loadChannels(); } }
-      catch(e) { clearInterval(timer); loadChannels(); }
+      try {
+        if (popup.closed) {
+          clearInterval(timer);
+          window.removeEventListener('message', handler);
+          loadChannels();
+          setTimeout(loadChannels, 1000);
+        }
+      } catch(e) { clearInterval(timer); loadChannels(); }
     }, 800);
 
   } catch(e) {
@@ -685,8 +694,9 @@ function goToDash() { window.location.href = '/dashboard'; }
   } catch(e) {}
 })();
 
-// Load channels on open
+// Load channels on open + poll every 3s to catch any updates
 loadChannels();
+setInterval(loadChannels, 3000);
 </script>
 </body>
 </html>
