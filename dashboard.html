@@ -338,13 +338,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
     <div class="card">
       <div class="card-hdr"><h2>Add Subjects</h2><span class="chip">one per line</span></div>
 
-      <!-- Post / Article toggle -->
-      <div class="content-type-row">
-        <button class="ct-btn sel-post" id="ctPost" onclick="setContentType('post')">📝 LinkedIn Post</button>
-        <button class="ct-btn" id="ctArt" onclick="setContentType('article')">📄 LinkedIn Article</button>
-      </div>
-
-      <!-- Image mode — ALWAYS visible for both post and article -->
+      <!-- Image mode -->
       <div class="mode-sel" id="modeSel">
         <button class="mode-opt sel-t" id="modeText"   onclick="setMode('no_image')"><span class="mi">Aa</span>Text Only</button>
         <button class="mode-opt"       id="modeAuto"   onclick="setMode('auto_image')"><span class="mi">✨</span>Auto Image</button>
@@ -367,11 +361,6 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
         </div>
         <input type="file" id="imgFile" accept="image/*" style="display:none" onchange="onFileChange()">
       </div>
-      <!-- Article note panel -->
-      <div class="mode-panel" id="panelArticle">
-        <div class="art-note">📄 Article: 2800–3000 chars, published to all channels. Image buttons above work for articles too — image appears on LinkedIn, Facebook &amp; Instagram.</div>
-      </div>
-
       <button class="add-btn" id="addBtn" onclick="addSubjects()">
         <span id="addLabel">+ Add to Queue</span>
       </button>
@@ -421,28 +410,6 @@ function updateCountdown(){
 
 // ── CONTENT TYPE & MODE ──
 let currentMode = 'no_image';
-let currentContentType = 'post';
-
-function setContentType(ct) {
-  currentContentType = ct;
-  document.getElementById('ctPost').className = 'ct-btn' + (ct === 'post' ? ' sel-post' : '');
-  document.getElementById('ctArt').className  = 'ct-btn' + (ct === 'article' ? ' sel-art' : '');
-
-  // Article note panel — show only when article selected
-  const panelArt = document.getElementById('panelArticle');
-
-  if (ct === 'article') {
-    document.getElementById('newSubjects').placeholder = 'The future of AI in marketing\nHow to lead remote teams\nPersonal branding strategy for 2025';
-    panelArt.classList.add('show');
-  } else {
-    document.getElementById('newSubjects').placeholder = 'AI tools for marketers\nRemote leadership tips\nPersonal branding in 2025';
-    panelArt.classList.remove('show');
-  }
-
-  // Always re-apply mode — this shows/hides auto/upload panels and updates button label
-  setMode(currentMode);
-}
-
 function setMode(m) {
   currentMode = m;
   document.getElementById('modeText').className   = 'mode-opt' + (m === 'no_image'     ? ' sel-t' : '');
@@ -452,16 +419,10 @@ function setMode(m) {
   document.getElementById('panelAuto').classList.toggle('show',   m === 'auto_image');
   document.getElementById('panelManual').classList.toggle('show', m === 'manual_image');
 
-  // Article note stays visible if article is selected, regardless of mode
-  if (currentContentType === 'article') {
-    document.getElementById('panelArticle').classList.add('show');
-  }
-
-  const isArt = currentContentType === 'article';
   const labels = {
-    no_image:     isArt ? '+ Add Articles to Queue'     : '+ Add to Queue',
-    auto_image:   isArt ? '+ Add Articles — Auto Image' : '+ Add — Auto Image',
-    manual_image: isArt ? '+ Add Articles — With Image' : '+ Add — With Image',
+    no_image:     '+ Add to Queue',
+    auto_image:   '+ Add — Auto Image',
+    manual_image: '+ Add — With Image',
   };
   document.getElementById('addLabel').textContent = labels[m];
 
@@ -530,9 +491,9 @@ function renderSubjects(subjects){
   const box=document.getElementById('subjectList');
   if(!subjects.length){box.innerHTML='<div class="empty-q">📭<br>Queue empty — add subjects above</div>';return;}
   box.innerHTML=subjects.map((s,i)=>{
-    const isN=i<2,hasM=s.includes('| IMG:'),hasA=s.toLowerCase().includes('(create image)'),isArt=s.toLowerCase().includes('(article)');
-    const clean=s.split('| IMG:')[0].replace('(create image)','').replace('(article)','').trim();
-    const tag=isArt?`<span class="qi-tag tag-art">article</span>`:hasM?`<span class="qi-tag tag-img">img</span>`:hasA?`<span class="qi-tag tag-auto">auto</span>`:`<span class="qi-tag tag-txt">post</span>`;
+    const isN=i<2,hasM=s.includes('| IMG:'),hasA=s.toLowerCase().includes('(create image)');
+    const clean=s.split('| IMG:')[0].replace('(create image)','').trim();
+    const tag=hasM?`<span class="qi-tag tag-img">img</span>`:hasA?`<span class="qi-tag tag-auto">auto</span>`:`<span class="qi-tag tag-txt">post</span>`;
     return`<div class="qi${isN?' next':''}"><span class="qi-n">${pad(i+1)}</span><span class="qi-t" style="color:${isN?'var(--text)':'var(--muted)'}">${clean}</span>${tag}<button class="qi-del" onclick="deleteSubject(${i})" title="Delete">✕</button></div>`;
   }).join('');
 }
@@ -666,7 +627,7 @@ async function addSubjects(){
   if(!lines.length)return;
   if(currentMode==='manual_image'&&!document.getElementById('imgFile').files.length){alert('Please select an image first.');return;}
   const orig=btn.innerHTML;btn.disabled=true;btn.innerHTML='<span class="spin">⟳</span> Processing...';
-  let payload={subjects:lines,mode:currentMode,content_type:currentContentType};
+  let payload={subjects:lines,mode:currentMode};
   if(currentMode==='manual_image'){
     const file=document.getElementById('imgFile').files[0];
     payload.filename=file.name;
