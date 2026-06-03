@@ -89,6 +89,11 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .sched-time-inp:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(176,133,255,0.1);}
 .sched-time-unit{font-size:13px;font-family:var(--mono);color:rgba(210,200,255,0.7);font-weight:600;}
 .slot-hint{font-size:10px;font-family:var(--mono);color:rgba(210,200,255,0.55);}
+.sched-min-sel{background:rgba(0,0,0,0.3);border:1.5px solid rgba(160,120,255,0.25);border-radius:8px;
+               padding:8px 6px;color:var(--text);font-family:var(--mono);font-size:14px;font-weight:700;
+               outline:none;cursor:pointer;transition:border-color 0.2s;}
+.sched-min-sel:focus{border-color:var(--p);}
+.sched-min-sel option{background:#0f0a1e;color:var(--text);}
 .slot-remove-btn{padding:5px 10px;border-radius:7px;border:1px solid rgba(255,96,96,0.25);
                  background:rgba(255,96,96,0.07);color:rgba(255,130,130,0.9);font-size:11px;
                  cursor:pointer;transition:all 0.2s;}
@@ -278,22 +283,40 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
         <!-- Slot 1 (always visible) -->
         <div class="sched-slot" id="slotRow1">
           <span class="slot-badge">Slot 1</span>
-          <input type="number" class="sched-time-inp" id="slot1" min="0" max="23" value="8" placeholder="8">
-          <span class="sched-time-unit">:00</span>
-          <span class="slot-hint">e.g. 8 = 8:00 AM</span>
+          <input type="number" class="sched-time-inp" id="slot1h" min="0" max="23" value="8" placeholder="HH">
+          <span class="sched-time-unit">:</span>
+          <select class="sched-min-sel" id="slot1m">
+            <option value="0">00</option><option value="5">05</option><option value="10">10</option>
+            <option value="15">15</option><option value="20">20</option><option value="25">25</option>
+            <option value="30">30</option><option value="35">35</option><option value="40">40</option>
+            <option value="45">45</option><option value="50">50</option><option value="55">55</option>
+          </select>
+          <span class="slot-hint">hour : minute</span>
         </div>
         <!-- Slot 2 (shown when added) -->
         <div class="sched-slot" id="slotRow2" style="display:none">
           <span class="slot-badge">Slot 2</span>
-          <input type="number" class="sched-time-inp" id="slot2" min="0" max="23" value="15" placeholder="15">
-          <span class="sched-time-unit">:00</span>
+          <input type="number" class="sched-time-inp" id="slot2h" min="0" max="23" value="15" placeholder="HH">
+          <span class="sched-time-unit">:</span>
+          <select class="sched-min-sel" id="slot2m">
+            <option value="0">00</option><option value="5">05</option><option value="10">10</option>
+            <option value="15">15</option><option value="20">20</option><option value="25">25</option>
+            <option value="30">30</option><option value="35">35</option><option value="40">40</option>
+            <option value="45">45</option><option value="50">50</option><option value="55">55</option>
+          </select>
           <button class="slot-remove-btn" onclick="removeSlot(2)">✕</button>
         </div>
         <!-- Slot 3 (shown when added) -->
         <div class="sched-slot" id="slotRow3" style="display:none">
           <span class="slot-badge">Slot 3</span>
-          <input type="number" class="sched-time-inp" id="slot3" min="0" max="23" value="21" placeholder="21">
-          <span class="sched-time-unit">:00</span>
+          <input type="number" class="sched-time-inp" id="slot3h" min="0" max="23" value="21" placeholder="HH">
+          <span class="sched-time-unit">:</span>
+          <select class="sched-min-sel" id="slot3m">
+            <option value="0">00</option><option value="5">05</option><option value="10">10</option>
+            <option value="15">15</option><option value="20">20</option><option value="25">25</option>
+            <option value="30">30</option><option value="35">35</option><option value="40">40</option>
+            <option value="45">45</option><option value="50">50</option><option value="55">55</option>
+          </select>
           <button class="slot-remove-btn" onclick="removeSlot(3)">✕</button>
         </div>
       </div>
@@ -606,17 +629,18 @@ function renderLogs(logs){
 // ── SCHEDULE SETTINGS ──
 let activeSlots = 1;  // how many slot rows are visible
 
-function to12h(h) {
-  if (h === 0)  return '12:00 AM';
-  if (h < 12)   return `${h}:00 AM`;
-  if (h === 12) return '12:00 PM';
-  return `${h-12}:00 PM`;
+function to12h(h, m) {
+  const mm  = String(m||0).padStart(2,'0');
+  if (h === 0)  return `12:${mm} AM`;
+  if (h < 12)   return `${h}:${mm} AM`;
+  if (h === 12) return `12:${mm} PM`;
+  return `${h-12}:${mm} PM`;
 }
 
 function updateMetaDisplay(slots) {
   const metaH = document.getElementById('metaHour');
   const metaB = document.getElementById('metaBatch');
-  if (metaH && slots.length > 0) metaH.textContent = slots.map(to12h).join(', ');
+  if (metaH && slots.length > 0) metaH.textContent = slots.map(s=>to12h(s.h||s, s.m||0)).join(', ');
   if (metaB) metaB.textContent = slots.length;
 }
 
@@ -630,8 +654,8 @@ function addSlot() {
 function removeSlot(n) {
   document.getElementById(`slotRow${n}`).style.display = 'none';
   if (n === 2 && activeSlots === 3) {
-    // Move slot 3 value to slot 2
-    document.getElementById('slot2').value = document.getElementById('slot3').value;
+    document.getElementById('slot2h').value = document.getElementById('slot3h').value;
+    document.getElementById('slot2m').value = document.getElementById('slot3m').value;
     document.getElementById('slotRow3').style.display = 'none';
     activeSlots = 1;
   } else if (n === 3) {
@@ -647,11 +671,18 @@ function getSlotValues() {
   for (let i = 1; i <= 3; i++) {
     const row = document.getElementById(`slotRow${i}`);
     if (row && row.style.display !== 'none') {
-      const val = parseInt(document.getElementById(`slot${i}`).value);
-      if (!isNaN(val)) slots.push(Math.max(0, Math.min(23, val)));
+      const h = Math.max(0, Math.min(23, parseInt(document.getElementById(`slot${i}h`).value)||0));
+      const m = parseInt(document.getElementById(`slot${i}m`).value)||0;
+      slots.push({h, m});
     }
   }
-  return [...new Set(slots)].sort((a,b)=>a-b);
+  // Remove duplicates and sort by time
+  const seen = new Set();
+  return slots.filter(s => {
+    const k = `${s.h}:${s.m}`;
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
+  }).sort((a,b) => a.h*60+a.m - (b.h*60+b.m));
 }
 
 async function saveSchedule() {
@@ -681,16 +712,18 @@ async function saveSchedule() {
 }
 
 function loadScheduleSettings(timeSlots) {
-  if (!timeSlots || !timeSlots.length) timeSlots = [8];
+  if (!timeSlots || !timeSlots.length) timeSlots = [{h:8,m:0}];
   timeSlots = timeSlots.slice(0, 3);
 
-  // Show/hide slot rows and fill values
   for (let i = 1; i <= 3; i++) {
     const row = document.getElementById(`slotRow${i}`);
-    const inp = document.getElementById(`slot${i}`);
+    const inpH = document.getElementById(`slot${i}h`);
+    const inpM = document.getElementById(`slot${i}m`);
     if (i <= timeSlots.length) {
+      const s = timeSlots[i-1];
       if (row) row.style.display = 'flex';
-      if (inp) inp.value = timeSlots[i-1];
+      if (inpH) inpH.value = s.h !== undefined ? s.h : s;
+      if (inpM) inpM.value = s.m !== undefined ? s.m : 0;
     } else {
       if (row) row.style.display = 'none';
     }
