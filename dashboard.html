@@ -11,7 +11,7 @@
 :root{
   --bg:#05030f;--card:rgba(255,255,255,0.028);--card-h:rgba(255,255,255,0.05);
   --border:rgba(160,120,255,0.13);--border2:rgba(160,120,255,0.25);
-  --text:#ede8ff;--muted:rgba(200,185,255,0.5);--muted2:rgba(200,185,255,0.22);
+  --text:#ede8ff;--muted:rgba(220,210,255,0.75);--muted2:rgba(210,200,255,0.5);
   --p:#b085ff;--p2:#ff80b5;--p3:#7ee8ff;--green:#3dffc0;--red:#ff6060;--amber:#ffcc5c;
   --font:'Syne',sans-serif;--mono:'DM Mono',monospace;--r:18px;
 }
@@ -72,6 +72,33 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .api-badge{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:11px;font-family:var(--mono);color:var(--muted);}
 .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
 .dok{background:var(--green);}.dwarn{background:var(--amber);}.derr{background:var(--red);}
+
+/* SCHEDULE SETTINGS */
+.sched-box{background:rgba(255,255,255,0.025);border:1px solid rgba(160,120,255,0.2);border-radius:14px;
+           padding:18px 20px;margin-top:16px;}
+.sched-row{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:14px;}
+.sched-field{display:flex;flex-direction:column;gap:6px;flex:1;min-width:160px;}
+.sched-label{font-size:11px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;
+             color:rgba(220,210,255,0.85);font-weight:600;}
+.sched-hint{font-size:10px;font-family:var(--mono);color:rgba(210,200,255,0.6);}
+.sched-seg{display:flex;gap:6px;}
+.seg-btn{flex:1;padding:8px;border-radius:8px;border:1.5px solid rgba(160,120,255,0.25);
+         background:rgba(255,255,255,0.03);color:rgba(220,210,255,0.7);font-family:var(--mono);
+         font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s;}
+.seg-btn:hover{border-color:var(--p);color:var(--text);}
+.seg-btn.active{border-color:var(--p);background:rgba(176,133,255,0.15);color:var(--p);}
+.sched-time-wrap{display:flex;align-items:center;gap:8px;}
+.sched-time-inp{width:64px;background:rgba(0,0,0,0.3);border:1.5px solid rgba(160,120,255,0.25);
+                border-radius:8px;padding:8px 10px;color:var(--text);font-family:var(--mono);
+                font-size:15px;font-weight:700;outline:none;text-align:center;
+                transition:border-color 0.2s;}
+.sched-time-inp:focus{border-color:var(--p);}
+.sched-time-unit{font-size:11px;font-family:var(--mono);color:rgba(210,200,255,0.65);}
+.sched-save-btn{padding:9px 20px;border-radius:9px;border:none;background:linear-gradient(135deg,var(--p),var(--p2));
+                color:#fff;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;
+                transition:all 0.2s;}
+.sched-save-btn:hover{opacity:0.88;transform:translateY(-1px);}
+.sched-saved{font-size:12px;font-family:var(--mono);color:var(--green);margin-top:6px;}
 
 /* STATS */
 .stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px;}
@@ -238,7 +265,32 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
       <div class="colon">:</div>
       <div class="dblock"><span class="dnum" id="ts">00</span><div class="dlabel">Secs</div></div>
     </div>
-    <div class="timer-meta">▶ Fires at <span class="hl">08:00 AM</span> your local time &nbsp;·&nbsp; batch size <span class="hl">2</span></div>
+    <div class="timer-meta" id="timerMeta">▶ Fires at <span class="hl" id="metaHour">08:00 AM</span> your local time &nbsp;·&nbsp; batch size <span class="hl" id="metaBatch">2</span></div>
+    <!-- Schedule Settings -->
+    <div class="sched-box" id="schedBox">
+      <div class="sched-row">
+        <div class="sched-field">
+          <label class="sched-label">📬 Batch Size</label>
+          <div class="sched-seg" id="batchSeg">
+            <button class="seg-btn active" data-val="1" onclick="setBatch(1)">1</button>
+            <button class="seg-btn" data-val="2" onclick="setBatch(2)">2</button>
+            <button class="seg-btn" data-val="3" onclick="setBatch(3)">3</button>
+          </div>
+          <div class="sched-hint">posts per day</div>
+        </div>
+        <div class="sched-field">
+          <label class="sched-label">⏰ Posting Time</label>
+          <div class="sched-time-wrap">
+            <input type="number" id="targetHour" min="0" max="23" value="8"
+              class="sched-time-inp" onchange="saveSchedule()">
+            <span class="sched-time-unit">:00 (24h, your local time)</span>
+          </div>
+          <div class="sched-hint">hour 0–23 · e.g. 9 = 9:00 AM</div>
+        </div>
+      </div>
+      <button class="sched-save-btn" id="schedSaveBtn" onclick="saveSchedule()">Save Schedule</button>
+      <div class="sched-saved" id="schedSaved" style="display:none">✓ Saved</div>
+    </div>
     <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
     <div class="api-badges">
       <div class="api-badge" id="badgeGroq"><div class="dot dwarn"></div>Groq LLM</div>
@@ -538,6 +590,76 @@ function renderLogs(logs){
   box.scrollTop=box.scrollHeight;
 }
 
+// ── SCHEDULE SETTINGS ──
+let currentBatch = 2;
+let schedSaveTimer = null;
+
+function setBatch(val) {
+  currentBatch = val;
+  document.querySelectorAll('.seg-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.val) === val);
+  });
+  scheduleSave();
+}
+
+function scheduleSave() {
+  // Debounce saves
+  clearTimeout(schedSaveTimer);
+  schedSaveTimer = setTimeout(saveSchedule, 800);
+}
+
+async function saveSchedule() {
+  const hourEl = document.getElementById('targetHour');
+  const hour   = Math.max(0, Math.min(23, parseInt(hourEl.value) || 8));
+  hourEl.value = hour;
+
+  const savedEl = document.getElementById('schedSaved');
+  const btnEl   = document.getElementById('schedSaveBtn');
+
+  try {
+    const res  = await fetch(`${API}/config`, {
+      method: 'POST', credentials: 'include',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ batch_size: currentBatch, target_hour: hour })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      savedEl.style.display = 'inline';
+      btnEl.textContent = '✓ Saved';
+      setTimeout(() => {
+        savedEl.style.display = 'none';
+        btnEl.textContent = 'Save Schedule';
+      }, 2000);
+      // Update meta display
+      updateMetaDisplay(hour, currentBatch);
+    }
+  } catch(e) { console.error('Schedule save failed', e); }
+}
+
+function updateMetaDisplay(hour, batch) {
+  const h12  = hour === 0 ? '12:00 AM' : hour < 12 ? `${hour}:00 AM` : hour === 12 ? '12:00 PM' : `${hour-12}:00 PM`;
+  const metaH = document.getElementById('metaHour');
+  const metaB = document.getElementById('metaBatch');
+  if (metaH) metaH.textContent = h12;
+  if (metaB) metaB.textContent = batch;
+}
+
+function loadScheduleSettings(batchSize, targetHour) {
+  currentBatch = batchSize || 2;
+  const hour   = targetHour !== undefined ? targetHour : 8;
+
+  // Update segment buttons
+  document.querySelectorAll('.seg-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.val) === currentBatch);
+  });
+
+  // Update hour input
+  const hourEl = document.getElementById('targetHour');
+  if (hourEl) hourEl.value = hour;
+
+  updateMetaDisplay(hour, currentBatch);
+}
+
 async function fetchStatus(){
   try{
     const res=await fetch(`${API}/status`,{credentials:'include'});
@@ -561,6 +683,9 @@ async function fetchStatus(){
     if(data.config||data.accounts)updateBadges(data.config,data.accounts);
     if(data.channels_info)renderChannels(data.channels_info);
     updateTzBanner(data.utc_offset);
+    if(data.batch_size !== undefined || data.target_hour !== undefined) {
+      loadScheduleSettings(data.batch_size, data.target_hour);
+    }
   }catch(e){
     if(connected){connected=false;document.getElementById('connBanner').classList.add('show');document.getElementById('statusLabel').textContent='Offline';}
   }
