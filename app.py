@@ -226,12 +226,25 @@ def to_unicode_bold(text):
 def format_linkedin_bold(text):
     return re.sub(r'\*\*(.*?)\*\*', lambda m: to_unicode_bold(m.group(1)), text)
 
+def get_user_batch_size(username):
+    """Get user's configured batch size (1-3, default 2)."""
+    cfg = load_config(username)
+    bs  = cfg.get("batch_size", BATCH_SIZE)
+    return max(1, min(3, int(bs)))
+
+def get_user_target_hour(username):
+    """Get user's configured posting hour (0-23, default 8)."""
+    cfg = load_config(username)
+    th  = cfg.get("target_hour", TARGET_HOUR)
+    return max(0, min(23, int(th)))
+
 def get_next_run_time_for_user(username):
     cfg    = load_config(username)
     offset = cfg.get("utc_offset_hours", 0)
+    th     = get_user_target_hour(username)
     now_utc  = datetime.utcnow()
     user_now = now_utc + timedelta(hours=offset)
-    target_local = user_now.replace(hour=TARGET_HOUR, minute=0, second=0, microsecond=0)
+    target_local = user_now.replace(hour=th, minute=0, second=0, microsecond=0)
     if user_now >= target_local:
         target_local += timedelta(days=1)
     return target_local - timedelta(hours=offset)
@@ -594,11 +607,12 @@ def run_batch(username, triggered_by="scheduler"):
         add_log(username, "Queue is empty!", "warn")
         state["running"] = False; state["status"] = "waiting"; return
 
-    batch = all_subjects[:BATCH_SIZE]
+    user_batch = get_user_batch_size(username)
+    batch = all_subjects[:user_batch]
     with open(subjects_file, "w", encoding="utf-8") as f:
-        f.write("\n".join(all_subjects[BATCH_SIZE:]))
+        f.write("\n".join(all_subjects[user_batch:]))
 
-    add_log(username, f"Processing {len(batch)} subjects. {len(all_subjects)-len(batch)} remaining.", "info")
+    add_log(username, f"Processing {len(batch)} subjects (batch size: {user_batch}). {len(all_subjects)-len(batch)} remaining.", "info")
 
     for j, subject in enumerate(batch):
         manual_image_url = None
@@ -663,10 +677,11 @@ def scheduler_loop():
             offset   = cfg.get("utc_offset_hours", 0)
             user_now = now_utc + timedelta(hours=offset)
             fire_key = (uname, user_now.date())
-            if (user_now.hour == TARGET_HOUR and user_now.minute == 0
+            user_th = get_user_target_hour(uname)
+            if (user_now.hour == user_th and user_now.minute == 0
                     and user_now.second < 5 and fire_key not in fired_today):
                 fired_today.add(fire_key)
-                add_log(uname, f"Scheduler fired at local 08:00 (UTC{offset:+.1f}h)", "info")
+                add_log(uname, f"Scheduler fired at local {user_th:02d}:00 (UTC{offset:+.1f}h)", "info")
                 threading.Thread(target=run_batch, args=(uname, "scheduler"), daemon=True).start()
         fired_today = {k for k in fired_today if k[1] >= now_utc.date()}
         time.sleep(1)
@@ -820,6 +835,11 @@ def save_config_route(username):
         val = (data.get(field) or "").strip()
         if val and "*" not in val:
             cfg[field] = val
+    # Batch size and posting time
+    if "batch_size" in data:
+        cfg["batch_size"] = max(1, min(3, int(data["batch_size"])))
+    if "target_hour" in data:
+        cfg["target_hour"] = max(0, min(23, int(data["target_hour"])))
     save_config(username, cfg)
     add_log(username, "Config updated ✓", "ok")
     return jsonify({"ok": True, "message": "Configuration saved!"})
@@ -2055,6 +2075,8 @@ def get_status(username):
         "subjects":      subjects,
         "logs":          state["logs"][-30:],
         "utc_offset":    offset,
+        "batch_size":    get_user_batch_size(username),
+        "target_hour":   get_user_target_hour(username),
         "config":        cfg,
         "channels_info": channels_info,
         "accounts": {
