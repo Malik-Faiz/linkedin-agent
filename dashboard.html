@@ -628,6 +628,7 @@ function renderLogs(logs){
 
 // ── SCHEDULE SETTINGS ──
 let activeSlots = 1;  // how many slot rows are visible
+let schedLoaded = false; // prevent polling from resetting UI
 
 function to12h(h, m) {
   const mm  = String(m||0).padStart(2,'0');
@@ -757,8 +758,9 @@ async function fetchStatus(){
     if(data.config||data.accounts)updateBadges(data.config,data.accounts);
     if(data.channels_info)renderChannels(data.channels_info);
     updateTzBanner(data.utc_offset);
-    if(data.time_slots) {
+    if(data.time_slots && !schedLoaded) {
       loadScheduleSettings(data.time_slots);
+      schedLoaded = true;
     }
   }catch(e){
     if(connected){connected=false;document.getElementById('connBanner').classList.add('show');document.getElementById('statusLabel').textContent='Offline';}
