@@ -1830,16 +1830,14 @@ def instagram_direct_auth(username):
     params = {
         "client_id":     IG_APP_ID,
         "redirect_uri":  IG_REDIRECT_URI,
-        "scope":         "instagram_basic,instagram_content_publish,instagram_manage_insights",
+        "scope":         "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_messages,instagram_business_manage_comments",
         "response_type": "code",
         "state":         state_token,
     }
-    # Instagram uses the Facebook OAuth dialog even for standalone IG apps
-    oauth_url = "https://www.facebook.com/v19.0/dialog/oauth?" + urllib.parse.urlencode(params)
-    # Route through universal start page — clears FB session so fresh IG login appears
-    host      = request.host_url.rstrip('/')
-    start_url = f"{host}/api/auth/start?platform=instagram_direct&label=Instagram&oauth={urllib.parse.quote(oauth_url)}"
-    return jsonify({"ok": True, "auth_url": start_url})
+    # Instagram Business Login — shows Instagram's own login page
+    # Uses the new Instagram API with Instagram Login
+    oauth_url = "https://www.instagram.com/oauth/authorize?" + urllib.parse.urlencode(params)
+    return jsonify({"ok": True, "auth_url": oauth_url})
 
 
 @app.route("/api/auth/instagram_direct/callback")
@@ -1865,12 +1863,13 @@ def instagram_direct_callback():
         return "<script>window.close();</script>Invalid state — please try again", 400
 
     try:
-        # Step 1: Exchange code for short-lived user access token
-        token_res = requests.get(
-            "https://graph.facebook.com/v19.0/oauth/access_token",
-            params={
+        # Step 1: Exchange code for short-lived token using Instagram's own endpoint
+        token_res = requests.post(
+            "https://api.instagram.com/oauth/access_token",
+            data={
                 "client_id":     IG_APP_ID,
                 "client_secret": IG_APP_SECRET,
+                "grant_type":    "authorization_code",
                 "redirect_uri":  IG_REDIRECT_URI,
                 "code":          code,
             },
@@ -1878,86 +1877,40 @@ def instagram_direct_callback():
         ).json()
 
         short_token = token_res.get("access_token")
-        if not short_token:
-            err = token_res.get("error", {})
-            return (
-                f"<script>window.close();</script>"
-                f"Token exchange failed: {err.get('message', str(token_res))}"
-            ), 400
+        ig_id       = str(token_res.get("user_id", ""))
 
-        # Step 2: Exchange short-lived token for long-lived token (60 days)
+        if not short_token:
+            err = token_res.get("error_message", str(token_res))
+            return _callback_page(False, f"Token exchange failed: {err}")
+
+        # Step 2: Exchange for long-lived token (60 days)
         long_res = requests.get(
-            "https://graph.facebook.com/v19.0/oauth/access_token",
+            "https://graph.instagram.com/access_token",
             params={
-                "grant_type":        "fb_exchange_token",
-                "client_id":         IG_APP_ID,
-                "client_secret":     IG_APP_SECRET,
-                "fb_exchange_token": short_token,
+                "grant_type":    "ig_exchange_token",
+                "client_secret": IG_APP_SECRET,
+                "access_token":  short_token,
             },
             timeout=15
         ).json()
-        long_token  = long_res.get("access_token", short_token)
-        expires_in  = long_res.get("expires_in", 5184000)  # ~60 days
+        long_token = long_res.get("access_token", short_token)
+        expires_in = long_res.get("expires_in", 5184000)
 
-        # Step 3: Find the user's Instagram Business/Creator account
-        # First, get their Facebook Pages (needed even for "direct" IG app)
-        pages_res = requests.get(
-            "https://graph.facebook.com/v19.0/me/accounts",
-            params={"access_token": long_token, "fields": "id,name,instagram_business_account"},
-            timeout=10
-        ).json()
-        pages = pages_res.get("data", [])
-
-        ig_id       = None
-        ig_username = None
-        ig_token    = long_token
-
-        for page in pages:
-            ig_acct = page.get("instagram_business_account", {})
-            if ig_acct.get("id"):
-                ig_id = ig_acct["id"]
-                # Get the page token (needed to publish via this IG account)
-                page_tok_res = requests.get(
-                    f"https://graph.facebook.com/v19.0/{page['id']}",
-                    params={"fields": "access_token", "access_token": long_token},
-                    timeout=10
-                ).json()
-                ig_token = page_tok_res.get("access_token", long_token)
-                break
-
-        if not ig_id:
-            # Try fetching IG account directly via /me for Instagram-native app
-            me_res = requests.get(
-                "https://graph.facebook.com/v19.0/me",
-                params={"fields": "id,name", "access_token": long_token},
-                timeout=10
-            ).json()
-            # If still no IG account found, surface a helpful error
-            return (
-                "<html><body><script>window.close();</script>"
-                "<p style='font-family:sans-serif;padding:20px'>"
-                "⚠ No Instagram Business or Creator account found linked to this Facebook login.<br><br>"
-                "Make sure:<br>"
-                "• Your Instagram account is set to Business or Creator<br>"
-                "• It is linked to a Facebook Page<br>"
-                "• You granted all requested permissions"
-                "</p></body></html>"
-            ), 400
-
-        # Step 4: Get Instagram username
+        # Step 3: Get Instagram username
         ig_info = requests.get(
-            f"https://graph.facebook.com/v19.0/{ig_id}",
-            params={"fields": "username,name", "access_token": ig_token},
+            "https://graph.instagram.com/me",
+            params={"fields": "id,username,name", "access_token": long_token},
             timeout=10
         ).json()
-        ig_username = ig_info.get("username") or ig_info.get("name") or ig_id
+        ig_username = ig_info.get("username", ig_id)
+        ig_id       = ig_info.get("id", ig_id)
 
-        # Step 5: Save to config (marks as direct connection)
+        # Step 4: Save to config
         cfg = load_config(username)
-        cfg["instagram_access_token"] = ig_token
-        cfg["instagram_account_id"]   = ig_id
-        cfg["instagram_username"]     = ig_username
-        cfg["instagram_via_facebook"] = False  # ← direct connection flag
+        cfg["instagram_access_token"]  = long_token
+        cfg["instagram_account_id"]    = ig_id
+        cfg["instagram_username"]      = ig_username
+        cfg["instagram_via_facebook"]  = False
         cfg["instagram_token_expires"] = (
             datetime.utcnow() + timedelta(seconds=expires_in)
         ).isoformat()
@@ -1969,13 +1922,13 @@ def instagram_direct_callback():
             "window.opener && window.opener.postMessage('channel_connected:instagram:1','*');"
             "window.close();"
             "</script>"
-            f"<p>Instagram @{ig_username} connected directly! Closing...</p>"
+            f"<p>Instagram @{ig_username} connected! Closing...</p>"
             "</body></html>"
         )
 
     except Exception as e:
         add_log(username, f"Instagram direct OAuth error: {e}", "error")
-        return f"<script>window.close();</script>Error: {e}", 500
+        return _callback_page(False, f"Error: {e}")
 
 
 @app.route("/api/auth/instagram_direct/disconnect", methods=["POST"])
