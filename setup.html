@@ -553,12 +553,12 @@ async function connectChannel(platform, slot) {
     btnEl.disabled = false; btnEl.innerHTML = origHTML;
     if (!data.ok) { showErr(data.message || 'Could not start OAuth.'); return; }
 
-    // Open popup
-    const w = 640, h = 720;
+    // Open popup — use noopener to ensure fresh session context
+    const w = 660, h = 740;
     const left = Math.round((screen.width - w) / 2);
     const top  = Math.round((screen.height - h) / 2);
     const popup = window.open(data.auth_url, `Connect ${platform} #${slot}`,
-      `width=${w},height=${h},left=${left},top=${top},scrollbars=yes`);
+      `width=${w},height=${h},left=${left},top=${top},scrollbars=yes,noopener=yes`);
     if (!popup) { showErr('Popup blocked! Allow popups for this site.'); return; }
 
     // Listen for success message
