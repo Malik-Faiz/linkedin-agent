@@ -76,29 +76,32 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 /* SCHEDULE SETTINGS */
 .sched-box{background:rgba(255,255,255,0.025);border:1px solid rgba(160,120,255,0.2);border-radius:14px;
            padding:18px 20px;margin-top:16px;}
-.sched-row{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:14px;}
-.sched-field{display:flex;flex-direction:column;gap:6px;flex:1;min-width:160px;}
-.sched-label{font-size:11px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;
-             color:rgba(220,210,255,0.85);font-weight:600;}
-.sched-hint{font-size:10px;font-family:var(--mono);color:rgba(210,200,255,0.6);}
-.sched-seg{display:flex;gap:6px;}
-.seg-btn{flex:1;padding:8px;border-radius:8px;border:1.5px solid rgba(160,120,255,0.25);
-         background:rgba(255,255,255,0.03);color:rgba(220,210,255,0.7);font-family:var(--mono);
-         font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s;}
-.seg-btn:hover{border-color:var(--p);color:var(--text);}
-.seg-btn.active{border-color:var(--p);background:rgba(176,133,255,0.15);color:var(--p);}
-.sched-time-wrap{display:flex;align-items:center;gap:8px;}
+.sched-label-main{font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;}
+.sched-hint-main{font-size:11px;font-family:var(--mono);color:rgba(210,200,255,0.7);margin-bottom:14px;line-height:1.6;}
+.sched-slots{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
+.sched-slot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.slot-badge{font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;
+            color:var(--p);background:rgba(176,133,255,0.12);border:1px solid rgba(176,133,255,0.25);
+            border-radius:6px;padding:3px 10px;white-space:nowrap;min-width:52px;text-align:center;}
 .sched-time-inp{width:64px;background:rgba(0,0,0,0.3);border:1.5px solid rgba(160,120,255,0.25);
                 border-radius:8px;padding:8px 10px;color:var(--text);font-family:var(--mono);
-                font-size:15px;font-weight:700;outline:none;text-align:center;
-                transition:border-color 0.2s;}
-.sched-time-inp:focus{border-color:var(--p);}
-.sched-time-unit{font-size:11px;font-family:var(--mono);color:rgba(210,200,255,0.65);}
+                font-size:16px;font-weight:700;outline:none;text-align:center;transition:border-color 0.2s;}
+.sched-time-inp:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(176,133,255,0.1);}
+.sched-time-unit{font-size:13px;font-family:var(--mono);color:rgba(210,200,255,0.7);font-weight:600;}
+.slot-hint{font-size:10px;font-family:var(--mono);color:rgba(210,200,255,0.55);}
+.slot-remove-btn{padding:5px 10px;border-radius:7px;border:1px solid rgba(255,96,96,0.25);
+                 background:rgba(255,96,96,0.07);color:rgba(255,130,130,0.9);font-size:11px;
+                 cursor:pointer;transition:all 0.2s;}
+.slot-remove-btn:hover{background:rgba(255,96,96,0.18);}
+.sched-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.sched-add-btn{padding:9px 16px;border-radius:9px;border:1.5px dashed rgba(176,133,255,0.3);
+               background:rgba(176,133,255,0.04);color:var(--p);font-family:var(--mono);
+               font-size:12px;cursor:pointer;transition:all 0.2s;}
+.sched-add-btn:hover{border-color:var(--p);background:rgba(176,133,255,0.1);}
 .sched-save-btn{padding:9px 20px;border-radius:9px;border:none;background:linear-gradient(135deg,var(--p),var(--p2));
-                color:#fff;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;
-                transition:all 0.2s;}
+                color:#fff;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s;}
 .sched-save-btn:hover{opacity:0.88;transform:translateY(-1px);}
-.sched-saved{font-size:12px;font-family:var(--mono);color:var(--green);margin-top:6px;}
+.sched-saved{font-size:12px;font-family:var(--mono);color:var(--green);}
 
 /* STATS */
 .stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px;}
@@ -265,31 +268,41 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
       <div class="colon">:</div>
       <div class="dblock"><span class="dnum" id="ts">00</span><div class="dlabel">Secs</div></div>
     </div>
-    <div class="timer-meta" id="timerMeta">▶ Fires at <span class="hl" id="metaHour">08:00 AM</span> your local time &nbsp;·&nbsp; batch size <span class="hl" id="metaBatch">2</span></div>
+    <div class="timer-meta" id="timerMeta">▶ Posts at <span class="hl" id="metaHour">08:00 AM</span> your local time &nbsp;·&nbsp; <span class="hl" id="metaBatch">1</span> slot(s) per day</div>
     <!-- Schedule Settings -->
     <div class="sched-box" id="schedBox">
-      <div class="sched-row">
-        <div class="sched-field">
-          <label class="sched-label">📬 Batch Size</label>
-          <div class="sched-seg" id="batchSeg">
-            <button class="seg-btn active" data-val="1" onclick="setBatch(1)">1</button>
-            <button class="seg-btn" data-val="2" onclick="setBatch(2)">2</button>
-            <button class="seg-btn" data-val="3" onclick="setBatch(3)">3</button>
-          </div>
-          <div class="sched-hint">posts per day</div>
+      <div class="sched-label-main">⏰ Daily Posting Schedule</div>
+      <div class="sched-hint-main">Set 1, 2, or 3 time slots. Each slot posts one subject from your queue automatically.</div>
+
+      <div class="sched-slots" id="schedSlots">
+        <!-- Slot 1 (always visible) -->
+        <div class="sched-slot" id="slotRow1">
+          <span class="slot-badge">Slot 1</span>
+          <input type="number" class="sched-time-inp" id="slot1" min="0" max="23" value="8" placeholder="8">
+          <span class="sched-time-unit">:00</span>
+          <span class="slot-hint">e.g. 8 = 8:00 AM</span>
         </div>
-        <div class="sched-field">
-          <label class="sched-label">⏰ Posting Time</label>
-          <div class="sched-time-wrap">
-            <input type="number" id="targetHour" min="0" max="23" value="8"
-              class="sched-time-inp" onchange="saveSchedule()">
-            <span class="sched-time-unit">:00 (24h, your local time)</span>
-          </div>
-          <div class="sched-hint">hour 0–23 · e.g. 9 = 9:00 AM</div>
+        <!-- Slot 2 (shown when added) -->
+        <div class="sched-slot" id="slotRow2" style="display:none">
+          <span class="slot-badge">Slot 2</span>
+          <input type="number" class="sched-time-inp" id="slot2" min="0" max="23" value="15" placeholder="15">
+          <span class="sched-time-unit">:00</span>
+          <button class="slot-remove-btn" onclick="removeSlot(2)">✕</button>
+        </div>
+        <!-- Slot 3 (shown when added) -->
+        <div class="sched-slot" id="slotRow3" style="display:none">
+          <span class="slot-badge">Slot 3</span>
+          <input type="number" class="sched-time-inp" id="slot3" min="0" max="23" value="21" placeholder="21">
+          <span class="sched-time-unit">:00</span>
+          <button class="slot-remove-btn" onclick="removeSlot(3)">✕</button>
         </div>
       </div>
-      <button class="sched-save-btn" id="schedSaveBtn" onclick="saveSchedule()">Save Schedule</button>
-      <div class="sched-saved" id="schedSaved" style="display:none">✓ Saved</div>
+
+      <div class="sched-actions">
+        <button class="sched-add-btn" id="addSlotBtn" onclick="addSlot()">+ Add Time Slot</button>
+        <button class="sched-save-btn" id="schedSaveBtn" onclick="saveSchedule()">Save Schedule</button>
+        <span class="sched-saved" id="schedSaved" style="display:none">✓ Saved!</span>
+      </div>
     </div>
     <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
     <div class="api-badges">
@@ -303,7 +316,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 
   <!-- STATS -->
   <div class="stats-row">
-    <div class="stat-card"><div class="sc-label">Posts Today</div><div class="sc-val cg" id="todayCount">0</div><div class="sc-sub">of 2 batch limit</div></div>
+    <div class="stat-card"><div class="sc-label">Posts Today</div><div class="sc-val cg" id="todayCount">0</div><div class="sc-sub">posted today</div></div>
     <div class="stat-card"><div class="sc-label">Subjects Left</div><div class="sc-val cp" id="subjLeft">—</div><div class="sc-sub">in queue</div></div>
     <div class="stat-card"><div class="sc-label">All-Time Sent</div><div class="sc-val cb" id="totalRun">0</div><div class="sc-sub">across all channels</div></div>
   </div>
@@ -591,73 +604,101 @@ function renderLogs(logs){
 }
 
 // ── SCHEDULE SETTINGS ──
-let currentBatch = 2;
-let schedSaveTimer = null;
+let activeSlots = 1;  // how many slot rows are visible
 
-function setBatch(val) {
-  currentBatch = val;
-  document.querySelectorAll('.seg-btn').forEach(b => {
-    b.classList.toggle('active', parseInt(b.dataset.val) === val);
-  });
-  scheduleSave();
+function to12h(h) {
+  if (h === 0)  return '12:00 AM';
+  if (h < 12)   return `${h}:00 AM`;
+  if (h === 12) return '12:00 PM';
+  return `${h-12}:00 PM`;
 }
 
-function scheduleSave() {
-  // Debounce saves
-  clearTimeout(schedSaveTimer);
-  schedSaveTimer = setTimeout(saveSchedule, 800);
+function updateMetaDisplay(slots) {
+  const metaH = document.getElementById('metaHour');
+  const metaB = document.getElementById('metaBatch');
+  if (metaH && slots.length > 0) metaH.textContent = slots.map(to12h).join(', ');
+  if (metaB) metaB.textContent = slots.length;
+}
+
+function addSlot() {
+  if (activeSlots >= 3) return;
+  activeSlots++;
+  document.getElementById(`slotRow${activeSlots}`).style.display = 'flex';
+  if (activeSlots >= 3) document.getElementById('addSlotBtn').style.display = 'none';
+}
+
+function removeSlot(n) {
+  document.getElementById(`slotRow${n}`).style.display = 'none';
+  if (n === 2 && activeSlots === 3) {
+    // Move slot 3 value to slot 2
+    document.getElementById('slot2').value = document.getElementById('slot3').value;
+    document.getElementById('slotRow3').style.display = 'none';
+    activeSlots = 1;
+  } else if (n === 3) {
+    activeSlots = 2;
+  } else if (n === 2) {
+    activeSlots = 1;
+  }
+  document.getElementById('addSlotBtn').style.display = 'flex';
+}
+
+function getSlotValues() {
+  const slots = [];
+  for (let i = 1; i <= 3; i++) {
+    const row = document.getElementById(`slotRow${i}`);
+    if (row && row.style.display !== 'none') {
+      const val = parseInt(document.getElementById(`slot${i}`).value);
+      if (!isNaN(val)) slots.push(Math.max(0, Math.min(23, val)));
+    }
+  }
+  return [...new Set(slots)].sort((a,b)=>a-b);
 }
 
 async function saveSchedule() {
-  const hourEl = document.getElementById('targetHour');
-  const hour   = Math.max(0, Math.min(23, parseInt(hourEl.value) || 8));
-  hourEl.value = hour;
-
+  const slots   = getSlotValues();
   const savedEl = document.getElementById('schedSaved');
   const btnEl   = document.getElementById('schedSaveBtn');
+
+  if (slots.length === 0) { alert('Add at least one time slot.'); return; }
 
   try {
     const res  = await fetch(`${API}/config`, {
       method: 'POST', credentials: 'include',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ batch_size: currentBatch, target_hour: hour })
+      body: JSON.stringify({ time_slots: slots })
     });
     const data = await res.json();
     if (data.ok) {
       savedEl.style.display = 'inline';
       btnEl.textContent = '✓ Saved';
+      updateMetaDisplay(slots);
       setTimeout(() => {
         savedEl.style.display = 'none';
         btnEl.textContent = 'Save Schedule';
       }, 2000);
-      // Update meta display
-      updateMetaDisplay(hour, currentBatch);
     }
   } catch(e) { console.error('Schedule save failed', e); }
 }
 
-function updateMetaDisplay(hour, batch) {
-  const h12  = hour === 0 ? '12:00 AM' : hour < 12 ? `${hour}:00 AM` : hour === 12 ? '12:00 PM' : `${hour-12}:00 PM`;
-  const metaH = document.getElementById('metaHour');
-  const metaB = document.getElementById('metaBatch');
-  if (metaH) metaH.textContent = h12;
-  if (metaB) metaB.textContent = batch;
-}
+function loadScheduleSettings(timeSlots) {
+  if (!timeSlots || !timeSlots.length) timeSlots = [8];
+  timeSlots = timeSlots.slice(0, 3);
 
-function loadScheduleSettings(batchSize, targetHour) {
-  currentBatch = batchSize || 2;
-  const hour   = targetHour !== undefined ? targetHour : 8;
-
-  // Update segment buttons
-  document.querySelectorAll('.seg-btn').forEach(b => {
-    b.classList.toggle('active', parseInt(b.dataset.val) === currentBatch);
-  });
-
-  // Update hour input
-  const hourEl = document.getElementById('targetHour');
-  if (hourEl) hourEl.value = hour;
-
-  updateMetaDisplay(hour, currentBatch);
+  // Show/hide slot rows and fill values
+  for (let i = 1; i <= 3; i++) {
+    const row = document.getElementById(`slotRow${i}`);
+    const inp = document.getElementById(`slot${i}`);
+    if (i <= timeSlots.length) {
+      if (row) row.style.display = 'flex';
+      if (inp) inp.value = timeSlots[i-1];
+    } else {
+      if (row) row.style.display = 'none';
+    }
+  }
+  activeSlots = timeSlots.length;
+  const addBtn = document.getElementById('addSlotBtn');
+  if (addBtn) addBtn.style.display = activeSlots >= 3 ? 'none' : 'flex';
+  updateMetaDisplay(timeSlots);
 }
 
 async function fetchStatus(){
@@ -683,8 +724,8 @@ async function fetchStatus(){
     if(data.config||data.accounts)updateBadges(data.config,data.accounts);
     if(data.channels_info)renderChannels(data.channels_info);
     updateTzBanner(data.utc_offset);
-    if(data.batch_size !== undefined || data.target_hour !== undefined) {
-      loadScheduleSettings(data.batch_size, data.target_hour);
+    if(data.time_slots) {
+      loadScheduleSettings(data.time_slots);
     }
   }catch(e){
     if(connected){connected=false;document.getElementById('connBanner').classList.add('show');document.getElementById('statusLabel').textContent='Offline';}
