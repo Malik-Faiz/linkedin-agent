@@ -694,6 +694,10 @@ def page_setup():     return load_html("setup.html")
 @app.route("/dashboard")
 def page_dashboard(): return load_html("dashboard.html")
 
+@app.route("/privacy")
+def privacy():
+    return load_html("privacy.html")
+
 @app.route("/ping")
 def ping():
     utc_now = datetime.utcnow()
@@ -1396,18 +1400,16 @@ def facebook_auth(username):
         "redirect_uri": FB_REDIRECT_URI,
         "state":        state,
         "scope":        "pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish",
+        "auth_type":    "rerequest",   # force Facebook to show the Allow screen every time
     }
     oauth_url = "https://www.facebook.com/v19.0/dialog/oauth?" + urllib.parse.urlencode(params)
 
-    # Store OAuth URL so the signout-retry button can use it
+    # Store for signout-retry
     session["fb_oauth_url"]     = oauth_url
     session["fb_reauth_target"] = oauth_url
 
-    # Open OAuth URL directly — this ALWAYS shows the Allow button on Facebook.
-    # The Allow button is what connects Facebook to our app.
-    # Do NOT navigate away (no logout redirects) — that breaks the OAuth context
-    # and Facebook goes to feed instead of showing Allow.
-    # The "Sign out & use different account" button on the success page handles switching.
+    # Return oauth_url directly — no logout navigation before it.
+    # auth_type=rerequest forces the permissions/Allow screen even if already authorized.
     return jsonify({"ok": True, "auth_url": oauth_url})
 
 
