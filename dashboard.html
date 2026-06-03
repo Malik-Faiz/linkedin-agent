@@ -11,7 +11,7 @@
 :root{
   --bg:#05030f;--card:rgba(255,255,255,0.028);--card-h:rgba(255,255,255,0.05);
   --border:rgba(160,120,255,0.13);--border2:rgba(160,120,255,0.25);
-  --text:#ede8ff;--muted:rgba(220,210,255,0.75);--muted2:rgba(210,200,255,0.5);
+  --text:#ede8ff;--muted:rgba(235,230,255,0.92);--muted2:rgba(225,218,255,0.75);
   --p:#b085ff;--p2:#ff80b5;--p3:#7ee8ff;--green:#3dffc0;--red:#ff6060;--amber:#ffcc5c;
   --font:'Syne',sans-serif;--mono:'DM Mono',monospace;--r:18px;
 }
@@ -77,7 +77,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .sched-box{background:rgba(255,255,255,0.025);border:1px solid rgba(160,120,255,0.2);border-radius:14px;
            padding:18px 20px;margin-top:16px;}
 .sched-label-main{font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px;}
-.sched-hint-main{font-size:11px;font-family:var(--mono);color:rgba(210,200,255,0.7);margin-bottom:14px;line-height:1.6;}
+.sched-hint-main{font-size:11px;font-family:var(--mono);color:rgba(230,225,255,0.88);margin-bottom:14px;line-height:1.6;}
 .sched-slots{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
 .sched-slot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .slot-badge{font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;
@@ -87,8 +87,8 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
                 border-radius:8px;padding:8px 10px;color:var(--text);font-family:var(--mono);
                 font-size:16px;font-weight:700;outline:none;text-align:center;transition:border-color 0.2s;}
 .sched-time-inp:focus{border-color:var(--p);box-shadow:0 0 0 3px rgba(176,133,255,0.1);}
-.sched-time-unit{font-size:13px;font-family:var(--mono);color:rgba(210,200,255,0.7);font-weight:600;}
-.slot-hint{font-size:10px;font-family:var(--mono);color:rgba(210,200,255,0.55);}
+.sched-time-unit{font-size:13px;font-family:var(--mono);color:rgba(230,225,255,0.88);font-weight:600;}
+.slot-hint{font-size:10px;font-family:var(--mono);color:rgba(225,218,255,0.78);}
 .sched-min-sel{background:rgba(0,0,0,0.3);border:1.5px solid rgba(160,120,255,0.25);border-radius:8px;
                padding:8px 6px;color:var(--text);font-family:var(--mono);font-size:14px;font-weight:700;
                outline:none;cursor:pointer;transition:border-color 0.2s;}
@@ -361,7 +361,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
     <!-- QUEUE -->
     <div class="card">
       <div class="card-hdr"><h2>Subject Queue</h2><span class="chip" id="queueChip">0 subjects</span></div>
-      <div class="next-badge">⏰ Next subject fire according to given time</div>
+      <div class="next-badge">⏰ Next 2 subjects fire at 08:00 AM your time</div>
       <div id="subjectList"></div>
     </div>
 
@@ -395,7 +395,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
         <input type="file" id="imgFile" accept="image/*" style="display:none" onchange="onFileChange()">
       </div>
       <div class="mode-panel" id="panelArticle" style="display:none">
-        <div class="art-note">📄 Article mode: generates a full long-form LinkedIn article (600+ words). Articles publish to LinkedIn only — not Facebook or Instagram.</div>
+        <div class="art-note">📄 Article mode: generates a full long-form article (600+ words). Publishes to LinkedIn as article. Facebook &amp; Instagram receive a post with title + preview. Add <strong>(create image)</strong> to subject for auto image on FB/IG.</div>
       </div>
 
       <button class="add-btn" id="addBtn" onclick="addSubjects()">
