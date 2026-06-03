@@ -226,28 +226,89 @@ def to_unicode_bold(text):
 def format_linkedin_bold(text):
     return re.sub(r'\*\*(.*?)\*\*', lambda m: to_unicode_bold(m.group(1)), text)
 
-def get_user_batch_size(username):
-    """Get user's configured batch size (1-3, default 2)."""
-    cfg = load_config(username)
-    bs  = cfg.get("batch_size", BATCH_SIZE)
-    return max(1, min(3, int(bs)))
-
-def get_user_target_hour(username):
-    """Get user's configured posting hour (0-23, default 8)."""
-    cfg = load_config(username)
-    th  = cfg.get("target_hour", TARGET_HOUR)
-    return max(0, min(23, int(th)))
-
 def get_next_run_time_for_user(username):
+    """
+    Returns the next scheduled run time for this user.
+    Looks at all subjects with time slots and returns the nearest upcoming one.
+    Falls back to default 08:00 if no subjects have time slots.
+    """
     cfg    = load_config(username)
     offset = cfg.get("utc_offset_hours", 0)
-    th     = get_user_target_hour(username)
     now_utc  = datetime.utcnow()
     user_now = now_utc + timedelta(hours=offset)
-    target_local = user_now.replace(hour=th, minute=0, second=0, microsecond=0)
-    if user_now >= target_local:
-        target_local += timedelta(days=1)
-    return target_local - timedelta(hours=offset)
+
+    # Read subjects and find next upcoming time slot
+    subjects_file = user_subjects_path(username)
+    next_times = []
+    if os.path.exists(subjects_file):
+        with open(subjects_file, "r", encoding="utf-8") as f:
+            subjects = [l.strip() for l in f if l.strip()]
+        for subj in subjects:
+            th = parse_subject_hour(subj)
+            if th is not None:
+                target = user_now.replace(hour=th, minute=0, second=0, microsecond=0)
+                if user_now >= target:
+                    target += timedelta(days=1)
+                next_times.append(target)
+
+    if next_times:
+        next_local = min(next_times)
+    else:
+        # fallback: 08:00 local
+        next_local = user_now.replace(hour=TARGET_HOUR, minute=0, second=0, microsecond=0)
+        if user_now >= next_local:
+            next_local += timedelta(days=1)
+
+    return next_local - timedelta(hours=offset)
+
+
+def parse_subject_hour(subject):
+    """
+    Extract posting hour from subject line.
+    Format: "Subject text @14" or "Subject text @14:00" or "Subject text @2pm"
+    Returns int hour (0-23) or None if no time found.
+    """
+    import re as _re
+    # Match @14, @14:00, @2pm, @9am, @3PM etc
+    m = _re.search(r'@(\d{1,2})(?::00)?\s*(am|pm)?', subject, _re.IGNORECASE)
+    if not m:
+        return None
+    hour   = int(m.group(1))
+    period = (m.group(2) or "").lower()
+    if period == "pm" and hour != 12:
+        hour += 12
+    elif period == "am" and hour == 12:
+        hour = 0
+    return max(0, min(23, hour))
+
+
+def get_subjects_due_now(username):
+    """
+    Returns list of subjects whose time slot matches current user-local time.
+    Also returns subjects with no time slot if it's 08:00 (default).
+    """
+    cfg    = load_config(username)
+    offset = cfg.get("utc_offset_hours", 0)
+    now_utc  = datetime.utcnow()
+    user_now = now_utc + timedelta(hours=offset)
+    cur_hour = user_now.hour
+
+    subjects_file = user_subjects_path(username)
+    if not os.path.exists(subjects_file):
+        return []
+
+    with open(subjects_file, "r", encoding="utf-8") as f:
+        subjects = [l.strip() for l in f if l.strip()]
+
+    due = []
+    for subj in subjects:
+        th = parse_subject_hour(subj)
+        if th is not None and th == cur_hour:
+            due.append(subj)
+        elif th is None and cur_hour == TARGET_HOUR:
+            # No time slot → post at default hour
+            due.append(subj)
+    return due
 
 def validate_image_url(url, timeout=8):
     try:
@@ -607,12 +668,12 @@ def run_batch(username, triggered_by="scheduler"):
         add_log(username, "Queue is empty!", "warn")
         state["running"] = False; state["status"] = "waiting"; return
 
-    user_batch = get_user_batch_size(username)
-    batch = all_subjects[:user_batch]
+    # Each scheduler call posts ONE subject (the next in queue for this time slot)
+    batch = all_subjects[:1]
     with open(subjects_file, "w", encoding="utf-8") as f:
-        f.write("\n".join(all_subjects[user_batch:]))
+        f.write("\n".join(all_subjects[1:]))
 
-    add_log(username, f"Processing {len(batch)} subjects (batch size: {user_batch}). {len(all_subjects)-len(batch)} remaining.", "info")
+    add_log(username, f"Processing 1 subject. {len(all_subjects)-1} remaining in queue.", "info")
 
     for j, subject in enumerate(batch):
         manual_image_url = None
@@ -668,22 +729,50 @@ def run_batch(username, triggered_by="scheduler"):
 
 # ─── SCHEDULER ────────────────────────────────────────────────────────────────
 def scheduler_loop():
-    print("[SCHEDULER] Started — fires at 08:00 local time per user")
-    fired_today = set()
+    """
+    Fires once per minute check. For each user, fires run_batch at each
+    of their configured time slots (up to 3 per day).
+    Time slots are stored in user config as "time_slots": [8, 15, 21]
+    Each fire posts ONE subject from the queue.
+    """
+    print("[SCHEDULER] Started — per-user time slots")
+    fired_today = {}   # {username: set of hours fired today}
     while True:
         now_utc = datetime.utcnow()
         for uname in load_users():
             cfg      = load_config(uname)
             offset   = cfg.get("utc_offset_hours", 0)
             user_now = now_utc + timedelta(hours=offset)
-            fire_key = (uname, user_now.date())
-            user_th = get_user_target_hour(uname)
-            if (user_now.hour == user_th and user_now.minute == 0
-                    and user_now.second < 5 and fire_key not in fired_today):
-                fired_today.add(fire_key)
-                add_log(uname, f"Scheduler fired at local {user_th:02d}:00 (UTC{offset:+.1f}h)", "info")
-                threading.Thread(target=run_batch, args=(uname, "scheduler"), daemon=True).start()
-        fired_today = {k for k in fired_today if k[1] >= now_utc.date()}
+            cur_hour = user_now.hour
+            cur_min  = user_now.minute
+            cur_sec  = user_now.second
+            today    = user_now.date()
+
+            # Init fired set for this user/day
+            if uname not in fired_today or fired_today[uname].get("date") != today:
+                fired_today[uname] = {"date": today, "hours": set()}
+
+            # Get user's time slots — list of {h, m} dicts
+            raw_slots = cfg.get("time_slots", [{"h": TARGET_HOUR, "m": 0}])
+            if not isinstance(raw_slots, list) or not raw_slots:
+                raw_slots = [{"h": TARGET_HOUR, "m": 0}]
+            # Normalize: support old int format and new {h,m} format
+            slots = []
+            for s in raw_slots:
+                if isinstance(s, dict):
+                    slots.append((int(s.get("h", 8)), int(s.get("m", 0))))
+                elif isinstance(s, (int, float)):
+                    slots.append((int(s), 0))
+
+            # Check if current time matches any slot (within 5s window)
+            for (sh, sm) in slots:
+                fire_key = (sh, sm)
+                if (cur_hour == sh and cur_min == sm and cur_sec < 5 and
+                        fire_key not in fired_today[uname]["hours"]):
+                    fired_today[uname]["hours"].add(fire_key)
+                    add_log(uname, f"Scheduler fired at local {sh:02d}:{sm:02d} (UTC{offset:+.1f}h)", "info")
+                    threading.Thread(target=run_batch, args=(uname, "scheduler"), daemon=True).start()
+
         time.sleep(1)
 
 def keep_alive_loop():
@@ -836,10 +925,27 @@ def save_config_route(username):
         if val and "*" not in val:
             cfg[field] = val
     # Batch size and posting time
-    if "batch_size" in data:
-        cfg["batch_size"] = max(1, min(3, int(data["batch_size"])))
-    if "target_hour" in data:
-        cfg["target_hour"] = max(0, min(23, int(data["target_hour"])))
+    # Time slots: list of {h, m} dicts — up to 3 slots
+    # e.g. [{"h": 8, "m": 30}, {"h": 15, "m": 0}]
+    if "time_slots" in data:
+        raw = data["time_slots"]
+        if isinstance(raw, list):
+            cleaned = []
+            seen    = set()
+            for s in raw[:3]:
+                if isinstance(s, dict):
+                    h = max(0, min(23, int(s.get("h", 8))))
+                    m = max(0, min(59, int(s.get("m", 0))))
+                elif isinstance(s, (int, float)):
+                    h, m = max(0, min(23, int(s))), 0
+                else:
+                    continue
+                key = (h, m)
+                if key not in seen:
+                    seen.add(key)
+                    cleaned.append({"h": h, "m": m})
+            cleaned.sort(key=lambda x: x["h"]*60 + x["m"])
+            cfg["time_slots"] = cleaned
     save_config(username, cfg)
     add_log(username, "Config updated ✓", "ok")
     return jsonify({"ok": True, "message": "Configuration saved!"})
@@ -2075,8 +2181,7 @@ def get_status(username):
         "subjects":      subjects,
         "logs":          state["logs"][-30:],
         "utc_offset":    offset,
-        "batch_size":    get_user_batch_size(username),
-        "target_hour":   get_user_target_hour(username),
+        "time_slots":    cfg.get("time_slots", [TARGET_HOUR]),
         "config":        cfg,
         "channels_info": channels_info,
         "accounts": {
