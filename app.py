@@ -1095,6 +1095,25 @@ body{{min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',s
 
   {org_section}
 
+  <!-- ── MANUAL COMPANY PAGE ── -->
+  <div class="divider"><span>OR ENTER COMPANY PAGE ID MANUALLY</span></div>
+  <div class="manual-box">
+    <div class="manual-hdr">🏢 Connect a Company Page manually</div>
+    <div class="manual-sub">
+      LinkedIn restricts the API from listing your pages automatically.<br>
+      Paste your Company Page numeric ID below — find it in your page URL:<br>
+      <code>linkedin.com/company/<strong>12345678</strong>/admin</code>
+      <br>or go to <strong>LinkedIn Page → Admin View → Page Info</strong>
+    </div>
+    <div class="manual-row">
+      <input type="text" id="manualPageId" placeholder="e.g. 12345678" maxlength="30"
+             oninput="this.value=this.value.replace(/[^0-9]/,'')">
+      <input type="text" id="manualPageName" placeholder="Page display name (e.g. My Company)">
+    </div>
+    <div id="manualErr" style="display:none;color:#ff8080;font-size:11px;margin-top:6px;"></div>
+    <button class="manual-btn" onclick="pickManual()">🔗 Connect Company Page →</button>
+  </div>
+
   <div class="loading" id="loadingBox">
     <span class="spin">⟳</span> Connecting...
   </div>
@@ -1106,6 +1125,25 @@ body{{min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',s
   </div>
   <p class="signout-note">Signs you out of LinkedIn so you can connect a different account</p>
 </div>
+
+<style>
+.manual-box{{margin-top:4px;padding:16px;border:1.5px dashed rgba(176,133,255,0.3);
+            border-radius:14px;background:rgba(176,133,255,0.04);}}
+.manual-hdr{{font-size:13px;font-weight:700;margin-bottom:8px;}}
+.manual-sub{{font-size:11px;color:rgba(200,185,255,0.55);line-height:1.75;margin-bottom:12px;font-family:'Segoe UI',sans-serif;}}
+.manual-sub code{{background:rgba(176,133,255,0.15);border-radius:4px;padding:1px 5px;font-size:11px;color:#b085ff;}}
+.manual-row{{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}}
+.manual-row input{{width:100%;background:rgba(0,0,0,0.4);border:1px solid rgba(176,133,255,0.2);
+                   border-radius:10px;padding:11px 13px;color:#ede8ff;font-family:'Segoe UI',sans-serif;
+                   font-size:13px;outline:none;transition:all 0.2s;}}
+.manual-row input:focus{{border-color:rgba(176,133,255,0.5);background:rgba(176,133,255,0.06);}}
+.manual-row input::placeholder{{color:rgba(200,185,255,0.4);}}
+.manual-btn{{width:100%;padding:12px;border-radius:11px;border:none;
+             background:linear-gradient(135deg,#0077b5,#0099cc);color:#fff;
+             font-family:'Segoe UI',sans-serif;font-size:14px;font-weight:700;
+             cursor:pointer;transition:all 0.2s;}}
+.manual-btn:hover{{opacity:0.88;transform:translateY(-1px);}}
+</style>
 
 <script>
 async function pick(acct_type, acct_id, acct_name) {{
@@ -1136,6 +1174,55 @@ async function pick(acct_type, acct_id, acct_name) {{
     alert('Network error: ' + e.message);
     document.querySelectorAll('.acct-card').forEach(c => c.style.pointerEvents='');
     document.getElementById('loadingBox').style.display='none';
+  }}
+}}
+
+async function pickManual() {{
+  const pageId   = document.getElementById('manualPageId').value.trim();
+  const pageName = document.getElementById('manualPageName').value.trim();
+  const errEl    = document.getElementById('manualErr');
+  errEl.style.display = 'none';
+
+  if (!pageId) {{
+    errEl.textContent = '⚠ Please enter a Company Page ID (the number from the URL).';
+    errEl.style.display = 'block'; return;
+  }}
+  if (!/^[0-9]+$/.test(pageId)) {{
+    errEl.textContent = '⚠ Page ID must be numbers only.';
+    errEl.style.display = 'block'; return;
+  }}
+
+  const name = pageName || ('Company Page ' + pageId);
+  document.getElementById('loadingBox').style.display = 'block';
+  document.querySelector('.manual-btn').disabled = true;
+
+  try {{
+    const res = await fetch('/api/auth/linkedin/pick', {{
+      method: 'POST',
+      headers: {{'Content-Type':'application/json'}},
+      body: JSON.stringify({{
+        username:  '{username}',
+        slot:      {slot},
+        acct_type: 'organization',
+        acct_id:   pageId,
+        acct_name: name,
+      }})
+    }});
+    const data = await res.json();
+    if (data.ok) {{
+      window.opener && window.opener.postMessage('channel_connected:linkedin:{slot}', '*');
+      window.close();
+    }} else {{
+      errEl.textContent = 'Error: ' + (data.message || 'Unknown error');
+      errEl.style.display = 'block';
+      document.getElementById('loadingBox').style.display = 'none';
+      document.querySelector('.manual-btn').disabled = false;
+    }}
+  }} catch(e) {{
+    errEl.textContent = 'Network error: ' + e.message;
+    errEl.style.display = 'block';
+    document.getElementById('loadingBox').style.display = 'none';
+    document.querySelector('.manual-btn').disabled = false;
   }}
 }}
 
