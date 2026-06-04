@@ -1043,7 +1043,7 @@ def linkedin_auth(username):
         "client_id":     LI_CLIENT_ID,
         "redirect_uri":  LI_REDIRECT_URI,
         "state":         state_payload,
-        "scope":         "openid profile w_member_social",
+        "scope":         "openid profile w_member_social r_organization_admin w_organization_social",
         "prompt":        "login",       # force credential prompt — works when no session
         "login_hint":    "",            # clear any prefilled email hint
     }
@@ -1442,7 +1442,7 @@ def linkedin_callback():
             "client_id":     LI_CLIENT_ID,
             "redirect_uri":  LI_REDIRECT_URI,
             "state":         state_raw,
-            "scope":         "openid profile w_member_social",
+            "scope":         "openid profile w_member_social r_organization_admin w_organization_social",
             "prompt":        "login",
         })
         return _li_account_picker_page(
