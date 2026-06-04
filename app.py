@@ -64,9 +64,7 @@ def load_html(name):
 # ─── ENCRYPTION ───────────────────────────────────────────────────────────────
 SENSITIVE_FIELDS = {
     "groq_api_key", "serpapi_key",
-    # LinkedIn slots 1-3
     "linkedin_1_access_token", "linkedin_2_access_token", "linkedin_3_access_token",
-    # Facebook / Instagram
     "facebook_access_token", "instagram_access_token",
 }
 
@@ -219,17 +217,11 @@ def format_linkedin_bold(text):
     return re.sub(r'\*\*(.*?)\*\*', lambda m: to_unicode_bold(m.group(1)), text)
 
 def get_next_run_time_for_user(username):
-    """
-    Returns the next scheduled run time for this user.
-    Looks at all subjects with time slots and returns the nearest upcoming one.
-    Falls back to default 08:00 if no subjects have time slots.
-    """
     cfg    = load_config(username)
     offset = cfg.get("utc_offset_hours", 0)
     now_utc  = datetime.utcnow()
     user_now = now_utc + timedelta(hours=offset)
 
-    # Read subjects and find next upcoming time slot
     subjects_file = user_subjects_path(username)
     next_times = []
     if os.path.exists(subjects_file):
@@ -246,7 +238,6 @@ def get_next_run_time_for_user(username):
     if next_times:
         next_local = min(next_times)
     else:
-        # fallback: 08:00 local
         next_local = user_now.replace(hour=TARGET_HOUR, minute=0, second=0, microsecond=0)
         if user_now >= next_local:
             next_local += timedelta(days=1)
@@ -255,13 +246,7 @@ def get_next_run_time_for_user(username):
 
 
 def parse_subject_hour(subject):
-    """
-    Extract posting hour from subject line.
-    Format: "Subject text @14" or "Subject text @14:00" or "Subject text @2pm"
-    Returns int hour (0-23) or None if no time found.
-    """
     import re as _re
-    # Match @14, @14:00, @2pm, @9am, @3PM etc
     m = _re.search(r'@(\d{1,2})(?::00)?\s*(am|pm)?', subject, _re.IGNORECASE)
     if not m:
         return None
@@ -275,10 +260,6 @@ def parse_subject_hour(subject):
 
 
 def get_subjects_due_now(username):
-    """
-    Returns list of subjects whose time slot matches current user-local time.
-    Also returns subjects with no time slot if it's 08:00 (default).
-    """
     cfg    = load_config(username)
     offset = cfg.get("utc_offset_hours", 0)
     now_utc  = datetime.utcnow()
@@ -298,7 +279,6 @@ def get_subjects_due_now(username):
         if th is not None and th == cur_hour:
             due.append(subj)
         elif th is None and cur_hour == TARGET_HOUR:
-            # No time slot → post at default hour
             due.append(subj)
     return due
 
@@ -376,9 +356,6 @@ def get_image_url(username, subject):
 # ════════════════════════════════════════════════════════════════════════════════
 
 def publish_to_linkedin_slot(username, slot, text, image_url=None):
-    """Publish to a specific LinkedIn account slot (1, 2, or 3).
-    Supports both personal profiles (urn:li:person:) and company pages (urn:li:organization:).
-    """
     cfg      = load_config(username)
     token    = cfg.get(f"linkedin_{slot}_access_token", "")
     urn      = cfg.get(f"linkedin_{slot}_urn", "")
@@ -388,12 +365,6 @@ def publish_to_linkedin_slot(username, slot, text, image_url=None):
     if not token or not urn:
         add_log(username, f"  → [LinkedIn #{slot}] Not connected — skipping.", "warn")
         return False
-
-    # Company pages use a different visibility URN
-    if acct_type == "organization":
-        visibility = {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
-    else:
-        visibility = {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
 
     headers = {
         "Authorization": f"Bearer {token}",
@@ -440,7 +411,6 @@ def publish_to_linkedin_slot(username, slot, text, image_url=None):
                 "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
             }
     else:
-        # Truncate to LinkedIn 3000 char limit
         safe_text = text[:3000].rsplit(" ", 1)[0] if len(text) > 3000 else text
         payload = {
             "author": urn, "lifecycleState": "PUBLISHED",
@@ -466,7 +436,6 @@ def publish_to_linkedin_slot(username, slot, text, image_url=None):
 
 
 def publish_to_facebook(username, text, image_url=None):
-    """Publish post directly to Facebook Page."""
     cfg      = load_config(username)
     token    = cfg.get("facebook_access_token", "")
     page_id  = cfg.get("facebook_page_id", "")
@@ -501,7 +470,6 @@ def publish_to_facebook(username, text, image_url=None):
 
 
 def publish_to_instagram(username, text, image_url=None):
-    """Publish image post to Instagram Business account."""
     cfg     = load_config(username)
     token   = cfg.get("instagram_access_token", "")
     ig_id   = cfg.get("instagram_account_id", "")
@@ -540,23 +508,14 @@ def publish_to_instagram(username, text, image_url=None):
 
 
 def publish_to_all(username, text, image_url=None):
-    """
-    Publish to ALL connected channels:
-      - LinkedIn slots 1, 2, 3 (each is a separate account)
-      - Facebook page
-      - Instagram business
-    Returns count of successful publishes.
-    """
     cfg        = load_config(username)
     ch_enabled = cfg.get("channel_enabled", {})
     success    = 0
 
     def is_enabled(platform, slot):
         key = f"{platform}_{slot}"
-        # Default True (enabled) unless user explicitly turned it off
         return ch_enabled.get(key, True)
 
-    # LinkedIn — up to 3 slots
     for slot in [1, 2, 3]:
         token = cfg.get(f"linkedin_{slot}_access_token", "")
         if token:
@@ -567,7 +526,6 @@ def publish_to_all(username, text, image_url=None):
             if ok:
                 success += 1
 
-    # Facebook
     if cfg.get("facebook_access_token"):
         if not is_enabled("facebook", 1):
             add_log(username, "  → [Facebook] Skipped (toggled OFF by user)", "info")
@@ -576,7 +534,6 @@ def publish_to_all(username, text, image_url=None):
             if ok:
                 success += 1
 
-    # Instagram — image required
     if cfg.get("instagram_access_token"):
         if not is_enabled("instagram", 1):
             add_log(username, "  → [Instagram] Skipped (toggled OFF by user)", "info")
@@ -624,7 +581,6 @@ def run_batch(username, triggered_by="scheduler"):
         add_log(username, "Queue is empty!", "warn")
         state["running"] = False; state["status"] = "waiting"; return
 
-    # Each scheduler call posts ONE subject (the next in queue for this time slot)
     batch = all_subjects[:1]
     with open(subjects_file, "w", encoding="utf-8") as f:
         f.write("\n".join(all_subjects[1:]))
@@ -677,14 +633,8 @@ def run_batch(username, triggered_by="scheduler"):
 
 # ─── SCHEDULER ────────────────────────────────────────────────────────────────
 def scheduler_loop():
-    """
-    Fires once per minute check. For each user, fires run_batch at each
-    of their configured time slots (up to 3 per day).
-    Time slots are stored in user config as "time_slots": [8, 15, 21]
-    Each fire posts ONE subject from the queue.
-    """
     print("[SCHEDULER] Started — per-user time slots")
-    fired_today = {}   # {username: set of hours fired today}
+    fired_today = {}
     while True:
         now_utc = datetime.utcnow()
         for uname in load_users():
@@ -696,15 +646,12 @@ def scheduler_loop():
             cur_sec  = user_now.second
             today    = user_now.date()
 
-            # Init fired set for this user/day
             if uname not in fired_today or fired_today[uname].get("date") != today:
                 fired_today[uname] = {"date": today, "hours": set()}
 
-            # Get user's time slots — list of {h, m} dicts
             raw_slots = cfg.get("time_slots", [{"h": TARGET_HOUR, "m": 0}])
             if not isinstance(raw_slots, list) or not raw_slots:
                 raw_slots = [{"h": TARGET_HOUR, "m": 0}]
-            # Normalize: support old int format and new {h,m} format
             slots = []
             for s in raw_slots:
                 if isinstance(s, dict):
@@ -712,7 +659,6 @@ def scheduler_loop():
                 elif isinstance(s, (int, float)):
                     slots.append((int(s), 0))
 
-            # Check if current time matches any slot (within 5s window)
             for (sh, sm) in slots:
                 fire_key = (sh, sm)
                 if (cur_hour == sh and cur_min == sm and cur_sec < 5 and
@@ -752,9 +698,7 @@ def privacy():
 
 @app.route("/instagram/webhook", methods=["GET", "POST"])
 def instagram_webhook():
-    """Instagram webhook verification and event handler."""
     if request.method == "GET":
-        # Verification challenge
         verify_token = os.environ.get("INSTAGRAM_VERIFY_TOKEN", "myverifytoken123")
         mode      = request.args.get("hub.mode")
         token     = request.args.get("hub.verify_token")
@@ -762,7 +706,6 @@ def instagram_webhook():
         if mode == "subscribe" and token == verify_token:
             return challenge, 200
         return "Forbidden", 403
-    # POST — ignore incoming events
     return "OK", 200
 
 
@@ -872,9 +815,6 @@ def save_config_route(username):
         val = (data.get(field) or "").strip()
         if val and "*" not in val:
             cfg[field] = val
-    # Batch size and posting time
-    # Time slots: list of {h, m} dicts — up to 3 slots
-    # e.g. [{"h": 8, "m": 30}, {"h": 15, "m": 0}]
     if "time_slots" in data:
         raw = data["time_slots"]
         if isinstance(raw, list):
@@ -899,7 +839,7 @@ def save_config_route(username):
     return jsonify({"ok": True, "message": "Configuration saved!"})
 
 # ════════════════════════════════════════════════════════════════════════════════
-#  CHANNELS STATUS  — GET /api/channels
+#  CHANNELS STATUS
 # ════════════════════════════════════════════════════════════════════════════════
 @app.route("/api/channels")
 def get_channels():
@@ -917,7 +857,6 @@ def get_channels():
         except Exception:
             return False
 
-    # Build LinkedIn slots 1-3
     linkedin = {}
     for slot in [1, 2, 3]:
         t_key  = f"linkedin_{slot}_access_token"
@@ -964,13 +903,6 @@ def get_channels():
 # ════════════════════════════════════════════════════════════════════════════════
 
 def _callback_page(success, message="", msg_key="", platform="linkedin", slot=1):
-    """
-    Returns an HTML page that:
-     - On success: posts a message to the opener and closes the popup
-     - On failure: shows the error message in the popup window
-    Uses a self-contained page so it works even when the session cookie
-    is not available in the popup (common cross-origin scenario on Railway).
-    """
     if success:
         event = msg_key or f"channel_connected:{platform}:{slot}"
         return f"""<!DOCTYPE html>
@@ -1030,10 +962,9 @@ def linkedin_auth(username):
         slot = int(slot)
     except ValueError:
         slot = 1
-    slot = max(1, min(3, slot))  # clamp 1-3
+    slot = max(1, min(3, slot))
 
     state_token   = secrets.token_hex(16)
-    # Encode username + slot into state — popup cookie may not be forwarded on Railway
     state_payload = f"{username}:{slot}:{state_token}"
     session[f"li_state_{slot}"] = state_token
     session["li_active_slot"]   = slot
@@ -1044,8 +975,8 @@ def linkedin_auth(username):
         "redirect_uri":  LI_REDIRECT_URI,
         "state":         state_payload,
         "scope":         "openid profile w_member_social r_organization_admin w_organization_social",
-        "prompt":        "login",       # force credential prompt — works when no session
-        "login_hint":    "",            # clear any prefilled email hint
+        "prompt":        "login",
+        "login_hint":    "",
     }
     oauth_url = "https://www.linkedin.com/oauth/v2/authorization?" + urllib.parse.urlencode(params)
 
@@ -1053,27 +984,20 @@ def linkedin_auth(username):
 
 
 def _li_account_picker_page(username, slot, access_token, expires_in, personal_name, personal_id, orgs, oauth_url=''):
-    """
-    Renders an in-popup page that lets the user pick:
-      • their personal LinkedIn profile, OR
-      • one of their company pages (organisations)
-    Submits to /api/auth/linkedin/pick to save the chosen account.
-    """
     org_cards = ""
     for org in orgs:
         oid   = org.get("id", "")
-        oname = org.get("name", f"Company {oid}")
+        oname = org.get("name", f"Company {oid}").replace("'", "\\'").replace('"', '&quot;')
         org_cards += f"""
-        <label class="acct-card" onclick="pick('organization', '{oid}', '{oname.replace("'", "\'")}')">
+        <label class="acct-card" onclick="pick('organization', '{oid}', '{oname}')">
           <span class="acct-ico">🏢</span>
           <span class="acct-info">
-            <strong>{oname}</strong>
-            <small>Company Page</small>
+            <strong>{org.get("name", f"Company {oid}")}</strong>
+            <small>Company Page · ID: {oid}</small>
           </span>
           <span class="acct-arrow">→</span>
         </label>"""
 
-    # Store token temporarily for the pick endpoint
     token_key = f"li_pending_{username}_{slot}"
     session[token_key] = {
         "access_token": access_token,
@@ -1082,11 +1006,24 @@ def _li_account_picker_page(username, slot, access_token, expires_in, personal_n
         "personal_name": personal_name,
     }
 
-    # Store oauth_url so signout route can restart the flow
     token_key2 = f"li_oauth_{username}_{slot}"
     session[token_key2] = oauth_url
 
     safe_name = personal_name.replace("'", "\\'")
+
+    org_section = ""
+    if orgs:
+        org_section = f"""
+        <div class="divider"><span>OR COMPANY PAGE ({len(orgs)} found)</span></div>
+        <div class="org-scroll">
+          {org_cards}
+        </div>"""
+    else:
+        org_section = """
+        <div class="no-orgs">
+          <span style="font-size:20px;">🏢</span>
+          <span>No company pages found on this account</span>
+        </div>"""
 
     return f"""<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1095,7 +1032,7 @@ def _li_account_picker_page(username, slot, access_token, expires_in, personal_n
 *{{box-sizing:border-box;margin:0;padding:0;}}
 body{{min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',sans-serif;
      display:flex;align-items:center;justify-content:center;padding:24px;}}
-.wrap{{width:100%;max-width:420px;}}
+.wrap{{width:100%;max-width:440px;}}
 .hdr{{text-align:center;margin-bottom:24px;}}
 .hdr h2{{font-size:20px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px;}}
 .hdr p{{font-size:12px;color:rgba(200,185,255,0.55);}}
@@ -1105,7 +1042,7 @@ body{{min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',s
                 color:rgba(200,185,255,0.4);margin-bottom:10px;}}
 .acct-card{{display:flex;align-items:center;gap:14px;padding:14px 16px;
             border:1.5px solid rgba(160,120,255,0.2);border-radius:14px;
-            background:rgba(255,255,255,0.03);margin-bottom:10px;
+            background:rgba(255,255,255,0.03);margin-bottom:8px;
             cursor:pointer;transition:all 0.2s;text-decoration:none;color:inherit;}}
 .acct-card:hover{{border-color:rgba(176,133,255,0.5);background:rgba(176,133,255,0.07);
                   transform:translateY(-1px);}}
@@ -1115,13 +1052,20 @@ body{{min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',s
                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}}
 .acct-info small{{display:block;font-size:11px;color:rgba(200,185,255,0.5);margin-top:2px;}}
 .acct-arrow{{color:rgba(176,133,255,0.5);font-size:16px;flex-shrink:0;}}
-.divider{{display:flex;align-items:center;gap:10px;margin:16px 0;}}
+.divider{{display:flex;align-items:center;gap:10px;margin:16px 0 12px;}}
 .divider::before,.divider::after{{content:'';flex:1;height:1px;background:rgba(160,120,255,0.15);}}
-.divider span{{font-size:10px;color:rgba(200,185,255,0.35);letter-spacing:1px;}}
+.divider span{{font-size:10px;color:rgba(200,185,255,0.35);letter-spacing:1px;white-space:nowrap;}}
+.org-scroll{{max-height:280px;overflow-y:auto;padding-right:4px;}}
+.org-scroll::-webkit-scrollbar{{width:4px;}}
+.org-scroll::-webkit-scrollbar-track{{background:rgba(255,255,255,0.03);border-radius:2px;}}
+.org-scroll::-webkit-scrollbar-thumb{{background:rgba(176,133,255,0.3);border-radius:2px;}}
+.no-orgs{{display:flex;align-items:center;gap:10px;padding:14px 16px;border-radius:14px;
+          border:1px dashed rgba(160,120,255,0.2);background:rgba(255,255,255,0.02);
+          font-size:12px;color:rgba(200,185,255,0.45);margin-bottom:8px;}}
 .loading{{display:none;text-align:center;padding:20px;font-size:13px;color:rgba(200,185,255,0.5);}}
 .spin{{display:inline-block;animation:sp 0.8s linear infinite;}}
 @keyframes sp{{to{{transform:rotate(360deg);}}}}
-.signout-row{{display:flex;align-items:center;justify-content:center;margin-top:24px;}}
+.signout-row{{display:flex;align-items:center;justify-content:center;margin-top:20px;}}
 .signout-btn{{display:flex;align-items:center;gap:8px;padding:11px 22px;border-radius:11px;
               border:1.5px solid rgba(255,96,96,0.25);background:rgba(255,96,96,0.07);
               color:rgba(255,130,130,0.9);font-size:13px;font-weight:600;
@@ -1149,7 +1093,7 @@ body{{min-height:100vh;background:#05030f;color:#ede8ff;font-family:'Segoe UI',s
     <span class="acct-arrow">→</span>
   </label>
 
-  {'<div class="divider"><span>OR COMPANY PAGE</span></div>' + org_cards if orgs else ''}
+  {org_section}
 
   <div class="loading" id="loadingBox">
     <span class="spin">⟳</span> Connecting...
@@ -1204,15 +1148,12 @@ function doSignOut() {{
 
 @app.route("/api/auth/linkedin/signout/<username>/<int:slot>")
 def linkedin_signout(username, slot):
-    """Sign user out of LinkedIn then redirect back to OAuth URL for fresh sign-in."""
     token_key = f"li_oauth_{username}_{slot}"
     oauth_url = session.get(token_key, "")
     if not oauth_url:
         return redirect("/setup")
 
-    # Safely embed oauth_url as a JS string
     safe_oauth = oauth_url.replace("\\", "\\\\").replace("'", "\\'")
-
 
     return f"""<!DOCTYPE html>
 <html><head><meta charset='UTF-8'><title>Signing out...</title>
@@ -1241,7 +1182,6 @@ p{{font-size:13px;color:rgba(200,185,255,.55);max-width:300px;line-height:1.7;}}
 
 @app.route("/api/auth/linkedin/reauth")
 def linkedin_reauth():
-    """Landing page after LinkedIn logout — shows Sign In button pointing to OAuth URL."""
     return """<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Sign in</title>
 <style>*{box-sizing:border-box;margin:0;padding:0;}body{min-height:100vh;background:#05030f;color:#ede8ff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;text-align:center;padding:28px;gap:16px;}h2{font-size:19px;font-weight:800;}p{font-size:13px;color:rgba(200,185,255,.55);max-width:300px;line-height:1.7;}.btn{padding:14px 28px;border-radius:12px;border:none;background:linear-gradient(135deg,#0077b5,#0099cc);color:#fff;font-size:15px;font-weight:700;cursor:pointer;}</style></head>
 <body><h2>✓ Signed out of LinkedIn</h2><p>Now sign in with the account you want to connect.</p><button class='btn' id='btn'>Sign In with LinkedIn →</button>
@@ -1254,7 +1194,7 @@ def linkedin_pick():
     data      = request.get_json()
     username  = data.get("username", "")
     slot      = int(data.get("slot", 1))
-    acct_type = data.get("acct_type", "personal")   # "personal" | "organization"
+    acct_type = data.get("acct_type", "personal")
     acct_id   = data.get("acct_id", "")
     acct_name = data.get("acct_name", "")
 
@@ -1273,22 +1213,19 @@ def linkedin_pick():
     cfg = load_config(username)
 
     if acct_type == "organization":
-        # For company pages, use the organization URN
         urn = f"urn:li:organization:{acct_id}"
     else:
-        # Personal profile
         urn = f"urn:li:person:{acct_id}"
 
     cfg[f"linkedin_{slot}_access_token"]  = access_token
     cfg[f"linkedin_{slot}_urn"]           = urn
     cfg[f"linkedin_{slot}_name"]          = acct_name
-    cfg[f"linkedin_{slot}_account_type"]  = acct_type   # "personal" | "organization"
+    cfg[f"linkedin_{slot}_account_type"]  = acct_type
     cfg[f"linkedin_{slot}_token_expires"] = (
         datetime.utcnow() + timedelta(seconds=expires_in)
     ).isoformat()
     save_config(username, cfg)
 
-    # Clean up pending token from session
     session.pop(token_key, None)
 
     add_log(username, f"LinkedIn slot {slot} → {acct_type} '{acct_name}' connected ✓", "ok")
@@ -1297,13 +1234,6 @@ def linkedin_pick():
 
 @app.route("/api/auth/start")
 def auth_start():
-    """
-    Just redirect straight to the OAuth URL.
-    prompt=login is already in the LinkedIn OAuth params — it forces LinkedIn
-    to show the sign-in form even when a session exists. Do NOT navigate away
-    from the OAuth URL (no logout redirects) or LinkedIn loses the OAuth context
-    and sends user to /feed after sign-in instead of the Allow screen.
-    """
     oauth_url = request.args.get("oauth", "")
     if not oauth_url:
         return "Missing oauth param", 400
@@ -1330,7 +1260,6 @@ def linkedin_callback():
         desc = request.args.get("error_description", error)
         return _callback_page(False, f"LinkedIn denied access: {desc}")
 
-    # State format: "username:slot:token"
     try:
         username, slot_str, state_token = state_raw.split(":", 2)
         slot = int(slot_str)
@@ -1373,37 +1302,40 @@ def linkedin_callback():
             "LinkedIn User"
         )
 
-        # Fetch organisations (company pages) this user administers.
-        # Uses /v2/organizationAcls which works with w_member_social scope.
-        # If the app doesn't have access, we gracefully skip — user still gets personal profile.
+        # ── FETCH ALL ORGANISATIONS (all roles, no filter) ──────────────────
         orgs = []
         try:
-            org_res = requests.get(
+            # Step 1: Get all ACLs — no role filter so we get every page the user
+            # has any admin role on (ADMINISTRATOR, DIRECT_SPONSORED_CONTENT_POSTER, etc.)
+            acl_res = requests.get(
                 "https://api.linkedin.com/v2/organizationAcls",
                 headers={
                     "Authorization": f"Bearer {access_token}",
                     "X-Restli-Protocol-Version": "2.0.0",
                 },
                 params={
-                    "q":          "roleAssignee",
-                    "role":       "ADMINISTRATOR",
-                    "count":      10,
+                    "q":     "roleAssignee",
+                    "count": 50,          # fetch up to 50 — default was 10
+                    # intentionally no "role" param → returns ALL roles
                 },
-                timeout=10
+                timeout=12
             ).json()
 
-            # Extract org IDs from ACL response
+            # Extract unique org IDs from URNs like "urn:li:organization:12345"
             org_ids = []
-            for elem in org_res.get("elements", []):
-                target = elem.get("organizationalTarget", "")
-                # target looks like "urn:li:organization:12345"
-                if "organization:" in str(target):
-                    org_id = str(target).split("organization:")[-1].strip()
-                    if org_id:
+            seen_ids = set()
+            for elem in acl_res.get("elements", []):
+                target = str(elem.get("organizationalTarget", ""))
+                if "organization:" in target:
+                    org_id = target.split("organization:")[-1].strip()
+                    if org_id and org_id not in seen_ids:
+                        seen_ids.add(org_id)
                         org_ids.append(org_id)
 
-            # Fetch names for each org
-            for org_id in org_ids[:5]:  # max 5
+            add_log(username, f"LinkedIn org IDs found: {org_ids}", "info")
+
+            # Step 2: Fetch each org's name individually (most reliable method)
+            for org_id in org_ids[:15]:  # cap at 15 pages
                 try:
                     org_info = requests.get(
                         f"https://api.linkedin.com/v2/organizations/{org_id}",
@@ -1413,21 +1345,30 @@ def linkedin_callback():
                         },
                         timeout=8
                     ).json()
+
+                    # Try multiple name fields — LinkedIn API is inconsistent
                     org_name = (
                         org_info.get("localizedName") or
-                        org_info.get("name", {}).get("localized", {}).get("en_US", f"Company {org_id}")
+                        (org_info.get("name") or {}).get("localized", {}).get("en_US") or
+                        next(iter((org_info.get("name") or {}).get("localized", {}).values()), None) or
+                        f"Company Page {org_id}"
                     )
                     orgs.append({"id": org_id, "name": org_name})
-                except Exception:
+                    add_log(username, f"  Org {org_id}: {org_name}", "info")
+
+                except Exception as org_err:
+                    add_log(username, f"  Org {org_id} name fetch failed: {org_err}", "warn")
                     orgs.append({"id": org_id, "name": f"Company Page {org_id}"})
 
-        except Exception as org_err:
-            # Org fetch is best-effort — user still gets personal profile picker
-            add_log(username, f"LinkedIn org fetch skipped: {org_err}", "warn")
+        except Exception as acl_err:
+            add_log(username, f"LinkedIn ACL fetch failed: {acl_err}", "warn")
+            # Continue — user still gets personal profile picker
 
-        # Store token in session temporarily for /pick endpoint
+        add_log(username, f"LinkedIn picker: personal='{li_name}', orgs={len(orgs)}", "info")
+
+        # Store token temporarily for /pick endpoint
         token_key = f"li_pending_{username}_{slot}"
-        session[token_key]     = {
+        session[token_key] = {
             "access_token":  access_token,
             "expires_in":    expires_in,
             "personal_id":   li_id,
@@ -1435,9 +1376,8 @@ def linkedin_callback():
         }
         session.modified = True
 
-        # Show account picker in popup
-        # Rebuild oauth_url to pass into picker (for sign-out-and-retry)
-        _oauth_url = "https://www.linkedin.com/oauth/v2/authorization?" + __import__('urllib').parse.urlencode({
+        # Rebuild oauth_url for sign-out-and-retry
+        _oauth_url = "https://www.linkedin.com/oauth/v2/authorization?" + urllib.parse.urlencode({
             "response_type": "code",
             "client_id":     LI_CLIENT_ID,
             "redirect_uri":  LI_REDIRECT_URI,
@@ -1445,6 +1385,7 @@ def linkedin_callback():
             "scope":         "openid profile w_member_social r_organization_admin w_organization_social",
             "prompt":        "login",
         })
+
         return _li_account_picker_page(
             username, slot, access_token, expires_in, li_name, li_id, orgs,
             oauth_url=_oauth_url
@@ -1483,23 +1424,19 @@ def facebook_auth(username):
         return jsonify({"ok": False, "message": "FACEBOOK_APP_ID not set in environment"}), 400
     state_token = secrets.token_hex(16)
     session["fb_state"] = state_token
-    # Encode username in state for session-less callback
     state = f"{username}:{state_token}"
     params = {
         "client_id":    FB_APP_ID,
         "redirect_uri": FB_REDIRECT_URI,
         "state":        state,
         "scope":        "pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish",
-        "auth_type":    "rerequest",   # force Facebook to show the Allow screen every time
+        "auth_type":    "rerequest",
     }
     oauth_url = "https://www.facebook.com/v19.0/dialog/oauth?" + urllib.parse.urlencode(params)
 
-    # Store for signout-retry
     session["fb_oauth_url"]     = oauth_url
     session["fb_reauth_target"] = oauth_url
 
-    # Return oauth_url directly — no logout navigation before it.
-    # auth_type=rerequest forces the permissions/Allow screen even if already authorized.
     return jsonify({"ok": True, "auth_url": oauth_url})
 
 
@@ -1513,7 +1450,6 @@ def facebook_callback():
         desc = request.args.get("error_description", error)
         return _callback_page(False, f"Facebook denied access: {desc}")
 
-    # Decode state: "username:token"
     try:
         username, state_token = state.split(":", 1)
     except Exception:
@@ -1554,7 +1490,6 @@ def facebook_callback():
             cfg["facebook_page_id"]      = page_id
             cfg["facebook_page_name"]    = page_name
 
-            # Check for linked Instagram Business account
             ig_res = requests.get(
                 f"https://graph.facebook.com/v19.0/{page_id}",
                 params={"fields": "instagram_business_account", "access_token": page_token},
@@ -1579,14 +1514,12 @@ def facebook_callback():
             save_config(username, cfg)
             add_log(username, f"Facebook connected ✓ — {page_name}", "ok")
         else:
-            # No pages found — show helpful error instead of saving useless token
             return _callback_page(False,
                 "No Facebook Pages found on this account.<br><br>"
                 "To connect Facebook you need a Facebook Page (not a personal profile).<br><br>"
                 "Go to <strong>facebook.com/pages</strong> → Create a Page → "
                 "then come back and click Connect Facebook again.")
 
-        # Store oauth_url for signout-and-retry
         oauth_url = session.get("fb_oauth_url", "")
         safe_oauth = oauth_url.replace("'", "\'")
         display_name = page_name if pages else 'Facebook Account'
@@ -1624,8 +1557,6 @@ var t = setTimeout(function() {{ window.close(); }}, 2000);
 function doSignOut() {{
   clearTimeout(t);
   sessionStorage.setItem('fb_oauth_url', '{safe_oauth}');
-  // Open Facebook logout in same window — after logout user lands on facebook.com
-  // Then they manually come back OR we detect via our reauth page
   window.location.href = '/api/auth/facebook/signout';
 }}
 </script>
@@ -1636,13 +1567,6 @@ function doSignOut() {{
 
 @app.route("/api/auth/facebook/prelogin")
 def facebook_prelogin():
-    """
-    Shown in popup BEFORE Facebook OAuth.
-    User sees:
-      [1] Sign out of Facebook  → navigates to facebook.com/logout
-      [2] After signing out, clicks "Sign In" → goes to OAuth URL → Allow → connected
-    Same pattern as LinkedIn signout page which works correctly.
-    """
     oauth_url = session.get("fb_oauth_url", "")
     if not oauth_url:
         return redirect("/setup")
@@ -1729,10 +1653,6 @@ function doLogout() {{
 
 @app.route("/api/auth/facebook/signout")
 def facebook_signout():
-    """
-    Shows a manual signout page for Facebook — same proven pattern as LinkedIn.
-    User clicks Sign Out button → Facebook logs out → Continue button appears → OAuth URL → Allow.
-    """
     oauth_url = session.get("fb_oauth_url", "")
     if not oauth_url:
         return redirect("/setup")
@@ -1822,11 +1742,6 @@ function doLogout() {{
 
 @app.route("/api/auth/facebook/reauth")
 def facebook_reauth():
-    """
-    Landing page after user manually logs out of Facebook.
-    Reads OAuth URL from sessionStorage (set by the signout button)
-    and shows a Sign In button that goes straight to OAuth.
-    """
     return """<!DOCTYPE html>
 <html><head><meta charset='UTF-8'><title>Sign in to Facebook</title>
 <style>
@@ -1852,7 +1767,6 @@ p{font-size:13px;color:rgba(200,185,255,.55);max-width:300px;line-height:1.7;}
 var u = sessionStorage.getItem('fb_oauth_url');
 if (u) {
   sessionStorage.removeItem('fb_oauth_url');
-  // Auto redirect after short delay
   setTimeout(function() { window.location.href = u; }, 800);
   document.getElementById('btn').onclick = function() { window.location.href = u; };
 } else {
@@ -1877,7 +1791,6 @@ def facebook_disconnect(username):
 @app.route("/api/auth/instagram/disconnect", methods=["POST"])
 @require_auth
 def instagram_disconnect(username):
-    """Disconnect Instagram (works for both via-Facebook and direct connections)."""
     cfg = load_config(username)
     for k in ["instagram_access_token", "instagram_account_id",
               "instagram_username", "instagram_via_facebook", "instagram_token_expires"]:
@@ -1887,23 +1800,12 @@ def instagram_disconnect(username):
     return jsonify({"ok": True})
 
 # ════════════════════════════════════════════════════════════════════════════════
-#  INSTAGRAM DIRECT OAUTH (independent of Facebook)
-#  Uses Instagram Graph API with its own app credentials:
-#    INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET, INSTAGRAM_REDIRECT_URI
-#
-#  Flow:
-#   1. GET  /api/auth/instagram_direct  → returns Instagram OAuth URL
-#   2. User logs in on Instagram dialog
-#   3. Instagram redirects to /api/auth/instagram_direct/callback
-#   4. We exchange code → short-lived token → long-lived token
-#   5. Fetch Instagram Business/Creator account ID + username
-#   6. Store token + account_id + username in user config
+#  INSTAGRAM DIRECT OAUTH
 # ════════════════════════════════════════════════════════════════════════════════
 
 @app.route("/api/auth/instagram_direct")
 @require_auth
 def instagram_direct_auth(username):
-    """Start standalone Instagram OAuth (Graph API, no Facebook required)."""
     if not IG_APP_ID:
         return jsonify({
             "ok":      False,
@@ -1915,10 +1817,6 @@ def instagram_direct_auth(username):
     state_token = secrets.token_hex(16)
     session["ig_direct_state"] = state_token
 
-    # Instagram Graph API OAuth dialog
-    # Scopes needed for business publishing:
-    #   instagram_basic, instagram_content_publish, pages_show_list (if using FB-linked),
-    #   instagram_manage_insights (optional)
     params = {
         "client_id":     IG_APP_ID,
         "redirect_uri":  IG_REDIRECT_URI,
@@ -1926,15 +1824,12 @@ def instagram_direct_auth(username):
         "response_type": "code",
         "state":         state_token,
     }
-    # Instagram API with Instagram Login — shows real Instagram login page
-    # Uses www.instagram.com/oauth/authorize endpoint
     oauth_url = "https://www.instagram.com/oauth/authorize?" + urllib.parse.urlencode(params)
     return jsonify({"ok": True, "auth_url": oauth_url})
 
 
 @app.route("/api/auth/instagram_direct/callback")
 def instagram_direct_callback():
-    """Handle callback from standalone Instagram OAuth."""
     username = session.get("username")
     if not username:
         return "<script>window.close();</script>Not authenticated", 401
@@ -1944,8 +1839,7 @@ def instagram_direct_callback():
     error = request.args.get("error", "")
 
     if error:
-        err_reason = request.args.get("error_reason", "")
-        err_desc   = request.args.get("error_description", "Unknown error")
+        err_desc = request.args.get("error_description", "Unknown error")
         return (
             f"<html><body><script>window.close();</script>"
             f"<p>Instagram auth error: {err_desc}</p></body></html>"
@@ -1955,7 +1849,6 @@ def instagram_direct_callback():
         return "<script>window.close();</script>Invalid state — please try again", 400
 
     try:
-        # Step 1: Exchange code for short-lived token via Instagram endpoint
         token_res = requests.post(
             "https://api.instagram.com/oauth/access_token",
             data={
@@ -1973,7 +1866,6 @@ def instagram_direct_callback():
         if not short_token:
             return _callback_page(False, f"Token exchange failed: {token_res}")
 
-        # Step 2: Exchange for long-lived token (60 days)
         long_res = requests.get(
             "https://graph.instagram.com/access_token",
             params={
@@ -1986,7 +1878,6 @@ def instagram_direct_callback():
         long_token = long_res.get("access_token", short_token)
         expires_in = long_res.get("expires_in", 5184000)
 
-        # Step 3: Get Instagram username
         ig_info = requests.get(
             "https://graph.instagram.com/me",
             params={"fields": "id,username", "access_token": long_token},
@@ -1995,7 +1886,6 @@ def instagram_direct_callback():
         ig_username = ig_info.get("username", ig_id)
         ig_id       = ig_info.get("id", ig_id)
 
-        # Step 4: Save to config
         cfg = load_config(username)
         cfg["instagram_access_token"]  = long_token
         cfg["instagram_account_id"]    = ig_id
@@ -2024,7 +1914,6 @@ def instagram_direct_callback():
 @app.route("/api/auth/instagram_direct/disconnect", methods=["POST"])
 @require_auth
 def instagram_direct_disconnect(username):
-    """Disconnect standalone Instagram account."""
     cfg = load_config(username)
     for k in ["instagram_access_token", "instagram_account_id",
               "instagram_username", "instagram_via_facebook", "instagram_token_expires"]:
@@ -2040,9 +1929,8 @@ def instagram_direct_disconnect(username):
 @app.route("/api/channel/toggle", methods=["POST"])
 @require_auth
 def channel_toggle(username):
-    """Enable or disable a channel for posting. Does not disconnect — just skips it during publish."""
     data     = request.get_json()
-    platform = data.get("platform", "")   # "linkedin" | "facebook" | "instagram"
+    platform = data.get("platform", "")
     slot     = int(data.get("slot", 1))
     enabled  = bool(data.get("enabled", True))
 
@@ -2074,15 +1962,13 @@ def get_status(username):
     cfg    = load_config(username)
     offset = cfg.get("utc_offset_hours", None)
 
-    # Build channels_info for dashboard — includes user-controlled enabled toggle
     channels_info = []
-    ch_enabled = cfg.get("channel_enabled", {})  # dict: "linkedin_1" -> True/False
+    ch_enabled = cfg.get("channel_enabled", {})
 
     for slot in [1, 2, 3]:
         tok  = cfg.get(f"linkedin_{slot}_access_token", "")
         name = cfg.get(f"linkedin_{slot}_name", f"LinkedIn #{slot}")
         key  = f"linkedin_{slot}"
-        # Default: enabled=True when connected (user must explicitly turn off)
         enabled = ch_enabled.get(key, True) if tok else False
         channels_info.append({
             "slot":     slot,
@@ -2092,7 +1978,6 @@ def get_status(username):
             "active":   bool(tok),
             "enabled":  enabled,
         })
-    # Facebook
     fb_tok  = cfg.get("facebook_access_token", "")
     fb_key  = "facebook_1"
     fb_ena  = ch_enabled.get(fb_key, True) if fb_tok else False
@@ -2104,7 +1989,6 @@ def get_status(username):
         "active":   bool(fb_tok),
         "enabled":  fb_ena,
     })
-    # Instagram
     ig_tok  = cfg.get("instagram_access_token", "")
     ig_key  = "instagram_1"
     ig_ena  = ch_enabled.get(ig_key, True) if ig_tok else False
@@ -2230,5 +2114,5 @@ if __name__ == "__main__":
     print(f"[STARTUP] Data:  {USER_DATA_DIR}/")
     print(f"[STARTUP] LinkedIn OAuth: {'✓ configured' if LI_CLIENT_ID else '✗ LINKEDIN_CLIENT_ID not set'}")
     print(f"[STARTUP] Facebook OAuth: {'✓ configured' if FB_APP_ID else '✗ FACEBOOK_APP_ID not set'}")
-    print(f"[STARTUP] Instagram OAuth: {'✓ configured' if IG_APP_ID else '✗ INSTAGRAM_APP_ID not set (optional — only needed for direct IG connect)'}")
+    print(f"[STARTUP] Instagram OAuth: {'✓ configured' if IG_APP_ID else '✗ INSTAGRAM_APP_ID not set (optional)'}")
     app.run(host="0.0.0.0", port=port, debug=False)
