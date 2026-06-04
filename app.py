@@ -974,7 +974,7 @@ def linkedin_auth(username):
         "client_id":     LI_CLIENT_ID,
         "redirect_uri":  LI_REDIRECT_URI,
         "state":         state_payload,
-        "scope":         "openid profile w_member_social r_organization_admin w_organization_social",
+        "scope":         "openid profile w_member_social",
         "prompt":        "login",
         "login_hint":    "",
     }
@@ -1382,7 +1382,7 @@ def linkedin_callback():
             "client_id":     LI_CLIENT_ID,
             "redirect_uri":  LI_REDIRECT_URI,
             "state":         state_raw,
-            "scope":         "openid profile w_member_social r_organization_admin w_organization_social",
+            "scope":         "openid profile w_member_social",
             "prompt":        "login",
         })
 
