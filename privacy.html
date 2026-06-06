@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — AI Social Agent</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
+
+  :root {
+    --bg:        #05030f;
+    --bg2:       #0b0720;
+    --surface:   rgba(255,255,255,0.03);
+    --border:    rgba(160,120,255,0.15);
+    --border-h:  rgba(61,255,192,0.25);
+    --accent:    #3dffc0;
+    --accent2:   #b085ff;
+    --accent3:   #ff80b5;
+    --text:      #ede8ff;
+    --muted:     rgba(200,185,255,0.55);
+    --muted2:    rgba(200,185,255,0.35);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    line-height: 1.75;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── background atmosphere ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 10% 0%, rgba(176,133,255,0.1) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 40% at 90% 100%, rgba(61,255,192,0.07) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── layout ── */
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+
+  /* ── header ── */
+  header {
+    padding: 56px 0 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 13px;
+    font-family: 'Syne', sans-serif;
+    text-decoration: none;
+    letter-spacing: 0.5px;
+    transition: color 0.2s;
+    width: fit-content;
+  }
+  .back-btn:hover { color: var(--accent); }
+  .back-btn svg { width: 14px; height: 14px; }
+
+  .badge {
+    display: inline-block;
+    background: rgba(61,255,192,0.08);
+    border: 1px solid rgba(61,255,192,0.2);
+    color: var(--accent);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 11px;
+    font-family: 'Syne', sans-serif;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    width: fit-content;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 800;
+    letter-spacing: -1px;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #ede8ff 0%, #b085ff 50%, #3dffc0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .meta {
+    font-size: 13px;
+    color: var(--muted2);
+  }
+
+  /* ── divider ── */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 8px 0 40px;
+    animation: fadeUp 0.6s 0.1s ease both;
+  }
+
+  /* ── toc ── */
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px 28px;
+    margin-bottom: 40px;
+    animation: fadeUp 0.6s 0.15s ease both;
+  }
+  .toc-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted2);
+    margin-bottom: 14px;
+  }
+  .toc ol {
+    list-style: none;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 20px;
+  }
+  @media (max-width: 540px) { .toc ol { grid-template-columns: 1fr; } }
+  .toc li { counter-increment: toc; }
+  .toc a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px;
+    transition: color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .toc a::before {
+    content: counter(toc, decimal-leading-zero);
+    font-family: 'Syne', sans-serif;
+    font-size: 10px;
+    color: var(--accent2);
+    opacity: 0.7;
+    flex-shrink: 0;
+  }
+  .toc a:hover { color: var(--accent); }
+  .toc ol { counter-reset: toc; }
+
+  /* ── sections ── */
+  section {
+    margin-bottom: 36px;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  section:nth-child(1)  { animation-delay: 0.2s; }
+  section:nth-child(2)  { animation-delay: 0.25s; }
+  section:nth-child(3)  { animation-delay: 0.3s; }
+  section:nth-child(4)  { animation-delay: 0.35s; }
+  section:nth-child(5)  { animation-delay: 0.4s; }
+  section:nth-child(6)  { animation-delay: 0.45s; }
+  section:nth-child(7)  { animation-delay: 0.5s; }
+  section:nth-child(8)  { animation-delay: 0.55s; }
+  section:nth-child(9)  { animation-delay: 0.6s; }
+  section:nth-child(10) { animation-delay: 0.65s; }
+
+  .section-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 32px;
+    transition: border-color 0.3s;
+  }
+  .section-card:hover { border-color: var(--border-h); }
+
+  .section-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--accent2);
+    opacity: 0.7;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 14px;
+    letter-spacing: -0.3px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2 .icon {
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  p {
+    color: var(--muted);
+    margin-bottom: 12px;
+    font-weight: 300;
+  }
+  p:last-child { margin-bottom: 0; }
+
+  ul, ol {
+    color: var(--muted);
+    padding-left: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-weight: 300;
+  }
+  li::before {
+    content: '→';
+    color: var(--accent);
+    font-size: 12px;
+    margin-top: 3px;
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+
+  strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(61,255,192,0.3);
+    transition: border-color 0.2s, opacity 0.2s;
+  }
+  a:hover { border-color: var(--accent); opacity: 0.85; }
+
+  /* ── highlight box ── */
+  .highlight {
+    background: rgba(61,255,192,0.05);
+    border: 1px solid rgba(61,255,192,0.2);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-top: 14px;
+    font-size: 13px;
+    color: rgba(61,255,192,0.8);
+    line-height: 1.6;
+  }
+  .highlight strong { color: var(--accent); }
+
+  /* ── platform pills ── */
+  .platforms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+  .pill-li  { background: rgba(0,119,181,0.15);  border: 1px solid rgba(0,119,181,0.3);  color: #4da3d4; }
+  .pill-fb  { background: rgba(24,119,242,0.12); border: 1px solid rgba(24,119,242,0.25); color: #6a9ff5; }
+  .pill-ig  { background: rgba(225,48,108,0.12); border: 1px solid rgba(225,48,108,0.25); color: #f07090; }
+
+  /* ── contact card ── */
+  .contact-card {
+    background: linear-gradient(135deg, rgba(176,133,255,0.08), rgba(61,255,192,0.05));
+    border: 1px solid rgba(176,133,255,0.25);
+    border-radius: 16px;
+    padding: 28px 32px;
+    text-align: center;
+    margin-top: 40px;
+    animation: fadeUp 0.6s 0.7s ease both;
+  }
+  .contact-card h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .contact-card p {
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .contact-card .email-btn {
+    display: inline-block;
+    padding: 11px 24px;
+    background: rgba(61,255,192,0.1);
+    border: 1px solid rgba(61,255,192,0.3);
+    border-radius: 10px;
+    color: var(--accent);
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    border-bottom: none;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .contact-card .email-btn:hover {
+    background: rgba(61,255,192,0.18);
+    border-color: rgba(61,255,192,0.5);
+    opacity: 1;
+  }
+
+  /* ── footer ── */
+  footer {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--muted2);
+    animation: fadeUp 0.6s 0.75s ease both;
+  }
+  .footer-brand {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  /* ── animation ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── scrollbar ── */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: rgba(176,133,255,0.3); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(176,133,255,0.5); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ── HEADER ── -->
+  <header>
+    <a href="/" class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 12H5M12 5l-7 7 7 7"/>
+      </svg>
+      Back to App
+    </a>
+    <div class="badge">Legal · Privacy</div>
+    <h1>Privacy Policy</h1>
+    <p class="meta">Effective date: June 1, 2025 &nbsp;·&nbsp; Last updated: June 1, 2025</p>
+  </header>
+
+  <div class="divider"></div>
+
+  <!-- ── TABLE OF CONTENTS ── -->
+  <div class="toc">
+    <div class="toc-title">Contents</div>
+    <ol>
+      <li><a href="#s1">Information We Collect</a></li>
+      <li><a href="#s2">How We Use Your Information</a></li>
+      <li><a href="#s3">Third-Party Platforms</a></li>
+      <li><a href="#s4">Data Storage & Security</a></li>
+      <li><a href="#s5">Data Retention</a></li>
+      <li><a href="#s6">Your Rights</a></li>
+      <li><a href="#s7">Cookies & Sessions</a></li>
+      <li><a href="#s8">Children's Privacy</a></li>
+      <li><a href="#s9">Changes to This Policy</a></li>
+      <li><a href="#s10">Contact Us</a></li>
+    </ol>
+  </div>
+
+  <!-- ── INTRO ── -->
+  <section>
+    <div class="section-card">
+      <p>
+        This Privacy Policy describes how <strong>AI Social Agent</strong> ("we", "us", or "our") 
+        collects, uses, and protects your information when you use our automated social media 
+        posting service. By using the app, you agree to the practices described in this policy.
+      </p>
+      <div class="highlight">
+        <strong>The short version:</strong> We store only what we need to run your automated posts. 
+        We never sell your data. Your API keys and OAuth tokens are encrypted at rest. 
+        You can delete your data at any time.
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 1 ── -->
+  <section id="s1">
+    <div class="section-card">
+      <div class="section-num">01</div>
+      <h2><span class="icon">📋</span> Information We Collect</h2>
+      <p>We collect the minimum information required to provide the service:</p>
+      <ul>
+        <li><strong>Account credentials</strong> — your username and a salted SHA-256 hash of your password. We never store your password in plain text.</li>
+        <li><strong>API keys</strong> — Groq API key and SerpAPI key you provide in Settings, encrypted at rest using Fernet symmetric encryption.</li>
+        <li><strong>OAuth tokens</strong> — access tokens issued by LinkedIn, Facebook, and Instagram when you connect those accounts. These are encrypted at rest and never shared.</li>
+        <li><strong>Post subjects</strong> — the topics and subjects you add to your posting queue.</li>
+        <li><strong>Timezone offset</strong> — used to schedule posts at your local time.</li>
+        <li><strong>Activity logs</strong> — timestamped records of posting actions (successes and errors) stored locally and shown in your dashboard.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ── 2 ── -->
+  <section id="s2">
+    <div class="section-card">
+      <div class="section-num">02</div>
+      <h2><span class="icon">⚙️</span> How We Use Your Information</h2>
+      <p>Your data is used solely to operate the service on your behalf:</p>
+      <ul>
+        <li>Authenticating your login and securing your session</li>
+        <li>Generating LinkedIn posts via the Groq AI API using your subjects</li>
+        <li>Fetching relevant images via SerpAPI when you request them</li>
+        <li>Publishing posts to the social media platforms you have connected</li>
+        <li>Running the scheduler to post at your configured times</li>
+        <li>Displaying your posting history and logs in the dashboard</li>
+      </ul>
+      <p style="margin-top:14px;">We do <strong>not</strong> use your data for advertising, profiling, or any purpose beyond operating the features you use.</p>
+    </div>
+  </section>
+
+  <!-- ── 3 ── -->
+  <section id="s3">
+    <div class="section-card">
+      <div class="section-num">03</div>
+      <h2><span class="icon">🔗</span> Third-Party Platforms</h2>
+      <p>
+        When you connect social accounts, you authorise this app to act on your behalf using 
+        tokens issued by those platforms. We interact with the following third-party APIs:
+      </p>
+      <div class="platforms">
+        <span class="pill pill-li">🔵 LinkedIn API</span>
+        <span class="pill pill-fb">📘 Facebook Graph API</span>
+        <span class="pill pill-ig">📷 Instagram Graph API</span>
+      </div>
+      <ul style="margin-top:16px;">
+        <li>OAuth tokens are scoped to the minimum permissions needed (post creation only).</li>
+        <li>We never access your contacts, messages, or personal feed content.</li>
+        <li>Each platform's own privacy policy governs how they handle your data.</li>
+        <li>You can revoke our access at any time from within each platform's security settings.</li>
+      </ul>
+      <p style="margin-top:14px;">
+        Post content is also generated using the <strong>Groq API</strong> (LLaMA model) — 
+        your subject text is sent to Groq's servers to generate post copy. 
+        Please review <a href="https://groq.com/privacy-policy/" target="_blank">Groq's Privacy Policy</a> for details.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── 4 ── -->
+  <section id="s4">
+    <div class="section-card">
+      <div class="section-num">04</div>
+      <h2><span class="icon">🔐</span> Data Storage & Security</h2>
+      <ul>
+        <li>All user data is stored on Railway's infrastructure in encrypted volumes.</li>
+        <li>Sensitive fields (API keys, OAuth tokens) are encrypted with Fernet AES-128 encryption before being written to disk.</li>
+        <li>Passwords are never stored — only a salted SHA-256 hash is kept.</li>
+        <li>Sessions are signed with a server-side secret key and expire on logout.</li>
+        <li>All communication with our server is over HTTPS (TLS).</li>
+        <li>User data directories are isolated per account — no user can access another user's data.</li>
+      </ul>
+      <div class="highlight">
+        Despite these measures, no system is 100% secure. We encourage you to use a strong, unique password and to disconnect social accounts when not in use.
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 5 ── -->
+  <section id="s5">
+    <div class="section-card">
+      <div class="section-num">05</div>
+      <h2><span class="icon">🗓️</span> Data Retention</h2>
+      <p>
+        We retain your data for as long as your account exists. Specifically:
+      </p>
+      <ul>
+        <li><strong>Account data</strong> — retained until you delete your account.</li>
+        <li><strong>Post subjects</strong> — consumed and removed from the queue as posts are published.</li>
+        <li><strong>Activity logs</strong> — capped at the last 100 entries per user, automatically rolling.</li>
+        <li><strong>OAuth tokens</strong> — stored until you disconnect the channel or delete your account.</li>
+      </ul>
+      <p style="margin-top:14px;">
+        To request deletion of your account and all associated data, contact us using the details below. We will process deletion within 30 days.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── 6 ── -->
+  <section id="s6">
+    <div class="section-card">
+      <div class="section-num">06</div>
+      <h2><span class="icon">✋</span> Your Rights</h2>
+      <p>Depending on your location, you may have the following rights regarding your personal data:</p>
+      <ul>
+        <li><strong>Access</strong> — request a copy of the data we hold about you.</li>
+        <li><strong>Correction</strong> — update incorrect information via the Settings page.</li>
+        <li><strong>Deletion</strong> — request full deletion of your account and data.</li>
+        <li><strong>Portability</strong> — request your data in a machine-readable format.</li>
+        <li><strong>Restriction</strong> — ask us to stop processing your data while a dispute is resolved.</li>
+        <li><strong>Objection</strong> — object to processing where we rely on legitimate interests.</li>
+      </ul>
+      <p style="margin-top:14px;">
+        To exercise any of these rights, contact us via the email below. We will respond within 30 days.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── 7 ── -->
+  <section id="s7">
+    <div class="section-card">
+      <div class="section-num">07</div>
+      <h2><span class="icon">🍪</span> Cookies & Sessions</h2>
+      <p>
+        We use a single server-side session cookie to keep you logged in. This cookie:
+      </p>
+      <ul>
+        <li>Is signed and encrypted — it cannot be forged or read by third parties.</li>
+        <li>Contains only your username and session state — no tracking data.</li>
+        <li>Is cleared immediately when you log out.</li>
+        <li>Does not track you across other websites.</li>
+      </ul>
+      <p style="margin-top:14px;">
+        We do <strong>not</strong> use advertising cookies, analytics trackers, or any third-party tracking scripts.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── 8 ── -->
+  <section id="s8">
+    <div class="section-card">
+      <div class="section-num">08</div>
+      <h2><span class="icon">👶</span> Children's Privacy</h2>
+      <p>
+        This service is not directed at children under the age of 13 (or 16 in the EU/EEA). 
+        We do not knowingly collect personal data from children. If you believe a child has 
+        provided us with personal information, please contact us and we will delete it promptly.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── 9 ── -->
+  <section id="s9">
+    <div class="section-card">
+      <div class="section-num">09</div>
+      <h2><span class="icon">📝</span> Changes to This Policy</h2>
+      <p>
+        We may update this Privacy Policy from time to time. When we do, we will update the 
+        "Last updated" date at the top of this page. We encourage you to review this policy 
+        periodically. Continued use of the service after changes constitutes acceptance of the 
+        updated policy.
+      </p>
+      <p>
+        For significant changes that materially affect your rights, we will make reasonable 
+        efforts to notify you via the dashboard or email.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── 10 ── -->
+  <section id="s10">
+    <div class="section-card">
+      <div class="section-num">10</div>
+      <h2><span class="icon">📬</span> Contact Us</h2>
+      <p>
+        If you have questions, concerns, or requests regarding this Privacy Policy or your 
+        personal data, please reach out:
+      </p>
+      <ul>
+        <li><strong>Email:</strong> privacy@yourdomain.com</li>
+        <li><strong>Response time:</strong> Within 30 days</li>
+        <li><strong>Data deletion requests:</strong> Processed within 30 days</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ── CONTACT CARD ── -->
+  <div class="contact-card" id="contact">
+    <h3>Questions about your data?</h3>
+    <p>We're happy to help. Reach out and we'll respond within 30 days.</p>
+    <a href="mailto:privacy@yourdomain.com" class="email-btn">✉ Contact Privacy Team</a>
+  </div>
+
+  <!-- ── FOOTER ── -->
+  <footer>
+    <span class="footer-brand">AI Social Agent</span>
+    <span>© 2025 · All rights reserved</span>
+    <span>Effective: June 1, 2025</span>
+  </footer>
+
+</div>
+</body>
+</html>
