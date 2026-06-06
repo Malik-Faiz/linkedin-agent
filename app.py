@@ -1529,7 +1529,25 @@ def facebook_auth(username):
 
     return jsonify({"ok": True, "auth_url": oauth_url})
 
-
+@app.route("/api/auth/loading")
+def auth_loading():
+    """Blank loading page — popup opens here instantly, then JS navigates it to OAuth URL."""
+    return """<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Connecting...</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{min-height:100vh;background:#05030f;color:#ede8ff;
+     display:flex;flex-direction:column;align-items:center;
+     justify-content:center;font-family:'Segoe UI',sans-serif;gap:16px;}
+.spin{font-size:40px;animation:sp 1s linear infinite;display:inline-block;}
+p{font-size:13px;color:rgba(200,185,255,0.5);font-family:monospace;}
+@keyframes sp{to{transform:rotate(360deg);}}
+</style></head>
+<body>
+<div class="spin">⟳</div>
+<p>Opening connection...</p>
+</body></html>"""
+    
 @app.route("/api/auth/facebook/callback")
 def facebook_callback():
     code  = request.args.get("code", "")
