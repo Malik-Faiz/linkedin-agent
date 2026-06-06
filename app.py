@@ -716,7 +716,7 @@ def ping():
                     "utc_iso": utc_now.isoformat() + "Z"})
 
 # ════════════════════════════════════════════════════════════════════════════════
-#  AUTH ROUTES
+#  AUTH ROUTES  ← FIX: session.clear() on login/register to prevent session bleed
 # ════════════════════════════════════════════════════════════════════════════════
 @app.route("/api/register", methods=["POST"])
 def register():
@@ -743,8 +743,12 @@ def register():
         cfg = load_config(username)
         cfg["utc_offset_hours"] = float(utc_offset)
         save_config(username, cfg)
+
+    # ── FIX: clear any existing session before setting new user ──
+    session.clear()
     session["username"] = username
     session.permanent   = True
+
     cfg = load_config(username)
     has_config = bool(cfg.get("groq_api_key"))
     return jsonify({"ok": True, "username": username, "has_config": has_config, "message": "Account created!"})
@@ -761,12 +765,17 @@ def login():
     if not verify_password(password, u["password_hash"], u["salt"]):
         return jsonify({"ok": False, "message": "Invalid username or password."}), 401
     utc_offset = data.get("utc_offset_hours")
+
+    # ── FIX: clear any existing session before setting new user ──
+    session.clear()
+    session["username"] = username
+    session.permanent   = True
+
     if utc_offset is not None:
         cfg = load_config(username)
         cfg["utc_offset_hours"] = float(utc_offset)
         save_config(username, cfg)
-    session["username"] = username
-    session.permanent   = True
+
     cfg = load_config(username)
     has_config = bool(cfg.get("groq_api_key"))
     return jsonify({"ok": True, "username": username, "has_config": has_config})
@@ -1347,20 +1356,23 @@ def linkedin_callback():
         desc = request.args.get("error_description", error)
         return _callback_page(False, f"LinkedIn denied access: {desc}")
 
+    # ── FIX: always parse username and slot from state — never fall back to session ──
     try:
-        username, slot_str, state_token = state_raw.split(":", 2)
-        slot = int(slot_str)
+        parts = state_raw.split(":", 2)
+        if len(parts) < 2:
+            raise ValueError("Malformed state")
+        username    = parts[0]
+        slot        = int(parts[1])
+        state_token = parts[2] if len(parts) > 2 else ""
     except Exception:
-        username    = session.get("username", "")
-        slot        = session.get("li_active_slot", 1)
-        state_token = state_raw
+        return _callback_page(False, "Invalid OAuth state — please log in and try again.")
 
     if not username:
         return _callback_page(False, "Session lost — please log in again and retry.")
 
     users = load_users()
     if username not in users:
-        return _callback_page(False, "Unknown user.")
+        return _callback_page(False, "Unknown user — please log in and try again.")
 
     try:
         # Exchange code for token
@@ -1389,26 +1401,19 @@ def linkedin_callback():
             "LinkedIn User"
         )
 
-        # ── FETCH ALL ORGANISATIONS (all roles, no filter) ──────────────────
+        # ── FETCH ALL ORGANISATIONS ──────────────────────────────────────────
         orgs = []
         try:
-            # Step 1: Get all ACLs — no role filter so we get every page the user
-            # has any admin role on (ADMINISTRATOR, DIRECT_SPONSORED_CONTENT_POSTER, etc.)
             acl_res = requests.get(
                 "https://api.linkedin.com/v2/organizationAcls",
                 headers={
                     "Authorization": f"Bearer {access_token}",
                     "X-Restli-Protocol-Version": "2.0.0",
                 },
-                params={
-                    "q":     "roleAssignee",
-                    "count": 50,          # fetch up to 50 — default was 10
-                    # intentionally no "role" param → returns ALL roles
-                },
+                params={"q": "roleAssignee", "count": 50},
                 timeout=12
             ).json()
 
-            # Extract unique org IDs from URNs like "urn:li:organization:12345"
             org_ids = []
             seen_ids = set()
             for elem in acl_res.get("elements", []):
@@ -1421,8 +1426,7 @@ def linkedin_callback():
 
             add_log(username, f"LinkedIn org IDs found: {org_ids}", "info")
 
-            # Step 2: Fetch each org's name individually (most reliable method)
-            for org_id in org_ids[:15]:  # cap at 15 pages
+            for org_id in org_ids[:15]:
                 try:
                     org_info = requests.get(
                         f"https://api.linkedin.com/v2/organizations/{org_id}",
@@ -1433,7 +1437,6 @@ def linkedin_callback():
                         timeout=8
                     ).json()
 
-                    # Try multiple name fields — LinkedIn API is inconsistent
                     org_name = (
                         org_info.get("localizedName") or
                         (org_info.get("name") or {}).get("localized", {}).get("en_US") or
@@ -1449,7 +1452,6 @@ def linkedin_callback():
 
         except Exception as acl_err:
             add_log(username, f"LinkedIn ACL fetch failed: {acl_err}", "warn")
-            # Continue — user still gets personal profile picker
 
         add_log(username, f"LinkedIn picker: personal='{li_name}', orgs={len(orgs)}", "info")
 
@@ -1502,7 +1504,7 @@ def linkedin_disconnect(username):
     return jsonify({"ok": True})
 
 # ════════════════════════════════════════════════════════════════════════════════
-#  FACEBOOK OAUTH
+#  FACEBOOK OAUTH  ← FIX: encode username in state; parse it back in callback
 # ════════════════════════════════════════════════════════════════════════════════
 @app.route("/api/auth/facebook")
 @require_auth
@@ -1511,6 +1513,7 @@ def facebook_auth(username):
         return jsonify({"ok": False, "message": "FACEBOOK_APP_ID not set in environment"}), 400
     state_token = secrets.token_hex(16)
     session["fb_state"] = state_token
+    # ── FIX: embed username in state so callback always knows who to save to ──
     state = f"{username}:{state_token}"
     params = {
         "client_id":    FB_APP_ID,
@@ -1537,18 +1540,17 @@ def facebook_callback():
         desc = request.args.get("error_description", error)
         return _callback_page(False, f"Facebook denied access: {desc}")
 
+    # ── FIX: always extract username from state — never fall back to session ──
     try:
         username, state_token = state.split(":", 1)
+        if not username:
+            raise ValueError("Empty username in state")
     except Exception:
-        username    = session.get("username", "")
-        state_token = state
-
-    if not username:
-        return _callback_page(False, "Session lost — please log in again and retry.")
+        return _callback_page(False, "Invalid OAuth state — please log in and try again.")
 
     users = load_users()
     if username not in users:
-        return _callback_page(False, "Unknown user.")
+        return _callback_page(False, "Unknown user — please log in and try again.")
 
     try:
         token_res = requests.get(
@@ -1558,7 +1560,7 @@ def facebook_callback():
         ).json()
         user_token = token_res.get("access_token")
         if not user_token:
-            return f"<script>window.close();</script>Token error: {token_res}", 400
+            return _callback_page(False, f"Token error: {token_res}")
 
         pages_res = requests.get(
             "https://graph.facebook.com/v19.0/me/accounts",
@@ -1608,7 +1610,7 @@ def facebook_callback():
                 "then come back and click Connect Facebook again.")
 
         oauth_url = session.get("fb_oauth_url", "")
-        safe_oauth = oauth_url.replace("'", "\'")
+        safe_oauth = oauth_url.replace("'", "\\'")
         display_name = page_name if pages else 'Facebook Account'
 
         return f"""<!DOCTYPE html>
@@ -1649,7 +1651,7 @@ function doSignOut() {{
 </script>
 </body></html>"""
     except Exception as e:
-        return f"<script>window.close();</script>Error: {e}", 500
+        return _callback_page(False, f"Error: {e}")
 
 
 @app.route("/api/auth/facebook/prelogin")
@@ -1658,7 +1660,7 @@ def facebook_prelogin():
     if not oauth_url:
         return redirect("/setup")
 
-    safe_oauth = oauth_url.replace("'", "\'")
+    safe_oauth = oauth_url.replace("'", "\\'")
     host       = request.host_url.rstrip("/")
     reauth_url = f"{host}/api/auth/facebook/reauth"
 
@@ -1744,7 +1746,7 @@ def facebook_signout():
     if not oauth_url:
         return redirect("/setup")
 
-    safe_oauth = oauth_url.replace("'", "\'")
+    safe_oauth = oauth_url.replace("'", "\\'")
     host = request.host_url.rstrip("/")
     reauth_url = f"{host}/api/auth/facebook/reauth"
 
@@ -1887,7 +1889,7 @@ def instagram_disconnect(username):
     return jsonify({"ok": True})
 
 # ════════════════════════════════════════════════════════════════════════════════
-#  INSTAGRAM DIRECT OAUTH
+#  INSTAGRAM DIRECT OAUTH  ← FIX: encode username in state; use it in callback
 # ════════════════════════════════════════════════════════════════════════════════
 
 @app.route("/api/auth/instagram_direct")
@@ -1902,6 +1904,8 @@ def instagram_direct_auth(username):
         }), 400
 
     state_token = secrets.token_hex(16)
+    # ── FIX: embed username in state so callback always knows who to save to ──
+    state_payload = f"{username}:{state_token}"
     session["ig_direct_state"] = state_token
 
     params = {
@@ -1909,7 +1913,7 @@ def instagram_direct_auth(username):
         "redirect_uri":  IG_REDIRECT_URI,
         "scope":         "instagram_business_basic,instagram_business_content_publish",
         "response_type": "code",
-        "state":         state_token,
+        "state":         state_payload,
     }
     oauth_url = "https://www.instagram.com/oauth/authorize?" + urllib.parse.urlencode(params)
     return jsonify({"ok": True, "auth_url": oauth_url})
@@ -1917,23 +1921,25 @@ def instagram_direct_auth(username):
 
 @app.route("/api/auth/instagram_direct/callback")
 def instagram_direct_callback():
-    username = session.get("username")
-    if not username:
-        return "<script>window.close();</script>Not authenticated", 401
-
-    code  = request.args.get("code", "")
-    state = request.args.get("state", "")
-    error = request.args.get("error", "")
+    code        = request.args.get("code", "")
+    state_raw   = request.args.get("state", "")
+    error       = request.args.get("error", "")
 
     if error:
         err_desc = request.args.get("error_description", "Unknown error")
-        return (
-            f"<html><body><script>window.close();</script>"
-            f"<p>Instagram auth error: {err_desc}</p></body></html>"
-        ), 400
+        return _callback_page(False, f"Instagram auth error: {err_desc}")
 
-    if state != session.get("ig_direct_state"):
-        return "<script>window.close();</script>Invalid state — please try again", 400
+    # ── FIX: always extract username from state — never rely solely on session ──
+    try:
+        username, state_token = state_raw.split(":", 1)
+        if not username:
+            raise ValueError("Empty username")
+    except Exception:
+        return _callback_page(False, "Invalid OAuth state — please log in and try again.")
+
+    users = load_users()
+    if username not in users:
+        return _callback_page(False, "Unknown user — please log in and try again.")
 
     try:
         token_res = requests.post(
