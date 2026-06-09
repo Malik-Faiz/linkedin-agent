@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LinkedIn Agent — Autonomous AI Posting</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#05030f;
+  --card:rgba(255,255,255,0.028);
+  --card-h:rgba(255,255,255,0.055);
+  --border:rgba(160,120,255,0.13);
+  --border2:rgba(160,120,255,0.3);
+  --text:#ede8ff;
+  --muted:rgba(200,185,255,0.5);
+  --muted2:rgba(200,185,255,0.22);
+  --p:#b085ff;
+  --p2:#ff80b5;
+  --p3:#7ee8ff;
+  --green:#3dffc0;
+  --red:#ff6060;
+  --gold:#f5c040;
+  --font:'Syne',sans-serif;
+  --mono:'DM Mono',monospace;
+  --max:1100px;
+}
+html{scroll-behavior:smooth;overflow-x:hidden;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;}
+
+body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;opacity:0.025;
+background:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");}
+
+.grid-bg{position:fixed;inset:0;z-index:0;pointer-events:none;
+background-image:linear-gradient(rgba(160,120,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(160,120,255,0.04) 1px,transparent 1px);
+background-size:68px 68px;
+mask-image:radial-gradient(ellipse 100% 60% at 50% 0%,black 20%,transparent 100%);}
+
+.orb{position:fixed;border-radius:50%;filter:blur(110px);pointer-events:none;z-index:0;}
+.o1{width:750px;height:750px;top:-22%;left:-18%;background:radial-gradient(circle,rgba(176,133,255,0.22),transparent 65%);animation:o1 16s ease-in-out infinite;}
+.o2{width:600px;height:600px;bottom:-22%;right:-14%;background:radial-gradient(circle,rgba(255,128,181,0.17),transparent 65%);animation:o2 19s ease-in-out infinite;}
+.o3{width:420px;height:420px;top:42%;left:46%;background:radial-gradient(circle,rgba(126,232,255,0.13),transparent 65%);animation:o3 13s ease-in-out infinite;}
+@keyframes o1{0%,100%{transform:translate(0,0);}50%{transform:translate(50px,-55px);}}
+@keyframes o2{0%,100%{transform:translate(0,0);}50%{transform:translate(-40px,45px);}}
+@keyframes o3{0%,100%{transform:translate(0,0);}50%{transform:translate(25px,-35px);}}
+
+/* ══ HEADER ══ */
+header{position:sticky;top:0;z-index:200;border-bottom:1px solid var(--border);background:rgba(5,3,15,0.82);backdrop-filter:blur(20px);}
+.hdr{max-width:var(--max);margin:0 auto;padding:0 36px;height:64px;display:flex;align-items:center;justify-content:space-between;}
+.logo{display:flex;align-items:center;gap:11px;text-decoration:none;color:inherit;}
+.logo-icon{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--p),var(--p2));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff;box-shadow:0 6px 20px rgba(176,133,255,0.4);}
+.logo-name{font-size:15px;font-weight:700;letter-spacing:-0.4px;}
+nav{display:flex;align-items:center;gap:4px;}
+.nl{padding:8px 15px;border-radius:20px;font-size:13px;color:var(--muted);text-decoration:none;transition:color 0.2s,background 0.2s;font-family:var(--font);}
+.nl:hover{color:var(--text);background:rgba(255,255,255,0.05);}
+.ping-dot{width:8px;height:8px;border-radius:50%;background:#666;display:inline-block;margin-right:4px;transition:background 0.4s;}
+.ping-dot.live{background:var(--green);box-shadow:0 0 0 3px rgba(61,255,192,0.2);animation:pingpulse 2s infinite;}
+.ping-dot.dead{background:var(--red);}
+@keyframes pingpulse{0%,100%{box-shadow:0 0 0 3px rgba(61,255,192,0.2);}50%{box-shadow:0 0 0 7px rgba(61,255,192,0.04);}}
+.ping-label{font-family:var(--mono);font-size:11px;color:var(--muted);}
+.nav-status{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:20px;background:var(--card);border:1px solid var(--border);}
+
+/* ══ HERO ══ */
+.hero{position:relative;z-index:10;padding:80px 36px 60px;text-align:center;}
+.hero-in{max-width:var(--max);margin:0 auto;}
+.badge{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--p);background:rgba(176,133,255,0.1);border:1px solid rgba(176,133,255,0.22);padding:7px 16px;border-radius:20px;margin-bottom:32px;opacity:0;animation:up 0.6s 0.2s cubic-bezier(0.16,1,0.3,1) forwards;}
+.bdot{width:6px;height:6px;border-radius:50%;background:var(--p);animation:blink 2.4s ease infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0.2;}}
+.h1{font-size:clamp(46px,7vw,88px);font-weight:800;line-height:0.92;letter-spacing:-4px;margin-bottom:24px;opacity:0;animation:up 0.7s 0.34s cubic-bezier(0.16,1,0.3,1) forwards;}
+.grad{background:linear-gradient(135deg,var(--p) 0%,var(--p2) 45%,var(--p3) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.sub{font-size:17px;line-height:1.75;color:var(--muted);max-width:500px;margin:0 auto 44px;opacity:0;animation:up 0.6s 0.48s cubic-bezier(0.16,1,0.3,1) forwards;}
+@keyframes up{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+
+/* ══ AUTH CARD ══ */
+.auth-wrap{max-width:460px;margin:0 auto;opacity:0;animation:up 0.7s 0.6s cubic-bezier(0.16,1,0.3,1) forwards;}
+.auth-card{background:rgba(255,255,255,0.026);border:1px solid rgba(176,133,255,0.22);border-radius:26px;padding:38px 36px;backdrop-filter:blur(24px);box-shadow:0 0 0 1px rgba(255,255,255,0.04) inset,0 60px 120px rgba(0,0,0,0.55),0 0 80px rgba(176,133,255,0.08);}
+.auth-ico{width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,rgba(176,133,255,0.2),rgba(255,128,181,0.14));border:1px solid rgba(176,133,255,0.25);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 16px;}
+.auth-title{font-size:24px;font-weight:800;letter-spacing:-1px;margin-bottom:4px;text-align:center;}
+.auth-sub{font-size:12px;color:var(--muted);font-family:var(--mono);text-align:center;margin-bottom:26px;}
+.tabs{display:flex;gap:3px;background:rgba(0,0,0,0.35);border:1px solid var(--border);border-radius:14px;padding:4px;margin-bottom:22px;}
+.tab{flex:1;padding:10px;border:none;background:none;color:var(--muted);font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;border-radius:11px;transition:all 0.22s;}
+.tab.on{background:rgba(176,133,255,0.14);color:var(--p);border:1px solid rgba(176,133,255,0.3);box-shadow:0 2px 16px rgba(176,133,255,0.12);}
+.field{margin-bottom:13px;}
+.field label{display:block;font-size:10px;font-family:var(--mono);letter-spacing:1.8px;text-transform:uppercase;color:var(--muted);margin-bottom:7px;}
+.inp-w{position:relative;}
+.inp-ico{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:15px;color:var(--muted2);pointer-events:none;transition:color 0.2s;}
+.inp-w:focus-within .inp-ico{color:var(--p);}
+.field input{width:100%;background:rgba(0,0,0,0.35);border:1px solid rgba(176,133,255,0.15);border-radius:13px;padding:13px 13px 13px 44px;color:var(--text);font-family:var(--mono);font-size:12.5px;outline:none;transition:border 0.2s,box-shadow 0.2s,background 0.2s;-webkit-appearance:none;}
+.field input:focus{border-color:rgba(176,133,255,0.5);background:rgba(176,133,255,0.05);box-shadow:0 0 0 3px rgba(176,133,255,0.1);}
+.field input::placeholder{color:var(--muted2);}
+.alert{display:none;align-items:flex-start;gap:9px;border-radius:12px;padding:11px 14px;font-size:11px;font-family:var(--mono);margin-bottom:13px;line-height:1.6;}
+.alert.show{display:flex;}
+.alert.err{background:rgba(255,96,96,0.08);border:1px solid rgba(255,96,96,0.22);color:var(--red);}
+.alert.ok{background:rgba(61,255,192,0.06);border:1px solid rgba(61,255,192,0.22);color:var(--green);}
+.auth-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--p),#d060f0,var(--p2));border:none;border-radius:14px;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 10px 28px rgba(176,133,255,0.32);transition:all 0.2s;position:relative;overflow:hidden;}
+.auth-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,0.16),transparent);pointer-events:none;}
+.auth-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 16px 40px rgba(176,133,255,0.44);}
+.auth-btn:disabled{opacity:0.35;cursor:not-allowed;}
+.auth-note{text-align:center;margin-top:14px;font-size:10px;color:var(--muted2);font-family:var(--mono);line-height:1.9;}
+.spin{animation:spin 0.8s linear infinite;display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* scroll hint */
+.scroll-hint{margin-top:32px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--muted2);opacity:0;animation:up 0.6s 1.2s cubic-bezier(0.16,1,0.3,1) forwards;display:flex;flex-direction:column;align-items:center;gap:8px;}
+.scroll-arrow{width:24px;height:24px;border-right:2px solid var(--muted2);border-bottom:2px solid var(--muted2);transform:rotate(45deg);animation:bounce 2s ease-in-out infinite;margin-top:4px;}
+@keyframes bounce{0%,100%{transform:rotate(45deg) translateY(0);}50%{transform:rotate(45deg) translateY(6px);}}
+
+/* ══ STATS ══ */
+.stats{position:relative;z-index:10;border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+.stats-in{max-width:var(--max);margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);}
+.stat{padding:32px 28px;border-right:1px solid var(--border);text-align:center;transition:background 0.2s;position:relative;overflow:hidden;}
+.stat:last-child{border-right:none;}
+.stat::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--p),var(--p2));transform:scaleX(0);transition:transform 0.35s cubic-bezier(0.16,1,0.3,1);}
+.stat:hover{background:rgba(176,133,255,0.03);}
+.stat:hover::after{transform:scaleX(1);}
+.stat-n{font-size:40px;font-weight:800;letter-spacing:-2.5px;line-height:1;margin-bottom:6px;background:linear-gradient(135deg,var(--p),var(--p2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.stat-l{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;}
+
+/* ══ SECTION ══ */
+.sec{position:relative;z-index:10;padding:96px 36px;}
+.sec-in{max-width:var(--max);margin:0 auto;}
+.sec-head{text-align:center;margin-bottom:56px;}
+.sec-tag{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--p);background:rgba(176,133,255,0.09);padding:6px 15px;border-radius:20px;border:1px solid rgba(176,133,255,0.18);margin-bottom:20px;}
+.sec-h2{font-size:clamp(32px,5vw,54px);font-weight:800;letter-spacing:-2.5px;line-height:1.0;margin-bottom:14px;}
+.sec-p{font-size:16px;color:var(--muted);max-width:460px;margin:0 auto;line-height:1.7;}
+
+/* ══ FEATURE CARDS ══ */
+.cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:22px;padding:30px 26px 26px;position:relative;overflow:hidden;transition:all 0.35s;cursor:default;}
+.card::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(176,133,255,0.07),transparent 55%);opacity:0;transition:opacity 0.35s;pointer-events:none;}
+.card:hover{border-color:var(--border2);transform:translateY(-5px);box-shadow:0 28px 64px rgba(0,0,0,0.38);}
+.card:hover::after{opacity:1;}
+.card-ico{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:18px;position:relative;z-index:1;}
+.ip{background:rgba(176,133,255,0.15);}
+.ir{background:rgba(255,128,181,0.15);}
+.ib{background:rgba(126,232,255,0.15);}
+.ig{background:rgba(61,255,192,0.15);}
+.iy{background:rgba(245,192,64,0.15);}
+.card-badge{position:absolute;top:22px;right:20px;font-family:var(--mono);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--p);background:rgba(176,133,255,0.1);padding:4px 10px;border-radius:20px;border:1px solid rgba(176,133,255,0.2);}
+.card h3{font-size:17px;font-weight:700;letter-spacing:-0.5px;margin-bottom:9px;position:relative;z-index:1;}
+.card p{font-size:13.5px;color:var(--muted);line-height:1.68;position:relative;z-index:1;}
+.card-num{position:absolute;bottom:10px;right:16px;font-size:72px;font-weight:800;letter-spacing:-4px;color:rgba(255,255,255,0.022);line-height:1;user-select:none;}
+
+/* ══ MARQUEE ══ */
+.marquee-wrap{position:relative;z-index:10;overflow:hidden;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:20px 0;background:rgba(255,255,255,0.01);}
+.marquee-track{display:flex;gap:0;width:max-content;animation:marquee 28s linear infinite;}
+.marquee-track:hover{animation-play-state:paused;}
+.m-item{display:flex;align-items:center;gap:10px;padding:0 32px;font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap;border-right:1px solid var(--border);}
+.m-item span{color:var(--p);}
+@keyframes marquee{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+
+/* ══ HOW IT WORKS ══ */
+.how-band{position:relative;z-index:10;background:rgba(255,255,255,0.012);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:96px 36px;}
+.how-in{max-width:var(--max);margin:0 auto;}
+.how-grid{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--border);border-radius:22px;overflow:hidden;}
+.how-step{padding:36px 30px;border-right:1px solid var(--border);position:relative;overflow:hidden;transition:background 0.3s;}
+.how-step:last-child{border-right:none;}
+.how-step::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--p),var(--p2));transform:scaleX(0);transform-origin:left;transition:transform 0.4s cubic-bezier(0.16,1,0.3,1);}
+.how-step:hover{background:rgba(176,133,255,0.04);}
+.how-step:hover::before{transform:scaleX(1);}
+.how-num{font-family:var(--mono);font-size:11px;color:var(--p);letter-spacing:2px;margin-bottom:18px;display:flex;align-items:center;gap:10px;}
+.how-num::after{content:'';flex:1;height:1px;background:rgba(176,133,255,0.18);}
+.how-step h3{font-size:16px;font-weight:700;letter-spacing:-0.4px;margin-bottom:9px;}
+.how-step p{font-size:13.5px;color:var(--muted);line-height:1.68;}
+
+/* ══ TERMINAL ══ */
+.terminal-section{position:relative;z-index:10;padding:0 36px 96px;}
+.term-in{max-width:680px;margin:0 auto;}
+.terminal{background:#0a0714;border:1px solid rgba(176,133,255,0.22);border-radius:18px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,0.5);}
+.term-bar{background:rgba(255,255,255,0.05);border-bottom:1px solid rgba(176,133,255,0.12);padding:12px 18px;display:flex;align-items:center;gap:8px;}
+.term-dot{width:11px;height:11px;border-radius:50%;}
+.td1{background:#ff5f57;}.td2{background:#febc2e;}.td3{background:#28c840;}
+.term-title{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:8px;}
+.term-body{padding:24px;font-family:var(--mono);font-size:13px;line-height:1.8;}
+.tl{display:flex;gap:10px;margin-bottom:4px;opacity:0;}
+.tl.show{opacity:1;}
+.tl-prompt{color:var(--p);flex-shrink:0;}
+.tl-text{color:#c8b4ff;}
+.tl-out{color:var(--green);}
+.tl-dim{color:var(--muted2);}
+.tl-acc{color:var(--p2);}
+.cursor{display:inline-block;width:8px;height:14px;background:var(--p);animation:blink2 1s step-end infinite;vertical-align:middle;margin-left:2px;}
+@keyframes blink2{0%,100%{opacity:1;}50%{opacity:0;}}
+
+/* ══ LIVE POST PREVIEW ══ */
+.preview-section{position:relative;z-index:10;padding:0 36px 96px;}
+.preview-in{max-width:var(--max);margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;}
+.preview-copy h2{font-size:clamp(28px,3.5vw,42px);font-weight:800;letter-spacing:-2px;line-height:1.05;margin-bottom:16px;}
+.preview-copy p{font-size:15px;color:var(--muted);line-height:1.7;margin-bottom:28px;}
+.btn-g{display:inline-flex;align-items:center;gap:9px;padding:14px 26px;border-radius:14px;background:linear-gradient(135deg,var(--p),#d060f0,var(--p2));border:none;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;box-shadow:0 10px 28px rgba(176,133,255,0.35);transition:all 0.22s;}
+.btn-g:hover{transform:translateY(-2px);box-shadow:0 16px 40px rgba(176,133,255,0.48);}
+.li-card{background:rgba(255,255,255,0.03);border:1px solid rgba(176,133,255,0.18);border-radius:16px;padding:20px;position:relative;}
+.li-top{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+.li-av{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--p),var(--p2));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:#fff;flex-shrink:0;}
+.li-meta h4{font-size:14px;font-weight:700;letter-spacing:-0.3px;}
+.li-meta p{font-size:12px;color:var(--muted);font-family:var(--mono);}
+.li-body{font-size:14px;line-height:1.72;color:var(--muted);margin-bottom:16px;min-height:80px;}
+.li-body .typed-text{color:var(--text);}
+.li-bottom{display:flex;gap:16px;padding-top:12px;border-top:1px solid var(--border);}
+.li-stat{font-family:var(--mono);font-size:11px;color:var(--muted2);display:flex;align-items:center;gap:5px;}
+.li-badge{position:absolute;top:-10px;right:16px;background:linear-gradient(135deg,var(--p),var(--p2));color:#fff;font-family:var(--mono);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;padding:4px 12px;border-radius:20px;}
+
+/* ══ CTA BAND ══ */
+.cta-wrap{padding:0 36px 96px;position:relative;z-index:10;}
+.cta-box{max-width:var(--max);margin:0 auto;background:linear-gradient(135deg,rgba(176,133,255,0.11),rgba(255,128,181,0.08),rgba(126,232,255,0.06));border:1px solid rgba(176,133,255,0.28);border-radius:28px;padding:72px 48px;text-align:center;position:relative;overflow:hidden;}
+.cta-box::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 70% 55% at 50% 0%,rgba(176,133,255,0.13),transparent);pointer-events:none;}
+.cta-h2{font-size:clamp(32px,5vw,54px);font-weight:800;letter-spacing:-3px;margin-bottom:16px;position:relative;z-index:1;}
+.cta-p{font-size:16px;color:var(--muted);max-width:380px;margin:0 auto 36px;line-height:1.7;position:relative;z-index:1;}
+.cta-btns{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;position:relative;z-index:1;}
+.btn-o{display:inline-flex;align-items:center;gap:9px;padding:14px 24px;border-radius:14px;background:transparent;border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;transition:all 0.22s;}
+.btn-o:hover{background:var(--card-h);border-color:rgba(176,133,255,0.45);}
+
+/* ══ FOOTER ══ */
+footer{position:relative;z-index:10;border-top:1px solid var(--border);}
+.foot-main{max-width:var(--max);margin:0 auto;padding:52px 36px 36px;display:grid;grid-template-columns:1.8fr 1fr 1fr 1fr;gap:40px;}
+.foot-brand p{font-size:13.5px;color:var(--muted);line-height:1.7;max-width:210px;margin-top:14px;}
+.foot-col h4{font-family:var(--mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted2);margin-bottom:16px;}
+.foot-col a{display:block;font-size:13.5px;color:var(--muted);text-decoration:none;margin-bottom:10px;transition:color 0.2s;}
+.foot-col a:hover{color:var(--text);}
+.foot-bottom{max-width:var(--max);margin:0 auto;padding:20px 36px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.foot-copy{font-family:var(--mono);font-size:10px;color:rgba(200,185,255,0.2);}
+.foot-links{display:flex;gap:16px;}
+.foot-links a{font-family:var(--mono);font-size:10px;color:rgba(200,185,255,0.25);text-decoration:none;transition:color 0.2s;}
+.foot-links a:hover{color:var(--muted);}
+
+/* ══ REVEAL ══ */
+.reveal{opacity:0;transform:translateY(26px);transition:opacity 0.7s cubic-bezier(0.16,1,0.3,1),transform 0.7s cubic-bezier(0.16,1,0.3,1);}
+.reveal.in{opacity:1;transform:none;}
+.d1{transition-delay:0.07s;}.d2{transition-delay:0.16s;}.d3{transition-delay:0.26s;}.d4{transition-delay:0.36s;}
+
+/* ══ FLOATING CARDS ══ */
+.float-showcase{position:relative;z-index:10;padding:0 36px 20px;overflow:hidden;}
+.float-inner{max-width:var(--max);margin:0 auto;position:relative;height:200px;}
+.f-card{position:absolute;background:rgba(255,255,255,0.04);border:1px solid rgba(176,133,255,0.18);border-radius:16px;padding:14px 18px;backdrop-filter:blur(12px);box-shadow:0 20px 50px rgba(0,0,0,0.4);display:flex;align-items:center;gap:12px;white-space:nowrap;}
+.f-ico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.f-card h4{font-size:13px;font-weight:700;margin-bottom:2px;}
+.f-card p{font-size:11px;color:var(--muted);font-family:var(--mono);}
+.fc1{left:4%;top:18px;animation:fc1 7s ease-in-out infinite;}
+.fc2{left:30%;top:55px;animation:fc2 8s ease-in-out infinite 0.5s;}
+.fc3{right:3%;top:12px;animation:fc3 6.5s ease-in-out infinite 1s;}
+.fc4{left:18%;top:118px;animation:fc4 9s ease-in-out infinite 1.5s;}
+.fc5{right:20%;top:112px;animation:fc5 7.5s ease-in-out infinite 0.8s;}
+@keyframes fc1{0%,100%{transform:translateY(0) rotate(-1deg);}50%{transform:translateY(-14px) rotate(0.5deg);}}
+@keyframes fc2{0%,100%{transform:translateY(0) rotate(0.5deg);}50%{transform:translateY(-18px) rotate(-1deg);}}
+@keyframes fc3{0%,100%{transform:translateY(0) rotate(1.5deg);}50%{transform:translateY(-12px) rotate(-0.5deg);}}
+@keyframes fc4{0%,100%{transform:translateY(0) rotate(-0.8deg);}50%{transform:translateY(-16px) rotate(1deg);}}
+@keyframes fc5{0%,100%{transform:translateY(0) rotate(1deg);}50%{transform:translateY(-10px) rotate(-1.2deg);}}
+
+/* ══ MOBILE ══ */
+@media(max-width:960px){
+  .hdr{padding:0 20px;}
+  .nl{display:none;}
+  .cards3,.how-grid,.preview-in{grid-template-columns:1fr;}
+  .stats-in{grid-template-columns:repeat(2,1fr);}
+  .foot-main{grid-template-columns:1fr 1fr;row-gap:32px;}
+  .sec,.how-band{padding:64px 20px;}
+  .cta-wrap,.float-showcase,.terminal-section,.preview-section{padding-left:20px;padding-right:20px;}
+  .cta-box{padding:48px 28px;}
+  .hero{padding:64px 20px 48px;}
+  .float-showcase{display:none;}
+}
+@media(max-width:600px){
+  .h1{letter-spacing:-2.5px;}
+  .stats-in{grid-template-columns:repeat(2,1fr);}
+  .foot-main{grid-template-columns:1fr;}
+  .cta-btns{flex-direction:column;align-items:center;}
+  .btn-g,.btn-o{width:100%;justify-content:center;}
+  .how-step{border-right:none;border-bottom:1px solid var(--border);}
+  .how-step:last-child{border-bottom:none;}
+  .auth-card{padding:30px 22px;}
+}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
+
+<!-- ═══ HEADER ═══ -->
+<header>
+  <div class="hdr">
+    <a class="logo" href="#">
+      <div class="logo-icon">Li</div>
+      <span class="logo-name">LinkedIn Agent</span>
+    </a>
+    <nav>
+      <a href="#features" class="nl">Features</a>
+      <a href="#how" class="nl">How it works</a>
+      <div class="nav-status">
+        <span class="ping-dot" id="pingDot"></span>
+        <span class="ping-label" id="pingLabel">checking...</span>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<!-- ═══ HERO + AUTH ═══ -->
+<section class="hero">
+  <div class="hero-in">
+    <div class="badge"><span class="bdot"></span> AI-Powered · Autonomous Posting</div>
+    <h1 class="h1">Post smarter.<br>Grow <span class="grad">faster.</span><br>Automate.</h1>
+    <p class="sub">AI-powered LinkedIn ghostwriting that schedules, generates, and publishes posts to multiple channels — on your timezone, every single day.</p>
+
+    <!-- AUTH CARD -->
+    <div class="auth-wrap">
+      <div class="auth-card">
+        <div class="auth-ico">🤖</div>
+        <div class="auth-title" id="authTitle">Welcome back</div>
+        <div class="auth-sub" id="authSub">sign in to your dashboard</div>
+
+        <div class="tabs">
+          <button class="tab on" id="tabLogin" onclick="switchTab('login')">Sign In</button>
+          <button class="tab" id="tabReg" onclick="switchTab('register')">Register</button>
+        </div>
+
+        <div class="alert err" id="errBox"><span style="font-size:15px;flex-shrink:0">⚠</span><span id="errMsg"></span></div>
+        <div class="alert ok"  id="okBox"><span style="font-size:15px;flex-shrink:0">✓</span><span id="okMsg"></span></div>
+
+        <!-- EMAIL field (both tabs) -->
+        <div class="field">
+          <label>Email Address</label>
+          <div class="inp-w">
+            <span class="inp-ico">✉</span>
+            <input type="email" id="inEmail" placeholder="you@example.com" autocomplete="email" onkeydown="if(event.key==='Enter')doSubmit()">
+          </div>
+        </div>
+
+        <!-- PASSWORD -->
+        <div class="field">
+          <label>Password</label>
+          <div class="inp-w">
+            <span class="inp-ico">🔒</span>
+            <input type="password" id="inPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doSubmit()">
+          </div>
+        </div>
+
+        <!-- CONFIRM PASSWORD (register only) -->
+        <div class="field" id="confirmField" style="display:none">
+          <label>Confirm Password</label>
+          <div class="inp-w">
+            <span class="inp-ico">🔐</span>
+            <input type="password" id="inConfirm" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSubmit()">
+          </div>
+        </div>
+
+        <button class="auth-btn" id="submitBtn" onclick="doSubmit()">
+          <span id="btnLabel">Sign In</span>
+        </button>
+
+        <div class="auth-note">Session 8h · timezone auto-detected · <span style="color:rgba(176,133,255,0.4)">no credit card</span></div>
+      </div>
+    </div>
+
+    <div class="scroll-hint">scroll to explore<div class="scroll-arrow"></div></div>
+  </div>
+</section>
+
+<!-- ═══ FLOATING CARDS ═══ -->
+<div class="float-showcase">
+  <div class="float-inner">
+    <div class="f-card fc1"><div class="f-ico ip">🤖</div><div><h4>Post generated</h4><p style="color:var(--green)">✓ Published to LinkedIn</p></div></div>
+    <div class="f-card fc2"><div class="f-ico ir">📈</div><div><h4>+342 impressions</h4><p>in the last 2 hours</p></div></div>
+    <div class="f-card fc3"><div class="f-ico ib">⏰</div><div><h4>Next post: 08:00</h4><p>tomorrow · auto-scheduled</p></div></div>
+    <div class="f-card fc4"><div class="f-ico ig">✨</div><div><h4>AI writing…</h4><p style="color:var(--p)">2.8s generation time</p></div></div>
+    <div class="f-card fc5"><div class="f-ico iy">🔗</div><div><h4>4 channels synced</h4><p>LinkedIn + Facebook</p></div></div>
+  </div>
+</div>
+
+<!-- ═══ STATS ═══ -->
+<div class="stats reveal">
+  <div class="stats-in">
+    <div class="stat"><div class="stat-n">12k+</div><div class="stat-l">Active users</div></div>
+    <div class="stat"><div class="stat-n">98%</div><div class="stat-l">On schedule</div></div>
+    <div class="stat"><div class="stat-n">4×</div><div class="stat-l">More reach</div></div>
+    <div class="stat"><div class="stat-n">3s</div><div class="stat-l">Per post</div></div>
+  </div>
+</div>
+
+<!-- ═══ MARQUEE ═══ -->
+<div class="marquee-wrap">
+  <div class="marquee-track">
+    <div class="m-item">🤖 Groq AI · <span>llama-3.1-70b</span></div>
+    <div class="m-item">📅 Daily scheduling · <span>08:00 local time</span></div>
+    <div class="m-item">🔗 Multi-channel · <span>4 platforms</span></div>
+    <div class="m-item">⚡ Generation speed · <span>&lt;3 seconds</span></div>
+    <div class="m-item">🌍 Timezone aware · <span>auto-detected</span></div>
+    <div class="m-item">📊 Analytics · <span>real-time insights</span></div>
+    <div class="m-item">✏️ Custom tone · <span>sounds like you</span></div>
+    <div class="m-item">🔔 Review queue · <span>approve before publish</span></div>
+    <div class="m-item">🤖 Groq AI · <span>llama-3.1-70b</span></div>
+    <div class="m-item">📅 Daily scheduling · <span>08:00 local time</span></div>
+    <div class="m-item">🔗 Multi-channel · <span>4 platforms</span></div>
+    <div class="m-item">⚡ Generation speed · <span>&lt;3 seconds</span></div>
+    <div class="m-item">🌍 Timezone aware · <span>auto-detected</span></div>
+    <div class="m-item">📊 Analytics · <span>real-time insights</span></div>
+    <div class="m-item">✏️ Custom tone · <span>sounds like you</span></div>
+    <div class="m-item">🔔 Review queue · <span>approve before publish</span></div>
+  </div>
+</div>
+
+<!-- ═══ FEATURES ═══ -->
+<section class="sec" id="features">
+  <div class="sec-in">
+    <div class="sec-head">
+      <div class="sec-tag reveal">✦ Features</div>
+      <h2 class="sec-h2 reveal d1">Everything you<br>need to grow.</h2>
+      <p class="sec-p reveal d2">One platform to generate, schedule, and publish content — completely hands-off.</p>
+    </div>
+    <div class="cards3">
+      <div class="card reveal d1"><div class="card-ico ip">🤖</div><div class="card-badge">llama-3.1</div><h3>AI Writing Engine</h3><p>Generate compelling LinkedIn posts in under 3 seconds. Authentic, human-sounding content powered by Groq.</p><div class="card-num">01</div></div>
+      <div class="card reveal d2"><div class="card-ico ir">📅</div><div class="card-badge">Multi-slot</div><h3>Smart Scheduling</h3><p>Set up to 3 daily time slots. Posts fire at your chosen times, timezone auto-detected — zero config required.</p><div class="card-num">02</div></div>
+      <div class="card reveal d3"><div class="card-ico ib">🔗</div><div class="card-badge">4 channels</div><h3>Multi-channel Publishing</h3><p>LinkedIn, Facebook, and Instagram simultaneously. One setup, multiple channels, infinite consistency.</p><div class="card-num">03</div></div>
+      <div class="card reveal d1"><div class="card-ico ig">📋</div><div class="card-badge">Review queue</div><h3>Post Review Queue</h3><p>Every generated post goes to review first. Edit, approve, or discard before it goes live — or let it auto-publish in 1 hour.</p><div class="card-num">04</div></div>
+      <div class="card reveal d2"><div class="card-ico iy">🎯</div><div class="card-badge">Per-subject</div><h3>Channel Targeting</h3><p>Choose which channels each subject posts to. Send some topics only to LinkedIn, others to all platforms.</p><div class="card-num">05</div></div>
+      <div class="card reveal d3"><div class="card-ico ip">🔔</div><div class="card-badge">Instant</div><h3>Email Notifications</h3><p>Get an email the moment each post is ready for review. Click through directly to approve, edit, or discard.</p><div class="card-num">06</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ HOW IT WORKS ═══ -->
+<div class="how-band" id="how">
+  <div class="how-in">
+    <div class="sec-head">
+      <div class="sec-tag reveal">↳ Process</div>
+      <h2 class="sec-h2 reveal d1">Three steps<br>to autopilot.</h2>
+      <p class="sec-p reveal d2">From zero to fully automated in under 10 minutes.</p>
+    </div>
+    <div class="how-grid">
+      <div class="how-step reveal d1"><div class="how-num">01</div><h3>Create your account</h3><p>Sign up with your email in seconds. We auto-detect your timezone so you're posting in peak engagement hours from day one.</p></div>
+      <div class="how-step reveal d2"><div class="how-num">02</div><h3>Connect your channels</h3><p>Link LinkedIn, Facebook, and Instagram via OAuth. 2 minutes — no coding, no API keys to copy, no headaches.</p></div>
+      <div class="how-step reveal d3"><div class="how-num">03</div><h3>Watch the AI work</h3><p>At your scheduled times, fresh posts go to your review queue. Approve or let them auto-publish — endlessly consistent.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TERMINAL ═══ -->
+<section class="terminal-section">
+  <div class="sec-head" style="margin-bottom:36px;">
+    <div class="sec-tag reveal">⚡ Under the hood</div>
+    <h2 class="sec-h2 reveal d1">Watch it<br><span class="grad">work live.</span></h2>
+  </div>
+  <div class="term-in reveal d2">
+    <div class="terminal">
+      <div class="term-bar">
+        <div class="term-dot td1"></div><div class="term-dot td2"></div><div class="term-dot td3"></div>
+        <span class="term-title">linkedin-agent · scheduler.py</span>
+      </div>
+      <div class="term-body" id="termBody">
+        <div class="tl show"><span class="tl-prompt">$</span><span class="tl-text">linkedin-agent start --user sara@growthq.io</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ LIVE POST PREVIEW ═══ -->
+<section class="preview-section">
+  <div class="preview-in">
+    <div class="preview-copy reveal">
+      <div class="sec-tag" style="margin-bottom:16px;">👁️ Live preview</div>
+      <h2>See exactly what<br><span class="grad">gets posted.</span></h2>
+      <p>Every post is AI-written in under 3 seconds, sent to your review queue, then published at your scheduled time. Authentic, engaging content — every single day.</p>
+      <a href="#" class="btn-g" onclick="document.getElementById('inEmail').focus();window.scrollTo({top:0,behavior:'smooth'});return false;">Try it yourself →</a>
+    </div>
+    <div class="reveal d2">
+      <div class="li-card">
+        <div class="li-badge">Live post preview</div>
+        <div class="li-top">
+          <div class="li-av">SK</div>
+          <div class="li-meta"><h4>Sara Kline</h4><p>Founder · GrowthHQ · Just now</p></div>
+        </div>
+        <div class="li-body"><span class="typed-text" id="typedPost"></span><span class="cursor" id="typeCursor"></span></div>
+        <div class="li-bottom">
+          <div class="li-stat">👍 <span id="likeCount">0</span> likes</div>
+          <div class="li-stat">💬 <span id="commentCount">0</span> comments</div>
+          <div class="li-stat">🔁 <span id="shareCount">0</span> reposts</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CTA ═══ -->
+<div class="cta-wrap">
+  <div class="cta-box reveal">
+    <h2 class="cta-h2">Start growing<br><span class="grad">today.</span></h2>
+    <p class="cta-p">Join thousands of professionals who've automated their LinkedIn presence. Free to start.</p>
+    <div class="cta-btns">
+      <a href="#" class="btn-g" onclick="window.scrollTo({top:0,behavior:'smooth'});setTimeout(()=>switchTab('register'),400);return false;">🚀 Create free account</a>
+      <a href="#features" class="btn-o">Learn more</a>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <div class="foot-main">
+    <div class="foot-brand">
+      <a class="logo" href="#" style="text-decoration:none;color:inherit;">
+        <div class="logo-icon" style="width:34px;height:34px;border-radius:10px;font-size:12px;">Li</div>
+        <span style="font-size:14px;font-weight:700;margin-left:10px;">LinkedIn Agent</span>
+      </a>
+      <p>Autonomous AI posting that grows your LinkedIn presence — every day, on autopilot.</p>
+    </div>
+    <div class="foot-col"><h4>Product</h4><a href="#features">Features</a><a href="#how">How it works</a><a href="#">Changelog</a><a href="#">Roadmap</a></div>
+    <div class="foot-col"><h4>Company</h4><a href="#">About</a><a href="#">Blog</a><a href="#">Careers</a><a href="#">Press</a></div>
+    <div class="foot-col"><h4>Support</h4><a href="#">Docs</a><a href="#">Help center</a><a href="#">Contact</a><a href="/privacy">Privacy</a></div>
+  </div>
+  <div class="foot-bottom">
+    <div class="foot-copy">© 2025 LinkedIn Agent · Autonomous post scheduler</div>
+    <div class="foot-links"><a href="/privacy">Privacy</a><a href="#">Terms</a><a href="#">Cookies</a></div>
+  </div>
+</footer>
+
+<script>
+/* ── AUTH ── */
+const API = window.location.origin + '/api';
+const SK  = 'li_session';
+
+function getUO(){ return -(new Date().getTimezoneOffset() / 60); }
+function storeSession(){ localStorage.setItem(SK, JSON.stringify({expiresAt: Date.now() + 8*3600*1000})); }
+function getS(){ try{ return JSON.parse(localStorage.getItem(SK)) || null; }catch{ return null; } }
+function isV(){ const s = getS(); return s && Date.now() < s.expiresAt; }
+
+let ct = 'login';
+
+function switchTab(t){
+  ct = t;
+  document.getElementById('tabLogin').classList.toggle('on', t === 'login');
+  document.getElementById('tabReg').classList.toggle('on',   t === 'register');
+  document.getElementById('confirmField').style.display = t === 'register' ? 'block' : 'none';
+  document.getElementById('btnLabel').textContent  = t === 'login' ? 'Sign In' : 'Create Account';
+  document.getElementById('authTitle').textContent = t === 'login' ? 'Welcome back' : 'Join the agent';
+  document.getElementById('authSub').textContent   = t === 'login' ? 'sign in to your dashboard' : 'create your free account';
+  hideAlerts();
+  ['inEmail','inPass','inConfirm'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+}
+
+function showErr(m){ document.getElementById('errMsg').textContent=m; document.getElementById('errBox').classList.add('show'); document.getElementById('okBox').classList.remove('show'); }
+function showOk(m){  document.getElementById('okMsg').textContent=m;  document.getElementById('okBox').classList.add('show');  document.getElementById('errBox').classList.remove('show'); }
+function hideAlerts(){ document.getElementById('errBox').classList.remove('show'); document.getElementById('okBox').classList.remove('show'); }
+
+async function doSubmit(){
+  const email   = document.getElementById('inEmail').value.trim();
+  const pass    = document.getElementById('inPass').value;
+  const confirm = document.getElementById('inConfirm').value;
+  const btn     = document.getElementById('submitBtn');
+  const lbl     = document.getElementById('btnLabel');
+  hideAlerts();
+
+  if(!email || !pass){ showErr('Please fill in all fields.'); return; }
+  if(ct === 'register'){
+    if(pass !== confirm){ showErr('Passwords do not match.'); return; }
+    if(pass.length < 6){ showErr('Password needs 6+ characters.'); return; }
+  }
+
+  btn.disabled = true;
+  lbl.innerHTML = '<span class="spin">⟳</span> ' + (ct === 'login' ? 'Signing in…' : 'Creating…');
+
+  try{
+    const endpoint = ct === 'login' ? 'login' : 'register';
+    const res  = await fetch(`${API}/${endpoint}`, {
+      method: 'POST', credentials: 'include',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email, password: pass, utc_offset_hours: getUO() })
+    });
+    const d = await res.json();
+    if(d.ok){
+      storeSession();
+      showOk(ct === 'login' ? 'Welcome back! Redirecting…' : 'Account created! Redirecting…');
+      setTimeout(() => { window.location.href = d.has_config ? '/dashboard' : '/setup'; }, 600);
+    } else {
+      showErr(d.message || 'Authentication failed.');
+      btn.disabled = false;
+      lbl.textContent = ct === 'login' ? 'Sign In' : 'Create Account';
+    }
+  } catch(e){
+    showErr('Cannot reach server — make sure the app is running.');
+    btn.disabled = false;
+    lbl.textContent = ct === 'login' ? 'Sign In' : 'Create Account';
+  }
+}
+
+/* ── PING CHECK ── */
+async function checkPing(){
+  const dot = document.getElementById('pingDot');
+  const lbl = document.getElementById('pingLabel');
+  try{
+    const res = await fetch(window.location.origin + '/ping', {cache:'no-store'});
+    const d   = await res.json();
+    dot.className = 'ping-dot live';
+    let t = '--:--';
+    if(d.utc_iso){
+      t = new Date(d.utc_iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+    }
+    lbl.textContent = 'server live · ' + t;
+  } catch(e){
+    dot.className = 'ping-dot dead';
+    lbl.textContent = 'server offline';
+  }
+}
+checkPing();
+setInterval(checkPing, 30000);
+
+/* ── SCROLL REVEAL ── */
+const obs = new IntersectionObserver(es => { es.forEach(e => { if(e.isIntersecting) e.target.classList.add('in'); }); }, {threshold:0.08});
+document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+
+/* ── TERMINAL ANIMATION ── */
+const lines = [
+  {t:'out', v:'✓ Session loaded · timezone: Europe/Stockholm (UTC+2)'},
+  {t:'out', v:'✓ LinkedIn + Facebook + Instagram connected · 5 channels'},
+  {t:'dim', v:'[08:00:01] Scheduler triggered (slot 1/2)...'},
+  {t:'cmd', v:'groq generate --model llama-3.1-8b --subject "founder mistakes"'},
+  {t:'dim', v:'⟳  Calling Groq API...'},
+  {t:'out', v:'✓ Post generated in 2.8s (2934 chars)'},
+  {t:'acc', v:'  "The biggest mistake founders make on LinkedIn is..."'},
+  {t:'dim', v:'⟳  Adding to review queue...'},
+  {t:'out', v:'✓ Review item created · ID: a3f9c2d1'},
+  {t:'out', v:'✓ Email sent → sara@growthq.io'},
+  {t:'dim', v:'[08:00:04] Auto-publish in 1h unless reviewed'},
+  {t:'dim', v:'[08:00:04] Next slot: 15:00 (in 6h 59m 56s)'},
+];
+let tli = 0;
+function addTermLine(){
+  if(tli >= lines.length) return;
+  const l  = lines[tli];
+  const tb = document.getElementById('termBody');
+  const div = document.createElement('div'); div.className = 'tl show';
+  const map = {
+    cmd: `<span class="tl-prompt">$</span><span class="tl-text">${l.v}</span>`,
+    out: `<span class="tl-out">${l.v}</span>`,
+    dim: `<span class="tl-dim">${l.v}</span>`,
+    acc: `<span class="tl-acc">${l.v}</span>`
+  };
+  div.innerHTML = map[l.t] || l.v;
+  tb.appendChild(div); tb.scrollTop = tb.scrollHeight;
+  tli++;
+  if(tli < lines.length) setTimeout(addTermLine, tli === 5 ? 1200 : 600);
+}
+setTimeout(addTermLine, 1400);
+
+/* ── TYPEWRITER ── */
+const post = "The biggest mistake founders make on LinkedIn?\n\nPosting when it feels right — not when it performs.\n\nI analyzed 6 months of my own data:\n• 8 AM posts got 3.2× more impressions\n• Consistency beat quality every time\n• Authenticity resonated most\n\nSo I automated it. Now it just... happens.\n\n#LinkedInTips #Founders #GrowthHacking";
+let ti = 0, likes = 0, comments = 0, shares = 0;
+function typePost(){
+  const el = document.getElementById('typedPost');
+  if(!el) return;
+  if(ti < post.length){
+    el.textContent = post.slice(0, ti + 1);
+    ti++;
+    setTimeout(typePost, ti < 30 ? 60 : 26);
+  } else {
+    document.getElementById('typeCursor').style.display = 'none';
+    let lt = setInterval(() => { if(likes < 247){ likes += Math.ceil((247-likes)*0.08+1); document.getElementById('likeCount').textContent = likes; } else clearInterval(lt); }, 55);
+    setTimeout(() => { let ct2 = setInterval(() => { if(comments < 38){ comments++; document.getElementById('commentCount').textContent = comments; } else clearInterval(ct2); }, 110); }, 400);
+    setTimeout(() => { let st  = setInterval(() => { if(shares < 19){  shares++;   document.getElementById('shareCount').textContent = shares;   } else clearInterval(st);  }, 180); }, 800);
+  }
+}
+const tObs = new IntersectionObserver(es => { es.forEach(e => { if(e.isIntersecting){ tObs.disconnect(); setTimeout(typePost, 600); } }); }, {threshold:0.3});
+const liCard = document.querySelector('.li-card');
+if(liCard) tObs.observe(liCard);
+
+/* ── AUTO REDIRECT if already logged in ── */
+(async () => {
+  try{
+    const s = getS();
+    if(!s || Date.now() > s.expiresAt) return;
+    const r = await fetch(`${API}/me`, {credentials:'include'});
+    const d = await r.json();
+    if(d.authenticated) window.location.href = d.has_config ? '/dashboard' : '/setup';
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>
