@@ -898,6 +898,8 @@ def keep_alive_loop():
 def page_login():     return load_html("index.html")
 @app.route("/setup")
 def page_setup():     return load_html("setup.html")
+@app.route("/profile")
+def page_profile():   return load_html("profile.html")
 @app.route("/dashboard")
 def page_dashboard(): return load_html("dashboard.html")
 
