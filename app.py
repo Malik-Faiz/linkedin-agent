@@ -895,7 +895,7 @@ def keep_alive_loop():
 #  PAGE ROUTES
 # ════════════════════════════════════════════════════════════════════════════════
 @app.route("/")
-def page_login():     return load_html("login.html")
+def page_login():     return load_html("index.html")
 @app.route("/setup")
 def page_setup():     return load_html("setup.html")
 @app.route("/dashboard")
