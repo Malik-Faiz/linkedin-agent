@@ -73,7 +73,7 @@ nav{display:flex;align-items:center;gap:4px;}
 .sub{font-size:17px;line-height:1.75;color:var(--muted);max-width:500px;margin:0 auto 44px;opacity:0;animation:up 0.6s 0.48s cubic-bezier(0.16,1,0.3,1) forwards;}
 @keyframes up{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
 
-/* ══ AUTH CARD — front and center ══ */
+/* ══ AUTH CARD ══ */
 .auth-wrap{max-width:460px;margin:0 auto;opacity:0;animation:up 0.7s 0.6s cubic-bezier(0.16,1,0.3,1) forwards;}
 .auth-card{background:rgba(255,255,255,0.026);border:1px solid rgba(176,133,255,0.22);border-radius:26px;padding:38px 36px;backdrop-filter:blur(24px);box-shadow:0 0 0 1px rgba(255,255,255,0.04) inset,0 60px 120px rgba(0,0,0,0.55),0 0 80px rgba(176,133,255,0.08);}
 .auth-ico{width:54px;height:54px;border-radius:16px;background:linear-gradient(135deg,rgba(176,133,255,0.2),rgba(255,128,181,0.14));border:1px solid rgba(176,133,255,0.25);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 16px;}
@@ -93,6 +93,7 @@ nav{display:flex;align-items:center;gap:4px;}
 .alert{display:none;align-items:flex-start;gap:9px;border-radius:12px;padding:11px 14px;font-size:11px;font-family:var(--mono);margin-bottom:13px;line-height:1.6;}
 .alert.show{display:flex;}
 .alert.err{background:rgba(255,96,96,0.08);border:1px solid rgba(255,96,96,0.22);color:var(--red);}
+.alert.ok{background:rgba(61,255,192,0.06);border:1px solid rgba(61,255,192,0.22);color:var(--green);}
 .auth-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--p),#d060f0,var(--p2));border:none;border-radius:14px;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 10px 28px rgba(176,133,255,0.32);transition:all 0.2s;position:relative;overflow:hidden;}
 .auth-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,0.16),transparent);pointer-events:none;}
 .auth-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 16px 40px rgba(176,133,255,0.44);}
@@ -301,35 +302,56 @@ footer{position:relative;z-index:10;border-top:1px solid var(--border);}
     <h1 class="h1">Post smarter.<br>Grow <span class="grad">faster.</span><br>Automate.</h1>
     <p class="sub">AI-powered LinkedIn ghostwriting that schedules, generates, and publishes posts to multiple channels — on your timezone, every single day.</p>
 
-    <!-- AUTH CARD — right here, centered -->
+    <!-- AUTH CARD -->
     <div class="auth-wrap">
       <div class="auth-card">
         <div class="auth-ico">🤖</div>
         <div class="auth-title" id="authTitle">Welcome back</div>
         <div class="auth-sub" id="authSub">sign in to your dashboard</div>
+
         <div class="tabs">
           <button class="tab on" id="tabLogin" onclick="switchTab('login')">Sign In</button>
           <button class="tab" id="tabReg" onclick="switchTab('register')">Register</button>
         </div>
+
         <div class="alert err" id="errBox"><span style="font-size:15px;flex-shrink:0">⚠</span><span id="errMsg"></span></div>
+        <div class="alert ok"  id="okBox"><span style="font-size:15px;flex-shrink:0">✓</span><span id="okMsg"></span></div>
+
+        <!-- EMAIL field (both tabs) -->
         <div class="field">
-          <label>Username</label>
-          <div class="inp-w"><span class="inp-ico">👤</span><input type="text" id="inUser" placeholder="your_username" autocomplete="username" onkeydown="if(event.key==='Enter')doSubmit()"></div>
+          <label>Email Address</label>
+          <div class="inp-w">
+            <span class="inp-ico">✉</span>
+            <input type="email" id="inEmail" placeholder="you@example.com" autocomplete="email" onkeydown="if(event.key==='Enter')doSubmit()">
+          </div>
         </div>
+
+        <!-- PASSWORD -->
         <div class="field">
           <label>Password</label>
-          <div class="inp-w"><span class="inp-ico">🔒</span><input type="password" id="inPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doSubmit()"></div>
+          <div class="inp-w">
+            <span class="inp-ico">🔒</span>
+            <input type="password" id="inPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doSubmit()">
+          </div>
         </div>
+
+        <!-- CONFIRM PASSWORD (register only) -->
         <div class="field" id="confirmField" style="display:none">
           <label>Confirm Password</label>
-          <div class="inp-w"><span class="inp-ico">🔐</span><input type="password" id="inConfirm" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSubmit()"></div>
+          <div class="inp-w">
+            <span class="inp-ico">🔐</span>
+            <input type="password" id="inConfirm" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSubmit()">
+          </div>
         </div>
-        <button class="auth-btn" id="submitBtn" onclick="doSubmit()"><span id="btnLabel">Sign In</span></button>
-        <div class="auth-note">Session 24h · timezone auto-detected · <span style="color:rgba(176,133,255,0.4)">no credit card</span></div>
+
+        <button class="auth-btn" id="submitBtn" onclick="doSubmit()">
+          <span id="btnLabel">Sign In</span>
+        </button>
+
+        <div class="auth-note">Session 8h · timezone auto-detected · <span style="color:rgba(176,133,255,0.4)">no credit card</span></div>
       </div>
     </div>
 
-    <!-- scroll down hint -->
     <div class="scroll-hint">scroll to explore<div class="scroll-arrow"></div></div>
   </div>
 </section>
@@ -360,20 +382,20 @@ footer{position:relative;z-index:10;border-top:1px solid var(--border);}
   <div class="marquee-track">
     <div class="m-item">🤖 Groq AI · <span>llama-3.1-70b</span></div>
     <div class="m-item">📅 Daily scheduling · <span>08:00 local time</span></div>
-    <div class="m-item">🔗 Buffer integration · <span>4 channels</span></div>
+    <div class="m-item">🔗 Multi-channel · <span>4 platforms</span></div>
     <div class="m-item">⚡ Generation speed · <span>&lt;3 seconds</span></div>
     <div class="m-item">🌍 Timezone aware · <span>auto-detected</span></div>
     <div class="m-item">📊 Analytics · <span>real-time insights</span></div>
     <div class="m-item">✏️ Custom tone · <span>sounds like you</span></div>
-    <div class="m-item">🔔 Notifications · <span>instant alerts</span></div>
+    <div class="m-item">🔔 Review queue · <span>approve before publish</span></div>
     <div class="m-item">🤖 Groq AI · <span>llama-3.1-70b</span></div>
     <div class="m-item">📅 Daily scheduling · <span>08:00 local time</span></div>
-    <div class="m-item">🔗 Buffer integration · <span>4 channels</span></div>
+    <div class="m-item">🔗 Multi-channel · <span>4 platforms</span></div>
     <div class="m-item">⚡ Generation speed · <span>&lt;3 seconds</span></div>
     <div class="m-item">🌍 Timezone aware · <span>auto-detected</span></div>
     <div class="m-item">📊 Analytics · <span>real-time insights</span></div>
     <div class="m-item">✏️ Custom tone · <span>sounds like you</span></div>
-    <div class="m-item">🔔 Notifications · <span>instant alerts</span></div>
+    <div class="m-item">🔔 Review queue · <span>approve before publish</span></div>
   </div>
 </div>
 
@@ -387,11 +409,11 @@ footer{position:relative;z-index:10;border-top:1px solid var(--border);}
     </div>
     <div class="cards3">
       <div class="card reveal d1"><div class="card-ico ip">🤖</div><div class="card-badge">llama-3.1</div><h3>AI Writing Engine</h3><p>Generate compelling LinkedIn posts in under 3 seconds. Authentic, human-sounding content powered by Groq.</p><div class="card-num">01</div></div>
-      <div class="card reveal d2"><div class="card-ico ir">📅</div><div class="card-badge">Daily · 08:00</div><h3>Smart Scheduling</h3><p>Posts fire at 8 AM your local time, every day. Timezone auto-detected on signup — zero config required.</p><div class="card-num">02</div></div>
-      <div class="card reveal d3"><div class="card-ico ib">🔗</div><div class="card-badge">4 channels</div><h3>Multi-channel Publishing</h3><p>LinkedIn and Facebook simultaneously via Buffer. One setup, four channels, infinite consistency.</p><div class="card-num">03</div></div>
-      <div class="card reveal d1"><div class="card-ico ig">📊</div><div class="card-badge">Real-time</div><h3>Analytics Dashboard</h3><p>Track impressions, engagement, and follower growth across all channels in real time.</p><div class="card-num">04</div></div>
-      <div class="card reveal d2"><div class="card-ico iy">✏️</div><div class="card-badge">Customizable</div><h3>Tone Customization</h3><p>Train the AI on your voice. Set professional or casual tones. Posts that sound unmistakably like you.</p><div class="card-num">05</div></div>
-      <div class="card reveal d3"><div class="card-ico ip">🔔</div><div class="card-badge">Instant</div><h3>Post Notifications</h3><p>Get alerted the moment each post goes live. Approve, edit, or skip posts before they publish.</p><div class="card-num">06</div></div>
+      <div class="card reveal d2"><div class="card-ico ir">📅</div><div class="card-badge">Multi-slot</div><h3>Smart Scheduling</h3><p>Set up to 3 daily time slots. Posts fire at your chosen times, timezone auto-detected — zero config required.</p><div class="card-num">02</div></div>
+      <div class="card reveal d3"><div class="card-ico ib">🔗</div><div class="card-badge">4 channels</div><h3>Multi-channel Publishing</h3><p>LinkedIn, Facebook, and Instagram simultaneously. One setup, multiple channels, infinite consistency.</p><div class="card-num">03</div></div>
+      <div class="card reveal d1"><div class="card-ico ig">📋</div><div class="card-badge">Review queue</div><h3>Post Review Queue</h3><p>Every generated post goes to review first. Edit, approve, or discard before it goes live — or let it auto-publish in 1 hour.</p><div class="card-num">04</div></div>
+      <div class="card reveal d2"><div class="card-ico iy">🎯</div><div class="card-badge">Per-subject</div><h3>Channel Targeting</h3><p>Choose which channels each subject posts to. Send some topics only to LinkedIn, others to all platforms.</p><div class="card-num">05</div></div>
+      <div class="card reveal d3"><div class="card-ico ip">🔔</div><div class="card-badge">Instant</div><h3>Email Notifications</h3><p>Get an email the moment each post is ready for review. Click through directly to approve, edit, or discard.</p><div class="card-num">06</div></div>
     </div>
   </div>
 </section>
@@ -405,9 +427,9 @@ footer{position:relative;z-index:10;border-top:1px solid var(--border);}
       <p class="sec-p reveal d2">From zero to fully automated in under 10 minutes.</p>
     </div>
     <div class="how-grid">
-      <div class="how-step reveal d1"><div class="how-num">01</div><h3>Create your account</h3><p>Sign up in seconds. We auto-detect your timezone so you're posting in peak engagement hours from day one.</p></div>
-      <div class="how-step reveal d2"><div class="how-num">02</div><h3>Connect your channels</h3><p>Link LinkedIn and Facebook via Buffer. 2 minutes — no coding, no API keys, no headaches.</p></div>
-      <div class="how-step reveal d3"><div class="how-num">03</div><h3>Watch the AI work</h3><p>Every morning at 8 AM, a fresh post goes live. Fully automated, endlessly consistent, always on brand.</p></div>
+      <div class="how-step reveal d1"><div class="how-num">01</div><h3>Create your account</h3><p>Sign up with your email in seconds. We auto-detect your timezone so you're posting in peak engagement hours from day one.</p></div>
+      <div class="how-step reveal d2"><div class="how-num">02</div><h3>Connect your channels</h3><p>Link LinkedIn, Facebook, and Instagram via OAuth. 2 minutes — no coding, no API keys to copy, no headaches.</p></div>
+      <div class="how-step reveal d3"><div class="how-num">03</div><h3>Watch the AI work</h3><p>At your scheduled times, fresh posts go to your review queue. Approve or let them auto-publish — endlessly consistent.</p></div>
     </div>
   </div>
 </div>
@@ -425,7 +447,7 @@ footer{position:relative;z-index:10;border-top:1px solid var(--border);}
         <span class="term-title">linkedin-agent · scheduler.py</span>
       </div>
       <div class="term-body" id="termBody">
-        <div class="tl show"><span class="tl-prompt">$</span><span class="tl-text">linkedin-agent start --user sara.kline</span></div>
+        <div class="tl show"><span class="tl-prompt">$</span><span class="tl-text">linkedin-agent start --user sara@growthq.io</span></div>
       </div>
     </div>
   </div>
@@ -437,8 +459,8 @@ footer{position:relative;z-index:10;border-top:1px solid var(--border);}
     <div class="preview-copy reveal">
       <div class="sec-tag" style="margin-bottom:16px;">👁️ Live preview</div>
       <h2>See exactly what<br><span class="grad">gets posted.</span></h2>
-      <p>Every post is AI-written in under 3 seconds, then queued to publish at 8 AM your local time. Authentic, engaging content — every single day.</p>
-      <a href="#" class="btn-g" onclick="document.getElementById('inUser').focus();return false;">Try it yourself →</a>
+      <p>Every post is AI-written in under 3 seconds, sent to your review queue, then published at your scheduled time. Authentic, engaging content — every single day.</p>
+      <a href="#" class="btn-g" onclick="document.getElementById('inEmail').focus();window.scrollTo({top:0,behavior:'smooth'});return false;">Try it yourself →</a>
     </div>
     <div class="reveal d2">
       <div class="li-card">
@@ -462,9 +484,9 @@ footer{position:relative;z-index:10;border-top:1px solid var(--border);}
 <div class="cta-wrap">
   <div class="cta-box reveal">
     <h2 class="cta-h2">Start growing<br><span class="grad">today.</span></h2>
-    <p class="cta-p">Join 12,000+ professionals who've automated their LinkedIn presence. Free to start.</p>
+    <p class="cta-p">Join thousands of professionals who've automated their LinkedIn presence. Free to start.</p>
     <div class="cta-btns">
-      <a href="#" class="btn-g" onclick="window.scrollTo({top:0,behavior:'smooth'});document.getElementById('tabReg').click();return false;">🚀 Create free account</a>
+      <a href="#" class="btn-g" onclick="window.scrollTo({top:0,behavior:'smooth'});setTimeout(()=>switchTab('register'),400);return false;">🚀 Create free account</a>
       <a href="#features" class="btn-o">Learn more</a>
     </div>
   </div>
@@ -482,140 +504,172 @@ footer{position:relative;z-index:10;border-top:1px solid var(--border);}
     </div>
     <div class="foot-col"><h4>Product</h4><a href="#features">Features</a><a href="#how">How it works</a><a href="#">Changelog</a><a href="#">Roadmap</a></div>
     <div class="foot-col"><h4>Company</h4><a href="#">About</a><a href="#">Blog</a><a href="#">Careers</a><a href="#">Press</a></div>
-    <div class="foot-col"><h4>Support</h4><a href="#">Docs</a><a href="#">Help center</a><a href="#">Contact</a><a href="#">Status</a></div>
+    <div class="foot-col"><h4>Support</h4><a href="#">Docs</a><a href="#">Help center</a><a href="#">Contact</a><a href="/privacy">Privacy</a></div>
   </div>
   <div class="foot-bottom">
     <div class="foot-copy">© 2025 LinkedIn Agent · Autonomous post scheduler</div>
-    <div class="foot-links"><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Cookies</a></div>
+    <div class="foot-links"><a href="/privacy">Privacy</a><a href="#">Terms</a><a href="#">Cookies</a></div>
   </div>
 </footer>
 
 <script>
 /* ── AUTH ── */
-const API=window.location.origin+'/api';
-const SK='li_session',SM=86400000;
-let ct='login';
-function getUO(){return-(new Date().getTimezoneOffset()/60);}
-function setS(u){localStorage.setItem(SK,JSON.stringify({username:u,loginAt:Date.now(),expiresAt:Date.now()+SM}));}
-function getS(){try{return JSON.parse(localStorage.getItem(SK))||null;}catch{return null;}}
-function isV(){const s=getS();return s&&Date.now()<s.expiresAt;}
+const API = window.location.origin + '/api';
+const SK  = 'li_session';
+
+function getUO(){ return -(new Date().getTimezoneOffset() / 60); }
+function storeSession(){ localStorage.setItem(SK, JSON.stringify({expiresAt: Date.now() + 8*3600*1000})); }
+function getS(){ try{ return JSON.parse(localStorage.getItem(SK)) || null; }catch{ return null; } }
+function isV(){ const s = getS(); return s && Date.now() < s.expiresAt; }
+
+let ct = 'login';
 
 function switchTab(t){
-  ct=t;
-  document.getElementById('tabLogin').classList.toggle('on',t==='login');
-  document.getElementById('tabReg').classList.toggle('on',t==='register');
-  document.getElementById('confirmField').style.display=t==='register'?'block':'none';
-  document.getElementById('btnLabel').textContent=t==='login'?'Sign In':'Create Account';
-  document.getElementById('authTitle').textContent=t==='login'?'Welcome back':'Join the agent';
-  document.getElementById('authSub').textContent=t==='login'?'sign in to your dashboard':'create your free account';
-  document.getElementById('errBox').classList.remove('show');
-  ['inUser','inPass','inConfirm'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ct = t;
+  document.getElementById('tabLogin').classList.toggle('on', t === 'login');
+  document.getElementById('tabReg').classList.toggle('on',   t === 'register');
+  document.getElementById('confirmField').style.display = t === 'register' ? 'block' : 'none';
+  document.getElementById('btnLabel').textContent  = t === 'login' ? 'Sign In' : 'Create Account';
+  document.getElementById('authTitle').textContent = t === 'login' ? 'Welcome back' : 'Join the agent';
+  document.getElementById('authSub').textContent   = t === 'login' ? 'sign in to your dashboard' : 'create your free account';
+  hideAlerts();
+  ['inEmail','inPass','inConfirm'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
 }
-function showErr(m){document.getElementById('errMsg').textContent=m;document.getElementById('errBox').classList.add('show');}
+
+function showErr(m){ document.getElementById('errMsg').textContent=m; document.getElementById('errBox').classList.add('show'); document.getElementById('okBox').classList.remove('show'); }
+function showOk(m){  document.getElementById('okMsg').textContent=m;  document.getElementById('okBox').classList.add('show');  document.getElementById('errBox').classList.remove('show'); }
+function hideAlerts(){ document.getElementById('errBox').classList.remove('show'); document.getElementById('okBox').classList.remove('show'); }
 
 async function doSubmit(){
-  const u=document.getElementById('inUser').value.trim();
-  const p=document.getElementById('inPass').value;
-  const pc=document.getElementById('inConfirm').value;
-  const btn=document.getElementById('submitBtn');
-  const lbl=document.getElementById('btnLabel');
-  document.getElementById('errBox').classList.remove('show');
-  if(!u||!p){showErr('Please fill in all fields.');return;}
-  if(ct==='register'){if(p!==pc){showErr('Passwords do not match.');return;}if(p.length<6){showErr('Password needs 6+ characters.');return;}}
-  btn.disabled=true;lbl.innerHTML='<span class="spin">⟳</span> '+(ct==='login'?'Signing in…':'Creating…');
+  const email   = document.getElementById('inEmail').value.trim();
+  const pass    = document.getElementById('inPass').value;
+  const confirm = document.getElementById('inConfirm').value;
+  const btn     = document.getElementById('submitBtn');
+  const lbl     = document.getElementById('btnLabel');
+  hideAlerts();
+
+  if(!email || !pass){ showErr('Please fill in all fields.'); return; }
+  if(ct === 'register'){
+    if(pass !== confirm){ showErr('Passwords do not match.'); return; }
+    if(pass.length < 6){ showErr('Password needs 6+ characters.'); return; }
+  }
+
+  btn.disabled = true;
+  lbl.innerHTML = '<span class="spin">⟳</span> ' + (ct === 'login' ? 'Signing in…' : 'Creating…');
+
   try{
-    const res=await fetch(`${API}/${ct==='login'?'login':'register'}`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p,utc_offset_hours:getUO()})});
-    const d=await res.json();
-    if(d.ok){setS(d.username);window.location.href=d.has_config?'/dashboard':'/setup';}
-    else{showErr(d.message||'Authentication failed.');btn.disabled=false;lbl.textContent=ct==='login'?'Sign In':'Create Account';}
-  }catch(e){showErr('Cannot reach server — make sure app.py is running.');btn.disabled=false;lbl.textContent=ct==='login'?'Sign In':'Create Account';}
+    const endpoint = ct === 'login' ? 'login' : 'register';
+    const res  = await fetch(`${API}/${endpoint}`, {
+      method: 'POST', credentials: 'include',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ email, password: pass, utc_offset_hours: getUO() })
+    });
+    const d = await res.json();
+    if(d.ok){
+      storeSession();
+      showOk(ct === 'login' ? 'Welcome back! Redirecting…' : 'Account created! Redirecting…');
+      setTimeout(() => { window.location.href = d.has_config ? '/dashboard' : '/setup'; }, 600);
+    } else {
+      showErr(d.message || 'Authentication failed.');
+      btn.disabled = false;
+      lbl.textContent = ct === 'login' ? 'Sign In' : 'Create Account';
+    }
+  } catch(e){
+    showErr('Cannot reach server — make sure the app is running.');
+    btn.disabled = false;
+    lbl.textContent = ct === 'login' ? 'Sign In' : 'Create Account';
+  }
 }
 
 /* ── PING CHECK ── */
 async function checkPing(){
-  const dot=document.getElementById('pingDot');
-  const lbl=document.getElementById('pingLabel');
+  const dot = document.getElementById('pingDot');
+  const lbl = document.getElementById('pingLabel');
   try{
-    const res=await fetch(window.location.origin+'/ping',{cache:'no-store'});
-    const d=await res.json();
-    dot.className='ping-dot live';
-    let t='--:--';
+    const res = await fetch(window.location.origin + '/ping', {cache:'no-store'});
+    const d   = await res.json();
+    dot.className = 'ping-dot live';
+    let t = '--:--';
     if(d.utc_iso){
-      t=new Date(d.utc_iso).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
-    } else if(d.utc_time){
-      const p=d.utc_time.split(':'),n=new Date();
-      t=new Date(Date.UTC(n.getUTCFullYear(),n.getUTCMonth(),n.getUTCDate(),+p[0],+p[1],+p[2])).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+      t = new Date(d.utc_iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
     }
-    lbl.textContent='server live · '+t;
-  }catch(e){
-    dot.className='ping-dot dead';
-    lbl.textContent='server offline';
+    lbl.textContent = 'server live · ' + t;
+  } catch(e){
+    dot.className = 'ping-dot dead';
+    lbl.textContent = 'server offline';
   }
 }
 checkPing();
-setInterval(checkPing,30000);
+setInterval(checkPing, 30000);
 
 /* ── SCROLL REVEAL ── */
-const obs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('in');});},{threshold:0.08});
-document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+const obs = new IntersectionObserver(es => { es.forEach(e => { if(e.isIntersecting) e.target.classList.add('in'); }); }, {threshold:0.08});
+document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
 
 /* ── TERMINAL ANIMATION ── */
-const lines=[
-  {t:'cmd',v:'linkedin-agent start --user sara.kline'},
-  {t:'out',v:'✓ Session loaded · timezone: Europe/Stockholm (UTC+2)'},
-  {t:'out',v:'✓ Buffer connected · 4 channels active'},
-  {t:'dim',v:'[08:00:01] Scheduler triggered...'},
-  {t:'cmd',v:'groq generate --model llama-3.1-70b --topic linkedin'},
-  {t:'dim',v:'⟳  Calling Groq API...'},
-  {t:'out',v:'✓ Post generated in 2.8s'},
-  {t:'acc',v:'  "The biggest mistake founders make on LinkedIn is..."'},
-  {t:'cmd',v:'buffer publish --channels all --schedule now'},
-  {t:'out',v:'✓ Published to LinkedIn · 08:00:04'},
-  {t:'out',v:'✓ Published to Facebook · 08:00:05'},
-  {t:'dim',v:'[08:00:05] Next run in 23h 59m 55s'},
+const lines = [
+  {t:'out', v:'✓ Session loaded · timezone: Europe/Stockholm (UTC+2)'},
+  {t:'out', v:'✓ LinkedIn + Facebook + Instagram connected · 5 channels'},
+  {t:'dim', v:'[08:00:01] Scheduler triggered (slot 1/2)...'},
+  {t:'cmd', v:'groq generate --model llama-3.1-8b --subject "founder mistakes"'},
+  {t:'dim', v:'⟳  Calling Groq API...'},
+  {t:'out', v:'✓ Post generated in 2.8s (2934 chars)'},
+  {t:'acc', v:'  "The biggest mistake founders make on LinkedIn is..."'},
+  {t:'dim', v:'⟳  Adding to review queue...'},
+  {t:'out', v:'✓ Review item created · ID: a3f9c2d1'},
+  {t:'out', v:'✓ Email sent → sara@growthq.io'},
+  {t:'dim', v:'[08:00:04] Auto-publish in 1h unless reviewed'},
+  {t:'dim', v:'[08:00:04] Next slot: 15:00 (in 6h 59m 56s)'},
 ];
-let tli=1;
+let tli = 0;
 function addTermLine(){
-  if(tli>=lines.length)return;
-  const l=lines[tli];
-  const tb=document.getElementById('termBody');
-  const div=document.createElement('div');div.className='tl show';
-  const map={cmd:`<span class="tl-prompt">$</span><span class="tl-text">${l.v}</span>`,out:`<span class="tl-out">${l.v}</span>`,dim:`<span class="tl-dim">${l.v}</span>`,acc:`<span class="tl-acc">${l.v}</span>`};
-  div.innerHTML=map[l.t]||l.v;
-  tb.appendChild(div);tb.scrollTop=tb.scrollHeight;
+  if(tli >= lines.length) return;
+  const l  = lines[tli];
+  const tb = document.getElementById('termBody');
+  const div = document.createElement('div'); div.className = 'tl show';
+  const map = {
+    cmd: `<span class="tl-prompt">$</span><span class="tl-text">${l.v}</span>`,
+    out: `<span class="tl-out">${l.v}</span>`,
+    dim: `<span class="tl-dim">${l.v}</span>`,
+    acc: `<span class="tl-acc">${l.v}</span>`
+  };
+  div.innerHTML = map[l.t] || l.v;
+  tb.appendChild(div); tb.scrollTop = tb.scrollHeight;
   tli++;
-  if(tli<lines.length)setTimeout(addTermLine,tli===6?1200:600);
+  if(tli < lines.length) setTimeout(addTermLine, tli === 5 ? 1200 : 600);
 }
-setTimeout(addTermLine,1400);
+setTimeout(addTermLine, 1400);
 
 /* ── TYPEWRITER ── */
-const post="The biggest mistake founders make on LinkedIn?\n\nPosting when it feels right — not when it performs.\n\nI analyzed 6 months of my own data:\n• 8 AM posts got 3.2× more impressions\n• Consistency beat quality every time\n• Authenticity resonated most\n\nSo I automated it. Now it just... happens.\n\n#LinkedInTips #Founders #GrowthHacking";
-let ti=0,likes=0,comments=0,shares=0;
+const post = "The biggest mistake founders make on LinkedIn?\n\nPosting when it feels right — not when it performs.\n\nI analyzed 6 months of my own data:\n• 8 AM posts got 3.2× more impressions\n• Consistency beat quality every time\n• Authenticity resonated most\n\nSo I automated it. Now it just... happens.\n\n#LinkedInTips #Founders #GrowthHacking";
+let ti = 0, likes = 0, comments = 0, shares = 0;
 function typePost(){
-  const el=document.getElementById('typedPost');
-  if(!el)return;
-  if(ti<post.length){
-    el.textContent=post.slice(0,ti+1);
+  const el = document.getElementById('typedPost');
+  if(!el) return;
+  if(ti < post.length){
+    el.textContent = post.slice(0, ti + 1);
     ti++;
-    setTimeout(typePost,ti<30?60:26);
-  }else{
-    document.getElementById('typeCursor').style.display='none';
-    let lt=setInterval(()=>{if(likes<247){likes+=Math.ceil((247-likes)*0.08+1);document.getElementById('likeCount').textContent=likes;}else clearInterval(lt);},55);
-    setTimeout(()=>{let ct2=setInterval(()=>{if(comments<38){comments++;document.getElementById('commentCount').textContent=comments;}else clearInterval(ct2);},110);},400);
-    setTimeout(()=>{let st=setInterval(()=>{if(shares<19){shares++;document.getElementById('shareCount').textContent=shares;}else clearInterval(st);},180);},800);
+    setTimeout(typePost, ti < 30 ? 60 : 26);
+  } else {
+    document.getElementById('typeCursor').style.display = 'none';
+    let lt = setInterval(() => { if(likes < 247){ likes += Math.ceil((247-likes)*0.08+1); document.getElementById('likeCount').textContent = likes; } else clearInterval(lt); }, 55);
+    setTimeout(() => { let ct2 = setInterval(() => { if(comments < 38){ comments++; document.getElementById('commentCount').textContent = comments; } else clearInterval(ct2); }, 110); }, 400);
+    setTimeout(() => { let st  = setInterval(() => { if(shares < 19){  shares++;   document.getElementById('shareCount').textContent = shares;   } else clearInterval(st);  }, 180); }, 800);
   }
 }
-const tObs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){tObs.disconnect();setTimeout(typePost,600);}});},{threshold:0.3});
-const liCard=document.querySelector('.li-card');
-if(liCard)tObs.observe(liCard);
+const tObs = new IntersectionObserver(es => { es.forEach(e => { if(e.isIntersecting){ tObs.disconnect(); setTimeout(typePost, 600); } }); }, {threshold:0.3});
+const liCard = document.querySelector('.li-card');
+if(liCard) tObs.observe(liCard);
 
-/* ── AUTO REDIRECT ── */
-(async()=>{
+/* ── AUTO REDIRECT if already logged in ── */
+(async () => {
   try{
-    const r=await fetch(`${API}/me`,{credentials:'include'});
-    const d=await r.json();
-    if(d.authenticated&&isV())window.location.href=d.has_config?'/dashboard':'/setup';
-  }catch(e){}
+    const s = getS();
+    if(!s || Date.now() > s.expiresAt) return;
+    const r = await fetch(`${API}/me`, {credentials:'include'});
+    const d = await r.json();
+    if(d.authenticated) window.location.href = d.has_config ? '/dashboard' : '/setup';
+  } catch(e) {}
 })();
 </script>
 </body>
