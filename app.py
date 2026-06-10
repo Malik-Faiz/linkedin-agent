@@ -242,25 +242,62 @@ def require_auth(f):
 
 # ─── EMAIL HELPERS ────────────────────────────────────────────────────────────
 def send_email(to_email, subject, html_body):
-    """Send an email via SMTP. Returns True on success."""
+    """Send an email via SMTP with multiple fallback methods."""
     if not SMTP_USER or not SMTP_PASSWORD:
-        print(f"[EMAIL] SMTP not configured — would have sent to {to_email}: {subject}")
+        print(f"[EMAIL] SMTP not configured — SMTP_USER or SMTP_PASSWORD missing")
         return False
+
+    print(f"[EMAIL] Attempting to send to {to_email}")
+    print(f"[EMAIL] Host: {SMTP_HOST}:{SMTP_PORT} | From: {SMTP_FROM or SMTP_USER}")
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = SMTP_FROM or SMTP_USER
+    msg["To"]      = to_email
+    msg.attach(MIMEText(html_body, "html"))
+    raw = msg.as_string()
+
+    # Method 1: STARTTLS on given port (587 standard)
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"]    = SMTP_FROM or SMTP_USER
-        msg["To"]      = to_email
-        msg.attach(MIMEText(html_body, "html"))
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as s:
+        print(f"[EMAIL] Trying STARTTLS on port {SMTP_PORT}...")
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as s:
+            s.ehlo()
             s.starttls()
+            s.ehlo()
             s.login(SMTP_USER, SMTP_PASSWORD)
-            s.sendmail(SMTP_FROM or SMTP_USER, to_email, msg.as_string())
-        print(f"[EMAIL] Sent to {to_email}: {subject}")
+            s.sendmail(SMTP_FROM or SMTP_USER, to_email, raw)
+        print(f"[EMAIL] Sent via STARTTLS to {to_email}")
         return True
-    except Exception as e:
-        print(f"[EMAIL] Failed to send to {to_email}: {e}")
-        return False
+    except Exception as e1:
+        print(f"[EMAIL] STARTTLS failed: {e1}")
+
+    # Method 2: SSL on port 465
+    try:
+        import ssl
+        print(f"[EMAIL] Trying SSL on port 465...")
+        ctx = ssl.create_default_context()
+        with smtplib.SMTP_SSL(SMTP_HOST, 465, context=ctx, timeout=20) as s:
+            s.login(SMTP_USER, SMTP_PASSWORD)
+            s.sendmail(SMTP_FROM or SMTP_USER, to_email, raw)
+        print(f"[EMAIL] Sent via SSL:465 to {to_email}")
+        return True
+    except Exception as e2:
+        print(f"[EMAIL] SSL:465 failed: {e2}")
+
+    # Method 3: Plain SMTP no TLS
+    try:
+        print(f"[EMAIL] Trying plain SMTP on port {SMTP_PORT}...")
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as s:
+            s.ehlo()
+            s.login(SMTP_USER, SMTP_PASSWORD)
+            s.sendmail(SMTP_FROM or SMTP_USER, to_email, raw)
+        print(f"[EMAIL] Sent via plain SMTP to {to_email}")
+        return True
+    except Exception as e3:
+        print(f"[EMAIL] Plain SMTP failed: {e3}")
+
+    print(f"[EMAIL] All methods failed for {to_email}")
+    return False
 
 def send_review_email(username, review_id, subject_text, post_preview):
     """Notify the user that a post is pending review."""
@@ -918,6 +955,35 @@ def instagram_webhook():
             return challenge, 200
         return "Forbidden", 403
     return "OK", 200
+
+
+@app.route("/api/test_email")
+@require_auth
+def test_email(username):
+    """Send a test email to verify SMTP config."""
+    users = load_users()
+    to_email = users.get(username, {}).get("email", "")
+    if not to_email:
+        return jsonify({"ok": False, "message": "No email on account"})
+    html = f"""
+    <div style="font-family:sans-serif;padding:24px;background:#05030f;color:#ede8ff;border-radius:12px;">
+      <h2 style="color:#b085ff;">✓ LinkedIn Agent — Email Test</h2>
+      <p style="color:rgba(200,185,255,0.7);margin-top:12px;">
+        SMTP is working correctly.<br>
+        Host: {SMTP_HOST}:{SMTP_PORT}<br>
+        From: {SMTP_FROM or SMTP_USER}
+      </p>
+    </div>
+    """
+    ok = send_email(to_email, "✓ LinkedIn Agent — SMTP Test", html)
+    return jsonify({
+        "ok": ok,
+        "message": f"Email {'sent' if ok else 'FAILED'} to {to_email}",
+        "smtp_host": SMTP_HOST,
+        "smtp_port": SMTP_PORT,
+        "smtp_user": SMTP_USER,
+        "to": to_email
+    })
 
 
 @app.route("/ping")
