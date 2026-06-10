@@ -242,13 +242,12 @@ def require_auth(f):
 
 # ─── EMAIL HELPERS ────────────────────────────────────────────────────────────
 def send_email(to_email, subject, html_body):
-    """Send an email via SMTP with multiple fallback methods."""
+    """Send email via SMTP (use Gmail SMTP on Railway)."""
     if not SMTP_USER or not SMTP_PASSWORD:
         print(f"[EMAIL] SMTP not configured — SMTP_USER or SMTP_PASSWORD missing")
         return False
 
-    print(f"[EMAIL] Attempting to send to {to_email}")
-    print(f"[EMAIL] Host: {SMTP_HOST}:{SMTP_PORT} | From: {SMTP_FROM or SMTP_USER}")
+    print(f"[EMAIL] Attempting to send to {to_email} via {SMTP_HOST}:{SMTP_PORT}")
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
@@ -257,44 +256,33 @@ def send_email(to_email, subject, html_body):
     msg.attach(MIMEText(html_body, "html"))
     raw = msg.as_string()
 
-    # Method 1: STARTTLS on given port (587 standard)
+    import ssl
+
+    # Method 1: STARTTLS port 587
     try:
-        print(f"[EMAIL] Trying STARTTLS on port {SMTP_PORT}...")
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as s:
+        print(f"[EMAIL] Trying STARTTLS port 587...")
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as s:
             s.ehlo()
             s.starttls()
             s.ehlo()
             s.login(SMTP_USER, SMTP_PASSWORD)
             s.sendmail(SMTP_FROM or SMTP_USER, to_email, raw)
-        print(f"[EMAIL] Sent via STARTTLS to {to_email}")
+        print(f"[EMAIL] Sent via Gmail STARTTLS to {to_email}")
         return True
     except Exception as e1:
-        print(f"[EMAIL] STARTTLS failed: {e1}")
+        print(f"[EMAIL] Gmail STARTTLS failed: {e1}")
 
-    # Method 2: SSL on port 465
+    # Method 2: SSL port 465
     try:
-        import ssl
-        print(f"[EMAIL] Trying SSL on port 465...")
+        print(f"[EMAIL] Trying Gmail SSL port 465...")
         ctx = ssl.create_default_context()
-        with smtplib.SMTP_SSL(SMTP_HOST, 465, context=ctx, timeout=20) as s:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=ctx, timeout=20) as s:
             s.login(SMTP_USER, SMTP_PASSWORD)
             s.sendmail(SMTP_FROM or SMTP_USER, to_email, raw)
-        print(f"[EMAIL] Sent via SSL:465 to {to_email}")
+        print(f"[EMAIL] Sent via Gmail SSL:465 to {to_email}")
         return True
     except Exception as e2:
-        print(f"[EMAIL] SSL:465 failed: {e2}")
-
-    # Method 3: Plain SMTP no TLS
-    try:
-        print(f"[EMAIL] Trying plain SMTP on port {SMTP_PORT}...")
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as s:
-            s.ehlo()
-            s.login(SMTP_USER, SMTP_PASSWORD)
-            s.sendmail(SMTP_FROM or SMTP_USER, to_email, raw)
-        print(f"[EMAIL] Sent via plain SMTP to {to_email}")
-        return True
-    except Exception as e3:
-        print(f"[EMAIL] Plain SMTP failed: {e3}")
+        print(f"[EMAIL] Gmail SSL:465 failed: {e2}")
 
     print(f"[EMAIL] All methods failed for {to_email}")
     return False
