@@ -195,6 +195,9 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .run-btn:disabled{opacity:0.4;cursor:not-allowed;}
 
 /* ════ REVIEW QUEUE ════ */
+.rv-url-inp{width:100%;background:rgba(0,0,0,0.3);border:1.5px solid rgba(176,133,255,0.15);border-radius:10px;padding:10px 12px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;transition:all 0.2s;}
+.rv-url-inp:focus{border-color:rgba(176,133,255,0.4);background:rgba(176,133,255,0.04);}
+.rv-url-inp::placeholder{color:rgba(200,185,255,0.3);}
 .review-section{margin-bottom:16px;}
 .review-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
 .review-hdr h2{font-size:15px;font-weight:700;letter-spacing:-0.3px;}
@@ -631,9 +634,13 @@ function renderLogs(logs){
 
 // ── REVIEW QUEUE ──
 let reviewData = [];
+let editingIds = new Set(); // tracks which review items have edit panel open
 
 function scrollToReview(){
-  document.getElementById('reviewAnchor')?.scrollIntoView({behavior:'smooth',block:'start'});
+  const el = document.getElementById('reviewAnchor');
+  if(!el) return;
+  const y = el.getBoundingClientRect().top + window.pageYOffset - 20;
+  window.scrollTo({top: y, behavior: 'smooth'});
 }
 
 function fmtCountdown(isoStr){
@@ -648,14 +655,26 @@ function fmtCountdown(isoStr){
 function renderReview(queue){
   reviewData = queue||[];
   const pending = reviewData.filter(r=>r.status==='pending');
-  const chip=document.getElementById('reviewChip'),title=document.getElementById('reviewTitle');
-  chip.textContent=`${pending.length} pending`;
-  chip.style.color=pending.length>0?'var(--amber)':'var(--muted)';
-  // Update notification badge in topbar
-  const badge=document.getElementById('reviewBadge');
-  if(badge){badge.textContent=pending.length;badge.classList.toggle('show',pending.length>0);}
-  const list=document.getElementById('reviewList');
-  if(!pending.length){list.innerHTML='<div class="review-empty">📭 No posts pending review — posts will appear here after generation</div>';return;}
+
+  // Always update badge + chip regardless of edit state
+  const chip  = document.getElementById('reviewChip');
+  const badge = document.getElementById('reviewBadge');
+  if(chip){ chip.textContent=`${pending.length} pending`; chip.style.color=pending.length>0?'var(--amber)':'var(--muted)'; }
+  if(badge){ badge.textContent=pending.length; badge.classList.toggle('show',pending.length>0); }
+
+  // If ANY item is currently being edited, skip re-rendering the list entirely
+  // (prevents edit area from closing every 3s due to polling)
+  if(editingIds.size > 0){
+    // Just update countdowns inline without touching the DOM structure
+    pending.forEach(r=>{
+      const cd = document.getElementById(`rvc_${r.id}`);
+      if(cd) cd.textContent = fmtCountdown(r.auto_publish_at);
+    });
+    return;
+  }
+
+  const list = document.getElementById('reviewList');
+  if(!pending.length){ list.innerHTML='<div class="review-empty">📭 No posts pending review — posts will appear here after generation</div>'; return; }
 
   const icons={'linkedin':'💼','facebook':'📘','instagram':'📸'};
   list.innerHTML=pending.map(item=>{
@@ -681,7 +700,6 @@ function renderReview(queue){
         <div class="rv-ch-label">Publishing to:</div>
         <div class="rv-ch-grid" id="rvch_${item.id}">${channels}</div>
       </div>
-      <!-- EDIT AREA (hidden by default) -->
       <div class="rv-edit-area" id="rve_${item.id}">
         <textarea class="rv-textarea" id="rvta_${item.id}" onkeyup="updateCharCount('${item.id}')">${item.post_text}</textarea>
         <div class="rv-charcount" id="rvcc_${item.id}">${item.post_text.length} / 3000 chars</div>
@@ -692,21 +710,19 @@ function renderReview(queue){
         </div>
         <input type="file" id="rvimg_${item.id}" accept="image/*" style="display:none" onchange="onRvImgChange('${item.id}')">
         <div style="font-size:10px;color:var(--muted2);font-family:var(--mono);margin-top:8px;">Or enter image URL:</div>
-        <input class="prof-inp" type="url" id="rvimgurl_${item.id}" placeholder="https://..." value="${item.image_url||''}" style="margin-top:6px;font-size:11px;">
+        <input class="rv-url-inp" type="url" id="rvimgurl_${item.id}" placeholder="https://..." value="${item.image_url||''}" style="margin-top:6px;">
       </div>
       <div class="rv-actions" style="margin-top:12px;">
         <button class="rv-btn publish" onclick="publishReview('${item.id}')">✓ Publish Now</button>
-        <button class="rv-btn edit" id="rvebtn_${item.id}" onclick="toggleEdit('${item.id}')">✏ Edit</button>
+        <button class="rv-btn edit" id="rvebtn_${item.id}" onclick="toggleEdit(event,'${item.id}')">✏ Edit</button>
         <button class="rv-btn discard" onclick="discardReview('${item.id}')">✕ Discard</button>
       </div>
     </div>`;
   }).join('');
 
-  // Re-attach channel toggle listeners
+  // Attach channel tag toggle listeners
   document.querySelectorAll('.rv-ch-tag[data-rv]').forEach(tag=>{
-    tag.addEventListener('click',()=>{
-      tag.classList.toggle('on');
-    });
+    tag.addEventListener('click', e=>{ e.stopPropagation(); tag.classList.toggle('on'); });
   });
 }
 
@@ -716,11 +732,24 @@ function updateCharCount(id){
   if(ta&&cc){cc.textContent=`${ta.value.length} / 3000 chars`;cc.style.color=ta.value.length>3000?'var(--red)':'var(--muted2)';}
 }
 
-function toggleEdit(id){
-  const ea=document.getElementById(`rve_${id}`),btn=document.getElementById(`rvebtn_${id}`);
-  if(!ea)return;
-  const isOpen=ea.classList.toggle('show');
-  if(btn)btn.textContent=isOpen?'✕ Cancel Edit':'✏ Edit';
+function toggleEdit(event, id){
+  if(event) event.stopPropagation();
+  const ea  = document.getElementById(`rve_${id}`);
+  const btn = document.getElementById(`rvebtn_${id}`);
+  if(!ea) return;
+  const isOpen = ea.classList.toggle('show');
+  if(isOpen){
+    editingIds.add(id);
+    if(btn) btn.textContent = '✕ Cancel Edit';
+    // Sync textarea with current preview text (in case it changed)
+    const ta = document.getElementById(`rvta_${id}`);
+    const pv = document.getElementById(`rvp_${id}`);
+    if(ta && pv && !ta.value.trim()) ta.value = pv.textContent;
+    updateCharCount(id);
+  } else {
+    editingIds.delete(id);
+    if(btn) btn.textContent = '✏ Edit';
+  }
 }
 
 function onRvImgChange(id){
@@ -759,7 +788,7 @@ async function publishReview(id){
   try{
     const res=await fetch(`${API}/review/${id}/publish`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     const data=await res.json();
-    if(data.ok){document.getElementById(`rvi_${id}`)?.remove();fetchStatus();}
+    if(data.ok){editingIds.delete(id);document.getElementById(`rvi_${id}`)?.remove();fetchStatus();}
     else alert(data.message||'Publish failed.');
   }catch(e){alert('Cannot reach server.');}
 }
@@ -769,7 +798,7 @@ async function discardReview(id){
   try{
     const res=await fetch(`${API}/review/${id}/discard`,{method:'POST',credentials:'include'});
     const data=await res.json();
-    if(data.ok){document.getElementById(`rvi_${id}`)?.remove();fetchStatus();}
+    if(data.ok){editingIds.delete(id);document.getElementById(`rvi_${id}`)?.remove();fetchStatus();}
   }catch(e){}
 }
 
