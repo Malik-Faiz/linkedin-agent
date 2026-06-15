@@ -149,6 +149,17 @@ def verify_password(password, stored_hash, salt):
     h, _ = hash_password(password, salt)
     return h == stored_hash
 
+def user_has_password(u):
+    """
+    Returns whether the user has a real, usable password set.
+    - If 'has_password' key exists, use it directly.
+    - Otherwise (legacy accounts): Google-authenticated accounts default to False
+      (they only have a random unusable hash), all other legacy accounts default to True.
+    """
+    if "has_password" in u:
+        return bool(u["has_password"])
+    return u.get("auth_provider") != "google"
+
 def find_user_by_email(email):
     """Return (username, user_data) for a given email, or (None, None)."""
     users = load_users()
@@ -1235,7 +1246,7 @@ def me():
     users = load_users()
     u = users.get(username, {})
     email = u.get("email", "")
-    has_password = u.get("has_password", True)  # default True for legacy accounts
+    has_password = user_has_password(u)
     cfg = load_config(username)
     has_config = bool(cfg.get("groq_api_key"))
     return jsonify({"ok": True, "authenticated": True, "username": username,
@@ -1258,7 +1269,7 @@ def update_email(username):
 
     users = load_users()
     u     = users.get(username, {})
-    has_password = u.get("has_password", True)
+    has_password = user_has_password(u)
 
     if has_password:
         if not password:
@@ -1290,7 +1301,7 @@ def update_password(username):
 
     users = load_users()
     u     = users.get(username, {})
-    has_password = u.get("has_password", True)
+    has_password = user_has_password(u)
 
     if has_password:
         if not current_pass:
@@ -1320,7 +1331,7 @@ def delete_account(username):
 
     users = load_users()
     u     = users.get(username, {})
-    has_password = u.get("has_password", True)
+    has_password = user_has_password(u)
 
     if has_password:
         if not password:
@@ -1956,7 +1967,7 @@ def get_status(username):
 
     users = load_users()
     user_email = users.get(username, {}).get("email", "")
-    has_password = users.get(username, {}).get("has_password", True)
+    has_password = user_has_password(users.get(username, {}))
 
     return jsonify({
         "status":         state["status"],
