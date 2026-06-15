@@ -82,6 +82,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .delete-box.show{display:block;}
 .delete-warning{font-size:12px;color:var(--red);font-family:var(--mono);line-height:1.7;margin-bottom:16px;padding:12px;background:rgba(255,96,96,0.06);border-radius:10px;}
 .delete-warning strong{display:block;margin-bottom:4px;font-size:13px;}
+.google-note{font-size:11px;font-family:var(--mono);color:var(--p3);background:rgba(126,232,255,0.07);border:1px solid rgba(126,232,255,0.2);border-radius:10px;padding:10px 14px;margin-bottom:14px;line-height:1.6;}
 
 /* STATS ROW */
 .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:22px;}
@@ -156,12 +157,15 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
         <input type="email" id="newEmail" placeholder="new@example.com" autocomplete="email">
       </div>
     </div>
-    <div class="field">
+    <div class="field" id="emailPassField">
       <label>Confirm with Password</label>
       <div class="inp-w">
         <span class="inp-ico">🔒</span>
         <input type="password" id="emailPass" placeholder="your current password">
       </div>
+    </div>
+    <div class="google-note" id="emailGoogleNote" style="display:none;">
+      🔵 Signed in with Google — no password needed to confirm.
     </div>
     <button class="btn-save" id="emailBtn" onclick="updateEmail()">
       <span id="emailBtnLabel">Save New Email</span>
@@ -171,11 +175,15 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 
   <!-- ══ CHANGE PASSWORD ══ -->
   <div class="section-card">
-    <div class="sec-title"><span class="sec-ico">🔒</span> Change Password</div>
-    <div class="sec-desc">Use a strong password — at least 6 characters. You'll stay logged in after changing.</div>
+    <div class="sec-title"><span class="sec-ico">🔒</span> <span id="passSecTitle">Change Password</span></div>
+    <div class="sec-desc" id="passSecDesc">Use a strong password — at least 6 characters. You'll stay logged in after changing.</div>
     <div class="divider"></div>
 
-    <div class="field">
+    <div class="google-note" id="passGoogleNote" style="display:none;">
+      🔵 You signed up with Google and don't have a password yet. Set one below to also enable email + password login.
+    </div>
+
+    <div class="field" id="curPassField">
       <label>Current Password</label>
       <div class="inp-w">
         <span class="inp-ico">🔑</span>
@@ -225,12 +233,15 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
           <input type="text" id="deleteConfirmText" placeholder="DELETE" style="border-color:rgba(255,96,96,0.3);color:var(--red);">
         </div>
       </div>
-      <div class="field">
+      <div class="field" id="deletePassField">
         <label>Your Password</label>
         <div class="inp-w">
           <span class="inp-ico">🔒</span>
           <input type="password" id="deletePass" placeholder="enter your password" style="border-color:rgba(255,96,96,0.3);" onkeydown="if(event.key==='Enter')deleteAccount()">
         </div>
+      </div>
+      <div class="google-note" id="deleteGoogleNote" style="display:none;">
+        🔵 Signed in with Google — no password needed, just type DELETE to confirm.
       </div>
       <button class="btn-danger" id="deleteBtn" onclick="deleteAccount()" style="margin-top:4px;">
         <span id="deleteBtnLabel">⚠ Permanently Delete My Account</span>
@@ -250,6 +261,8 @@ function isV(){const s=getS();return s&&Date.now()<s.expiresAt;}
 function clearS(){localStorage.removeItem(SK);}
 
 /* ── LOAD PROFILE ── */
+let hasPassword = true; // global flag
+
 async function loadProfile(){
   try{
     const res  = await fetch(`${API}/status`, {credentials:'include'});
@@ -267,10 +280,52 @@ async function loadProfile(){
     document.getElementById('statQueue').textContent = (data.subjects || []).length;
     document.getElementById('statTotal').textContent = data.total_run ?? '0';
 
-    // Since — not in status, skip gracefully
     document.getElementById('profileSince').textContent = 'account · linkedin agent';
+
+    // Handle Google-only accounts (no password set yet)
+    hasPassword = data.has_password !== false; // default true
+    applyAuthUI();
   }catch(e){
     console.error('Failed to load profile', e);
+  }
+}
+
+function applyAuthUI(){
+  const emailPassField  = document.getElementById('emailPassField');
+  const emailGoogleNote = document.getElementById('emailGoogleNote');
+  const curPassField    = document.getElementById('curPassField');
+  const passGoogleNote  = document.getElementById('passGoogleNote');
+  const passSecTitle    = document.getElementById('passSecTitle');
+  const passSecDesc     = document.getElementById('passSecDesc');
+  const passBtnLabel    = document.getElementById('passBtnLabel');
+  const deletePassField = document.getElementById('deletePassField');
+  const deleteGoogleNote= document.getElementById('deleteGoogleNote');
+
+  if(!hasPassword){
+    // Email update — hide password confirm, show note
+    if(emailPassField)  emailPassField.style.display = 'none';
+    if(emailGoogleNote) emailGoogleNote.style.display = 'block';
+
+    // Password section — becomes "Set Password"
+    if(curPassField)   curPassField.style.display = 'none';
+    if(passGoogleNote) passGoogleNote.style.display = 'block';
+    if(passSecTitle)   passSecTitle.textContent = 'Set Password';
+    if(passSecDesc)    passSecDesc.textContent = 'You signed up with Google. Set a password to also enable email + password login.';
+    if(passBtnLabel)   passBtnLabel.textContent = 'Set Password';
+
+    // Delete account — hide password field, show note
+    if(deletePassField)  deletePassField.style.display = 'none';
+    if(deleteGoogleNote) deleteGoogleNote.style.display = 'block';
+  } else {
+    if(emailPassField)  emailPassField.style.display = 'block';
+    if(emailGoogleNote) emailGoogleNote.style.display = 'none';
+    if(curPassField)   curPassField.style.display = 'block';
+    if(passGoogleNote) passGoogleNote.style.display = 'none';
+    if(passSecTitle)   passSecTitle.textContent = 'Change Password';
+    if(passSecDesc)    passSecDesc.textContent = "Use a strong password — at least 6 characters. You'll stay logged in after changing.";
+    if(passBtnLabel)   passBtnLabel.textContent = 'Change Password';
+    if(deletePassField)  deletePassField.style.display = 'block';
+    if(deleteGoogleNote) deleteGoogleNote.style.display = 'none';
   }
 }
 
@@ -293,7 +348,8 @@ function setBtnLoading(btnId, labelId, loading, defaultLabel){
 async function updateEmail(){
   const newEmail = document.getElementById('newEmail').value.trim();
   const password = document.getElementById('emailPass').value;
-  if(!newEmail || !password){ showMsg('emailMsg','err','All fields are required.'); return; }
+  if(!newEmail){ showMsg('emailMsg','err','New email is required.'); return; }
+  if(hasPassword && !password){ showMsg('emailMsg','err','Password is required to confirm.'); return; }
   setBtnLoading('emailBtn','emailBtnLabel',true,'Save New Email');
   try{
     const res  = await fetch(`${API}/profile/update_email`,{
@@ -321,10 +377,14 @@ async function updatePassword(){
   const current = document.getElementById('curPass').value;
   const np      = document.getElementById('newPass').value;
   const np2     = document.getElementById('newPass2').value;
-  if(!current || !np || !np2){ showMsg('passMsg','err','All fields are required.'); return; }
+  const defaultLabel = hasPassword ? 'Change Password' : 'Set Password';
+
+  if(hasPassword && !current){ showMsg('passMsg','err','Current password is required.'); return; }
+  if(!np || !np2){ showMsg('passMsg','err','All fields are required.'); return; }
   if(np !== np2){ showMsg('passMsg','err','New passwords do not match.'); return; }
   if(np.length < 6){ showMsg('passMsg','err','Password must be at least 6 characters.'); return; }
-  setBtnLoading('passBtn','passBtnLabel',true,'Change Password');
+
+  setBtnLoading('passBtn','passBtnLabel',true,defaultLabel);
   try{
     const res  = await fetch(`${API}/profile/update_password`,{
       method:'POST', credentials:'include',
@@ -333,15 +393,19 @@ async function updatePassword(){
     });
     const data = await res.json();
     if(data.ok){
-      showMsg('passMsg','ok','Password changed successfully!');
+      showMsg('passMsg','ok', data.message || 'Password updated successfully!');
       document.getElementById('curPass').value  = '';
       document.getElementById('newPass').value  = '';
       document.getElementById('newPass2').value = '';
+      if(data.has_password){
+        hasPassword = true;
+        applyAuthUI();
+      }
     } else {
       showMsg('passMsg','err', data.message || 'Update failed.');
     }
   }catch(e){ showMsg('passMsg','err','Cannot reach server.'); }
-  setBtnLoading('passBtn','passBtnLabel',false,'Change Password');
+  setBtnLoading('passBtn','passBtnLabel',false, hasPassword ? 'Change Password' : 'Set Password');
 }
 
 /* ── DELETE ACCOUNT ── */
@@ -362,7 +426,7 @@ async function deleteAccount(){
   const confirmText = document.getElementById('deleteConfirmText').value.trim();
   const password    = document.getElementById('deletePass').value;
   if(confirmText !== 'DELETE'){ showMsg('deleteMsg','err','Type DELETE (all caps) to confirm.'); return; }
-  if(!password){ showMsg('deleteMsg','err','Password is required.'); return; }
+  if(hasPassword && !password){ showMsg('deleteMsg','err','Password is required.'); return; }
   setBtnLoading('deleteBtn','deleteBtnLabel',true,'⚠ Permanently Delete My Account');
   try{
     const res  = await fetch(`${API}/profile/delete`,{
