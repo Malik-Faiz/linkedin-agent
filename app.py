@@ -1096,6 +1096,7 @@ def google_callback():
                 "salt":          salt,
                 "name":          name,
                 "auth_provider": "google",
+                "has_password":  False,
                 "created_at":    datetime.now().isoformat()
             }
             save_users(users)
@@ -1174,6 +1175,7 @@ def register():
         "email":         email,
         "password_hash": h,
         "salt":          salt,
+        "has_password":  True,
         "created_at":    datetime.now().isoformat()
     }
     save_users(users)
@@ -1231,11 +1233,15 @@ def me():
     if not username:
         return jsonify({"ok": False, "authenticated": False})
     users = load_users()
-    email = users.get(username, {}).get("email", "")
+    u = users.get(username, {})
+    email = u.get("email", "")
+    has_password = u.get("has_password", True)  # default True for legacy accounts
     cfg = load_config(username)
     has_config = bool(cfg.get("groq_api_key"))
     return jsonify({"ok": True, "authenticated": True, "username": username,
-                    "email": email, "has_config": has_config})
+                    "email": email, "has_config": has_config,
+                    "has_password": has_password,
+                    "auth_provider": u.get("auth_provider", "local")})
 
 # ════════════════════════════════════════════════════════════════════════════════
 #  PROFILE / ACCOUNT MANAGEMENT
@@ -1252,9 +1258,15 @@ def update_email(username):
 
     users = load_users()
     u     = users.get(username, {})
+    has_password = u.get("has_password", True)
 
-    if not verify_password(password, u["password_hash"], u["salt"]):
-        return jsonify({"ok": False, "message": "Current password is incorrect."}), 401
+    if has_password:
+        if not password:
+            return jsonify({"ok": False, "message": "Current password is required."}), 400
+        if not verify_password(password, u["password_hash"], u["salt"]):
+            return jsonify({"ok": False, "message": "Current password is incorrect."}), 401
+    # Google-only accounts (no password set) skip password verification —
+    # they're already authenticated via session + Google OAuth
 
     # Check not already taken by another user
     existing, _ = find_user_by_email(new_email)
@@ -1278,15 +1290,22 @@ def update_password(username):
 
     users = load_users()
     u     = users.get(username, {})
+    has_password = u.get("has_password", True)
 
-    if not verify_password(current_pass, u["password_hash"], u["salt"]):
-        return jsonify({"ok": False, "message": "Current password is incorrect."}), 401
+    if has_password:
+        if not current_pass:
+            return jsonify({"ok": False, "message": "Current password is required."}), 400
+        if not verify_password(current_pass, u["password_hash"], u["salt"]):
+            return jsonify({"ok": False, "message": "Current password is incorrect."}), 401
+    # Google-only accounts: no current password needed — setting a password for the first time
 
     h, salt = hash_password(new_pass)
     users[username]["password_hash"] = h
     users[username]["salt"]          = salt
+    users[username]["has_password"]  = True
     save_users(users)
-    return jsonify({"ok": True, "message": "Password updated successfully."})
+    msg = "Password set successfully! You can now also log in with email + password." if not has_password else "Password updated successfully."
+    return jsonify({"ok": True, "message": msg, "has_password": True})
 
 
 @app.route("/api/profile/delete", methods=["POST"])
@@ -1301,9 +1320,14 @@ def delete_account(username):
 
     users = load_users()
     u     = users.get(username, {})
+    has_password = u.get("has_password", True)
 
-    if not verify_password(password, u["password_hash"], u["salt"]):
-        return jsonify({"ok": False, "message": "Password is incorrect."}), 401
+    if has_password:
+        if not password:
+            return jsonify({"ok": False, "message": "Password is required."}), 400
+        if not verify_password(password, u["password_hash"], u["salt"]):
+            return jsonify({"ok": False, "message": "Password is incorrect."}), 401
+    # Google-only accounts: session + DELETE confirmation is sufficient
 
     # Remove user data directory
     import shutil
@@ -1932,6 +1956,7 @@ def get_status(username):
 
     users = load_users()
     user_email = users.get(username, {}).get("email", "")
+    has_password = users.get(username, {}).get("has_password", True)
 
     return jsonify({
         "status":         state["status"],
@@ -1950,6 +1975,7 @@ def get_status(username):
         "channels_info":  channels_info,
         "review_queue":   pending_reviews,
         "email":          user_email,
+        "has_password":   has_password,
         "accounts": {
             "linkedin_1":  bool(cfg.get("linkedin_1_access_token")),
             "linkedin_2":  bool(cfg.get("linkedin_2_access_token")),
