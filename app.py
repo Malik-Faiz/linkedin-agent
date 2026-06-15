@@ -39,6 +39,11 @@ IG_APP_ID        = os.environ.get("INSTAGRAM_APP_ID", "")
 IG_APP_SECRET    = os.environ.get("INSTAGRAM_APP_SECRET", "")
 IG_REDIRECT_URI  = os.environ.get("INSTAGRAM_REDIRECT_URI", "")
 
+# ─── GOOGLE OAUTH (Sign In / Sign Up) ─────────────────────────────────────────
+GOOGLE_CLIENT_ID     = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_REDIRECT_URI  = os.environ.get("GOOGLE_REDIRECT_URI", "")
+
 # ─── EMAIL CONFIG ─────────────────────────────────────────────────────────────
 SMTP_HOST     = os.environ.get("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT     = int(os.environ.get("SMTP_PORT", "587"))
@@ -932,6 +937,10 @@ def page_dashboard(): return load_html("dashboard.html")
 def privacy():
     return load_html("privacy.html")
 
+@app.route("/data-deletion")
+def data_deletion():
+    return load_html("data-deletion.html")
+
 @app.route("/instagram/webhook", methods=["GET", "POST"])
 def instagram_webhook():
     if request.method == "GET":
@@ -983,6 +992,155 @@ def ping():
 # ════════════════════════════════════════════════════════════════════════════════
 #  AUTH ROUTES  — now use EMAIL instead of username
 # ════════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════════════
+#  GOOGLE OAUTH — Sign In / Sign Up
+# ════════════════════════════════════════════════════════════════════════════════
+@app.route("/api/auth/google")
+def google_auth():
+    if not GOOGLE_CLIENT_ID:
+        return jsonify({"ok": False, "message": "GOOGLE_CLIENT_ID not set in environment"}), 400
+    state_token = secrets.token_hex(16)
+    session["google_state"] = state_token
+    # Pass along utc_offset_hours via state so we can set timezone on first login
+    utc_offset = request.args.get("utc_offset_hours", "")
+    state_payload = f"{state_token}:{utc_offset}"
+    params = {
+        "client_id":     GOOGLE_CLIENT_ID,
+        "redirect_uri":  GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope":         "openid email profile",
+        "state":         state_payload,
+        "prompt":        "select_account",
+        "access_type":   "online",
+    }
+    oauth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
+    return jsonify({"ok": True, "auth_url": oauth_url})
+
+
+@app.route("/api/auth/google/callback")
+def google_callback():
+    code  = request.args.get("code", "")
+    state = request.args.get("state", "")
+    error = request.args.get("error", "")
+
+    if error:
+        return _google_result_page(False, f"Google sign-in was cancelled or denied: {error}")
+
+    if not code:
+        return _google_result_page(False, "Missing authorization code from Google.")
+
+    # Parse utc_offset from state if present
+    utc_offset = None
+    try:
+        parts = state.split(":", 1)
+        if len(parts) > 1 and parts[1]:
+            utc_offset = float(parts[1])
+    except Exception:
+        pass
+
+    try:
+        # Exchange code for access token
+        token_res = requests.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code":          code,
+                "client_id":     GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "redirect_uri":  GOOGLE_REDIRECT_URI,
+                "grant_type":    "authorization_code",
+            },
+            timeout=15
+        ).json()
+
+        access_token = token_res.get("access_token")
+        if not access_token:
+            return _google_result_page(False, f"Token exchange failed: {token_res.get('error_description', str(token_res))}")
+
+        # Get user info
+        userinfo = requests.get(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10
+        ).json()
+
+        email          = (userinfo.get("email") or "").strip().lower()
+        email_verified = userinfo.get("email_verified", False)
+        name           = userinfo.get("name", "")
+
+        if not email:
+            return _google_result_page(False, "Could not retrieve email from Google account.")
+        if not email_verified:
+            return _google_result_page(False, "Your Google email is not verified. Please verify it with Google first.")
+
+        # Find or create user
+        username, user_data = find_user_by_email(email)
+        users = load_users()
+        is_new = False
+
+        if not username:
+            # Create new account — Google-authenticated, no password
+            is_new   = True
+            username = re.sub(r'[^a-z0-9_]', '_', email.split("@")[0].lower())[:20]
+            base_uname = username
+            counter = 1
+            while username in users:
+                username = f"{base_uname}_{counter}"
+                counter += 1
+
+            # Generate a random unusable password hash (Google-only account)
+            random_pass = secrets.token_hex(32)
+            h, salt = hash_password(random_pass)
+            users[username] = {
+                "email":         email,
+                "password_hash": h,
+                "salt":          salt,
+                "name":          name,
+                "auth_provider": "google",
+                "created_at":    datetime.now().isoformat()
+            }
+            save_users(users)
+            os.makedirs(user_dir(username), exist_ok=True)
+
+            if utc_offset is not None:
+                cfg = load_config(username)
+                cfg["utc_offset_hours"] = utc_offset
+                save_config(username, cfg)
+        else:
+            # Existing account — mark that Google is linked (without breaking existing password login)
+            if not users[username].get("auth_provider"):
+                users[username]["auth_provider"] = "google"
+                save_users(users)
+
+        # Log the user in
+        session.clear()
+        session["username"] = username
+        session.permanent   = True
+
+        cfg = load_config(username)
+        has_config = bool(cfg.get("groq_api_key"))
+        redirect_to = "/dashboard" if has_config else "/setup"
+        return _google_result_page(True, "Signed in with Google!", redirect_to=redirect_to)
+
+    except Exception as e:
+        return _google_result_page(False, f"Google sign-in error: {e}")
+
+
+def _google_result_page(success, message, redirect_to="/"):
+    """Returns an HTML page that stores the session marker and redirects."""
+    if success:
+        return f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>body{{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#05030f;color:#3dffc0;font-family:'Segoe UI',sans-serif;text-align:center;}}.box{{padding:40px;border:1px solid rgba(61,255,192,0.3);border-radius:20px;background:rgba(61,255,192,0.05);}}.ico{{font-size:48px;margin-bottom:16px;}}h2{{font-size:20px;margin-bottom:8px;}}p{{font-size:13px;color:rgba(200,185,255,0.6);}}</style></head>
+<body><div class="box"><div class="ico">✓</div><h2>{message}</h2><p>Redirecting...</p></div>
+<script>
+localStorage.setItem('li_session', JSON.stringify({{expiresAt: Date.now() + 8*3600*1000}}));
+setTimeout(function(){{window.location.href='{redirect_to}';}}, 600);
+</script></body></html>"""
+    else:
+        return f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>body{{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#05030f;color:#ff6060;font-family:'Segoe UI',sans-serif;text-align:center;}}.box{{padding:40px;border:1px solid rgba(255,96,96,0.3);border-radius:20px;background:rgba(255,96,96,0.05);max-width:420px;}}.ico{{font-size:48px;margin-bottom:16px;}}h2{{font-size:18px;margin-bottom:8px;}}p{{font-size:12px;color:rgba(255,150,150,0.8);margin-top:8px;}}a{{display:inline-block;margin-top:20px;padding:10px 24px;background:rgba(255,96,96,0.15);border:1px solid rgba(255,96,96,0.3);color:#ff6060;border-radius:10px;text-decoration:none;font-size:13px;}}</style></head>
+<body><div class="box"><div class="ico">✕</div><h2>Google Sign-In Failed</h2><p>{message}</p><a href="/">← Back to Login</a></div></body></html>"""
+
+
 @app.route("/api/register", methods=["POST"])
 def register():
     data     = request.get_json()
