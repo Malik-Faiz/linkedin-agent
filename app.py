@@ -1508,7 +1508,7 @@ def linkedin_auth(username):
     params = {
         "response_type": "code", "client_id": LI_CLIENT_ID,
         "redirect_uri": LI_REDIRECT_URI, "state": state_payload,
-        "scope": "openid profile w_member_social", "prompt": "login", "login_hint": "",
+        "scope": "openid profile email", "prompt": "login", "login_hint": "",
     }
     oauth_url = "https://www.linkedin.com/oauth/v2/authorization?" + urllib.parse.urlencode(params)
     return jsonify({"ok": True, "auth_url": oauth_url})
@@ -1668,7 +1668,7 @@ def linkedin_callback():
         session.modified = True
         _oauth_url = "https://www.linkedin.com/oauth/v2/authorization?" + urllib.parse.urlencode({
             "response_type": "code", "client_id": LI_CLIENT_ID, "redirect_uri": LI_REDIRECT_URI,
-            "state": state_raw, "scope": "openid profile w_member_social", "prompt": "login",
+            "state": state_raw, "scope": "openid profile email", "prompt": "login",
         })
         return _li_account_picker_page(username, slot, access_token, expires_in, li_name, li_id, orgs, oauth_url=_oauth_url)
     except Exception as e:
