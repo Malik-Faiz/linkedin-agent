@@ -531,6 +531,12 @@ def publish_to_linkedin_slot(username, slot, text, image_url=None):
         add_log(username, f"  → [LinkedIn #{slot}] Not connected — skipping.", "warn")
         return False
 
+    # NOTE: LinkedIn posting requires the "w_member_social" scope (Share on LinkedIn /
+    # Community Management API). The app currently only has OpenID Connect access
+    # (sign-in + profile only), so publishing is disabled until that access is approved.
+    add_log(username, f"  → [LinkedIn #{slot} — {name}] Posting unavailable — app is connected via OpenID Connect only (sign-in/profile access). LinkedIn posting requires Community Management API approval.", "warn")
+    return False
+
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type":  "application/json",
