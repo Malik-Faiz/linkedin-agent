@@ -2081,6 +2081,29 @@ def get_review_queue(username):
     queue = load_review_queue(username)
     return jsonify({"ok": True, "queue": queue})
 
+@app.route("/api/review/<review_id>/save", methods=["POST"])
+@require_auth
+def save_review_item(username, review_id):
+    """Save edits (text/image/channels) to a pending review item WITHOUT publishing."""
+    queue = load_review_queue(username)
+    item  = next((i for i in queue if i["id"] == review_id), None)
+    if not item:
+        return jsonify({"ok": False, "message": "Review item not found"}), 404
+    if item["status"] != "pending":
+        return jsonify({"ok": False, "message": f"Already {item['status']}"}), 400
+
+    data = request.get_json() or {}
+    if "post_text" in data:
+        item["post_text"] = data["post_text"]
+    if "image_url" in data:
+        item["image_url"] = data["image_url"] or None
+    if "target_channels" in data:
+        item["target_channels"] = data["target_channels"]
+
+    save_review_queue(username, queue)
+    add_log(username, f"Review post {review_id} edited & saved (still pending)", "ok")
+    return jsonify({"ok": True, "item": item})
+
 @app.route("/api/review/<review_id>/publish", methods=["POST"])
 @require_auth
 def publish_review_item(username, review_id):
