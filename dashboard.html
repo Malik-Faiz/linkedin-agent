@@ -299,6 +299,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
   <div class="banner warn" id="expiryBanner">⏰ Session expires in <strong id="expiryCountdown" style="margin-left:4px;">—</strong>. Please re-login.</div>
   <div class="banner err"  id="connBanner">⚠ Cannot reach server.</div>
   <div class="banner warn" id="noChanBanner">⚠ No channels connected — <span style="cursor:pointer;text-decoration:underline" onclick="window.location.href='/setup'">go to Channels setup →</span></div>
+  <div class="banner warn" id="noApiBanner">⚠ No Groq API key set — posts can't be generated yet. <span style="cursor:pointer;text-decoration:underline" onclick="window.location.href='/setup'">Add one in Setup →</span></div>
   <div class="banner info" id="tzBanner"><span id="tzText">Detecting timezone...</span></div>
 
   <!-- TIMER -->
@@ -915,6 +916,8 @@ async function fetchStatus(){
     renderSubjects(data.subjects||[]);
     renderLogs(data.logs||[]);
     if(data.config||data.accounts)updateBadges(data.config,data.accounts);
+    const noApiBanner=document.getElementById('noApiBanner');
+    if(noApiBanner)noApiBanner.classList.toggle('show', !(data.config&&data.config.groq_api_key));
     if(data.channels_info)renderChannels(data.channels_info);
     updateTzBanner(data.utc_offset);
     if(data.time_slots&&!schedLoaded){loadScheduleSettings(data.time_slots);schedLoaded=true;}
@@ -977,7 +980,6 @@ async function doLogout(){
     const res=await fetch(`${API}/me`,{credentials:'include'});
     const data=await res.json();
     if(!data.authenticated||!isV()){clearS();window.location.href='/';return;}
-    if(!data.has_config){window.location.href='/setup';return;}
     fetchStatus();
     ivals.push(setInterval(updateCountdown,1000));
     ivals.push(setInterval(fetchStatus,3000));
