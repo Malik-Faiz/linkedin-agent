@@ -55,7 +55,7 @@ APP_BASE_URL  = os.environ.get("APP_BASE_URL", "http://localhost:5000")
 # ─── AI PROMPTS ───────────────────────────────────────────────────────────────
 SYSTEM_PROMPT_POST = """You are an expert LinkedIn ghostwriter.
 Write a highly engaging, professional LinkedIn post based on the user's subject.
-IMPORTANT: Your response must be between 2800 and 3000 characters total. Count carefully.
+IMPORTANT: Your response must be between 2000 and 3000 characters total. Count carefully.
 1. Hook on the first line wrapped in **asterisks**.
 2. Short, punchy sentences with good spacing between paragraphs.
 3. Include real insights, tips, or a story to fill the length naturally.
