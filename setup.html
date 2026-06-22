@@ -22,36 +22,58 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .o1{width:700px;height:700px;top:-25%;right:-18%;background:radial-gradient(circle,rgba(176,133,255,0.2),transparent 65%);}
 .o2{width:500px;height:500px;bottom:-18%;left:-12%;background:radial-gradient(circle,rgba(255,128,181,0.14),transparent 65%);}
 .wrapper{position:relative;z-index:10;max-width:680px;margin:0 auto;padding:44px 24px 80px;}
+
+/* TOPBAR */
 .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:44px;}
 .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;}
 .brand-icon{width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,var(--p),var(--p2));display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;box-shadow:0 6px 20px rgba(176,133,255,0.38);}
 .brand-name{font-size:16px;font-weight:700;letter-spacing:-0.3px;}
 .skip-btn{font-size:12px;font-family:var(--mono);color:var(--muted);padding:8px 16px;border:1px solid var(--border2);border-radius:10px;cursor:pointer;background:none;transition:all 0.2s;}
 .skip-btn:hover{color:var(--text);border-color:var(--p);background:rgba(176,133,255,0.06);}
+
+/* STEPS */
 .steps{display:flex;align-items:center;justify-content:center;margin-bottom:36px;}
 .step{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--muted2);}
 .step.active{color:var(--p);}.step.done{color:var(--green);}
 .step-num{width:26px;height:26px;border-radius:50%;border:1.5px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:11px;}
 .step-line{width:40px;height:1px;background:var(--border);margin:0 8px;}
+
+/* PAGE HEADER */
 .page-hdr{margin-bottom:36px;}
 .step-label{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-family:var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--p);background:rgba(176,133,255,0.1);border:1px solid rgba(176,133,255,0.2);border-radius:20px;padding:5px 14px;margin-bottom:16px;}
 .page-title{font-size:clamp(28px,5vw,38px);font-weight:800;letter-spacing:-1.5px;margin-bottom:10px;}
 .page-sub{font-size:15px;color:var(--muted);line-height:1.65;}
+
+/* ALERTS */
 .alert{display:none;align-items:center;gap:10px;border-radius:14px;padding:14px 16px;font-size:13px;font-family:var(--mono);margin-bottom:22px;line-height:1.5;}
 .alert.show{display:flex;}
 .alert.err{background:rgba(255,96,96,0.07);border:1px solid rgba(255,96,96,0.2);color:var(--red);}
 .alert.ok{background:rgba(61,255,192,0.06);border:1px solid rgba(61,255,192,0.2);color:var(--green);}
 
-/* ── CARDS ── */
+/* API KEY CARDS */
 .card{background:var(--card);border:1px solid var(--border2);border-radius:20px;padding:28px;margin-bottom:14px;position:relative;overflow:hidden;transition:border-color 0.2s;}
 .card::before{content:'';position:absolute;inset:0;border-radius:20px;background:linear-gradient(135deg,rgba(255,255,255,0.015),transparent);pointer-events:none;}
-.card-head{display:flex;align-items:center;gap:14px;margin-bottom:22px;}
-.card-badge{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;font-family:var(--mono);flex-shrink:0;}
-.bg-g{background:rgba(176,133,255,0.15);color:var(--p);border:1px solid rgba(176,133,255,0.2);}
-.bg-s{background:rgba(255,204,92,0.12);color:var(--amber);border:1px solid rgba(255,204,92,0.2);}
-.card-head-info h3{font-size:16px;font-weight:700;margin-bottom:3px;}
-.card-head-info p{font-size:11px;color:var(--muted);font-family:var(--mono);}
-.field{margin-bottom:16px;}
+.card-head{display:flex;align-items:center;gap:14px;margin-bottom:16px;}
+.card-logo{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.card-logo.groq{background:rgba(0,0,0,0.4);border:1px solid rgba(176,133,255,0.3);}
+.card-logo.serp{background:rgba(255,204,92,0.1);border:1px solid rgba(255,204,92,0.25);}
+.card-head-info h3{font-size:16px;font-weight:700;margin-bottom:2px;}
+.card-head-info .card-sub{font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:0;}
+
+/* HOW TO GET KEY */
+.how-to{background:rgba(0,0,0,0.25);border:1px solid rgba(176,133,255,0.12);border-radius:12px;padding:14px 16px;margin-bottom:16px;}
+.how-to-title{font-size:10px;font-family:var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--p);margin-bottom:10px;}
+.how-to-steps{display:flex;flex-direction:column;gap:6px;}
+.how-to-step{display:flex;align-items:flex-start;gap:10px;font-size:12px;font-family:var(--mono);color:var(--muted2);line-height:1.6;}
+.how-step-num{width:18px;height:18px;border-radius:50%;background:rgba(176,133,255,0.15);border:1px solid rgba(176,133,255,0.3);color:var(--p);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.how-to-link{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:8px 14px;border-radius:9px;background:rgba(176,133,255,0.1);border:1px solid rgba(176,133,255,0.25);color:var(--p);font-size:11px;font-family:var(--mono);text-decoration:none;transition:all 0.2s;}
+.how-to-link:hover{background:rgba(176,133,255,0.18);border-color:var(--p);}
+.how-to-link.amber{background:rgba(255,204,92,0.08);border-color:rgba(255,204,92,0.25);color:var(--amber);}
+.how-to-link.amber:hover{background:rgba(255,204,92,0.15);}
+.free-tag{font-size:9px;background:rgba(61,255,192,0.15);border:1px solid rgba(61,255,192,0.3);color:var(--green);border-radius:5px;padding:1px 7px;margin-left:6px;}
+
+/* FIELD */
+.field{margin-bottom:0;}
 .field label{display:block;font-size:10px;font-family:var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
 .inp-w{position:relative;}
 .inp-ico{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted2);pointer-events:none;}
@@ -59,23 +81,23 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .field input:focus{border-color:rgba(176,133,255,0.4);background:rgba(176,133,255,0.04);box-shadow:0 0 0 3px rgba(176,133,255,0.08);}
 .field input::placeholder{color:var(--muted2);}
 
-/* ══ SECTION DIVIDER ══ */
+/* SECTION DIVIDER */
 .section-divider{display:flex;align-items:center;gap:14px;margin:30px 0 18px;}
 .section-divider span{font-size:11px;font-family:var(--mono);letter-spacing:3px;text-transform:uppercase;color:var(--p);white-space:nowrap;}
 .section-divider::before,.section-divider::after{content:'';flex:1;height:1px;background:var(--border2);}
 
-/* ══ CHANNEL PLATFORM GROUP ══ */
-.platform-group{margin-bottom:18px;}
-.platform-group-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
-.plat-icon{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
-.plat-icon.li{background:rgba(0,119,181,0.18);border:1px solid rgba(0,119,181,0.3);}
-.plat-icon.fb{background:rgba(24,119,242,0.18);border:1px solid rgba(24,119,242,0.3);}
-.plat-icon.ig{background:rgba(225,48,108,0.18);border:1px solid rgba(225,48,108,0.25);}
+/* CHANNEL PLATFORM GROUP */
+.platform-group{margin-bottom:20px;}
+.platform-group-hdr{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.plat-logo{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.plat-logo.li{background:rgba(0,119,181,0.15);border:1px solid rgba(0,119,181,0.3);}
+.plat-logo.fb{background:rgba(24,119,242,0.15);border:1px solid rgba(24,119,242,0.3);}
+.plat-logo.ig{background:rgba(225,48,108,0.12);border:1px solid rgba(225,48,108,0.25);}
 .plat-name{font-size:14px;font-weight:700;letter-spacing:-0.2px;}
 .plat-sub{font-size:11px;color:var(--muted);font-family:var(--mono);}
 .plat-count{margin-left:auto;font-size:11px;font-family:var(--mono);background:var(--card);border:1px solid var(--border2);border-radius:7px;padding:3px 10px;color:var(--muted);}
 
-/* ══ CHANNEL SLOT ══ */
+/* CHANNEL SLOT */
 .ch-slot{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:14px;border:1.5px solid var(--border);background:rgba(0,0,0,0.18);margin-bottom:8px;transition:all 0.25s;position:relative;}
 .ch-slot.connected{border-color:rgba(61,255,192,0.32);background:rgba(61,255,192,0.035);}
 .ch-slot.expired{border-color:rgba(255,204,92,0.32);background:rgba(255,204,92,0.04);}
@@ -88,8 +110,8 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .ch-slot.expired .ch-slot-status{color:var(--amber);}
 .ch-slot-actions{display:flex;gap:7px;flex-shrink:0;}
 
-/* ══ CONNECT BUTTONS ══ */
-.conn-btn{display:flex;align-items:center;gap:7px;padding:9px 16px;border-radius:10px;border:none;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+/* CONNECT BUTTONS */
+.conn-btn{display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:10px;border:none;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
 .conn-btn:hover:not(:disabled){opacity:0.85;transform:translateY(-1px);}
 .conn-btn.li{background:linear-gradient(135deg,#0077b5,#0099cc);color:#fff;}
 .conn-btn.fb{background:linear-gradient(135deg,#1877f2,#0866ff);color:#fff;}
@@ -98,33 +120,32 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .disc-btn:hover{background:rgba(255,96,96,0.18);}
 button:disabled{opacity:0.4;cursor:not-allowed;}
 
-/* ══ LIVE DOT ══ */
+/* LIVE DOT */
 .live-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 .live-dot.on{background:var(--green);box-shadow:0 0 0 3px rgba(61,255,192,0.18);animation:ldp 2s infinite;}
 .live-dot.off{background:var(--muted2);}
 .live-dot.warn{background:var(--amber);}
 @keyframes ldp{0%,100%{box-shadow:0 0 0 3px rgba(61,255,192,0.18);}50%{box-shadow:0 0 0 6px rgba(61,255,192,0.04);}}
 
-/* ══ INSTAGRAM NOTE ══ */
+/* INSTAGRAM NOTE */
 .ig-auto-note{padding:10px 14px;border-radius:10px;background:rgba(225,48,108,0.06);border:1px solid rgba(225,48,108,0.18);font-size:11px;color:rgba(255,150,180,0.8);font-family:var(--mono);line-height:1.75;margin-top:4px;}
 
-/* ══ NOTE BOX ══ */
-.note-box{padding:12px 14px;border-radius:11px;background:rgba(176,133,255,0.06);border:1px solid rgba(176,133,255,0.15);font-size:11px;color:var(--muted);font-family:var(--mono);line-height:1.75;margin-top:16px;}
+/* NOTE BOX */
+.note-box{padding:12px 14px;border-radius:11px;background:rgba(176,133,255,0.06);border:1px solid rgba(176,133,255,0.15);font-size:11px;color:var(--muted);font-family:var(--mono);line-height:1.9;margin-top:16px;}
 
-/* ══ CHANNELS CARD ══ */
+/* CHANNELS CARD */
 .channels-card{background:var(--card);border:1px solid var(--border2);border-radius:20px;padding:28px;margin-bottom:14px;position:relative;overflow:hidden;}
 .channels-card::before{content:'';position:absolute;inset:0;border-radius:20px;background:linear-gradient(135deg,rgba(255,255,255,0.015),transparent);pointer-events:none;}
 
-/* ══ POPUP BLOCKED BANNER ══ */
+/* POPUP BLOCKED BANNER */
 .popup-banner{display:none;align-items:flex-start;gap:12px;padding:16px 18px;border-radius:14px;background:rgba(255,204,92,0.07);border:1px solid rgba(255,204,92,0.25);margin-bottom:18px;}
 .popup-banner.show{display:flex;}
 .popup-banner-icon{font-size:20px;flex-shrink:0;margin-top:1px;}
-.popup-banner-body{flex:1;}
 .popup-banner-body strong{display:block;font-size:13px;color:var(--amber);margin-bottom:4px;}
 .popup-banner-body p{font-size:11px;color:rgba(255,204,92,0.7);font-family:var(--mono);line-height:1.75;}
 .popup-banner-body ol{font-size:11px;color:rgba(255,204,92,0.7);font-family:var(--mono);line-height:2;padding-left:16px;margin-top:4px;}
 
-/* ══ SUBMIT ══ */
+/* SUBMIT */
 .submit-area{margin-top:26px;display:flex;flex-direction:column;gap:10px;}
 .btn-primary{width:100%;padding:17px;background:linear-gradient(135deg,var(--p),#d060f0,var(--p2));border:none;border-radius:14px;color:#fff;font-family:var(--font);font-size:16px;font-weight:700;cursor:pointer;position:relative;overflow:hidden;box-shadow:0 10px 30px rgba(176,133,255,0.3);transition:opacity 0.2s,transform 0.15s;}
 .btn-primary::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,0.15),transparent);}
@@ -159,7 +180,7 @@ button:disabled{opacity:0.4;cursor:not-allowed;}
   <div class="page-hdr">
     <div class="step-label">⚙ Configuration</div>
     <h1 class="page-title">Connect your accounts</h1>
-    <p class="page-sub">Connect your social accounts and API keys. Click a platform button — login page opens — you log in — done.</p>
+    <p class="page-sub">Add your API keys and connect your social channels. Everything is encrypted and stored securely.</p>
   </div>
 
   <!-- Popup blocked banner -->
@@ -182,9 +203,33 @@ button:disabled{opacity:0.4;cursor:not-allowed;}
   <!-- ═══ GROQ ═══ -->
   <div class="card">
     <div class="card-head">
-      <div class="card-badge bg-g">G</div>
-      <div class="card-head-info"><h3>Groq API Key</h3><p>AI post generation · groq.com/keys</p></div>
+      <div class="card-logo groq">
+        <!-- Groq logo -->
+        <svg width="28" height="28" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="32" cy="32" r="32" fill="#f55036"/>
+          <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-family="Arial Black,sans-serif" font-weight="900" font-size="30" fill="white">G</text>
+        </svg>
+      </div>
+      <div class="card-head-info">
+        <h3>Groq API Key <span class="free-tag">FREE</span></h3>
+        <div class="card-sub">Powers AI post generation · ultra-fast LLM inference</div>
+      </div>
     </div>
+
+    <div class="how-to">
+      <div class="how-to-title">🔑 How to get your Groq key</div>
+      <div class="how-to-steps">
+        <div class="how-to-step"><div class="how-step-num">1</div><span>Go to <strong style="color:var(--text)">console.groq.com</strong> and sign up for a free account</span></div>
+        <div class="how-to-step"><div class="how-step-num">2</div><span>In the left sidebar, click <strong style="color:var(--text)">API Keys</strong></span></div>
+        <div class="how-to-step"><div class="how-step-num">3</div><span>Click <strong style="color:var(--text)">Create API Key</strong>, give it a name, and copy it</span></div>
+        <div class="how-to-step"><div class="how-step-num">4</div><span>Paste it below — free tier gives generous usage limits</span></div>
+      </div>
+      <a class="how-to-link" href="https://console.groq.com/keys" target="_blank" rel="noopener">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Open console.groq.com/keys →
+      </a>
+    </div>
+
     <div class="field">
       <label>API Key</label>
       <div class="inp-w"><span class="inp-ico">🔑</span><input type="password" id="cfgGroq" placeholder="gsk_••••••••••••••••••••••••"></div>
@@ -194,9 +239,32 @@ button:disabled{opacity:0.4;cursor:not-allowed;}
   <!-- ═══ SERPAPI ═══ -->
   <div class="card">
     <div class="card-head">
-      <div class="card-badge bg-s">S</div>
-      <div class="card-head-info"><h3>SerpAPI Key</h3><p>auto image search · optional · serpapi.com</p></div>
+      <div class="card-logo serp">
+        <svg width="28" height="28" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="32" cy="32" r="32" fill="#ffcc5c"/>
+          <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-family="Arial Black,sans-serif" font-weight="900" font-size="22" fill="#1a1200">S</text>
+        </svg>
+      </div>
+      <div class="card-head-info">
+        <h3>SerpAPI Key <span style="font-size:9px;background:rgba(255,204,92,0.15);border:1px solid rgba(255,204,92,0.3);color:var(--amber);border-radius:5px;padding:1px 7px;margin-left:4px;font-family:var(--mono);">OPTIONAL</span></h3>
+        <div class="card-sub">Auto-fetches relevant images for posts · 100 searches/month free</div>
+      </div>
     </div>
+
+    <div class="how-to">
+      <div class="how-to-title">🔑 How to get your SerpAPI key</div>
+      <div class="how-to-steps">
+        <div class="how-to-step"><div class="how-step-num">1</div><span>Go to <strong style="color:var(--text)">serpapi.com</strong> and create a free account</span></div>
+        <div class="how-to-step"><div class="how-step-num">2</div><span>After signup, go to your <strong style="color:var(--text)">Dashboard</strong> — your key is shown at the top</span></div>
+        <div class="how-to-step"><div class="how-step-num">3</div><span>Copy the key and paste it below. Free plan = <strong style="color:var(--text)">100 searches/month</strong></span></div>
+        <div class="how-to-step"><div class="how-step-num">4</div><span>Without this key, posts will still generate but without auto images</span></div>
+      </div>
+      <a class="how-to-link amber" href="https://serpapi.com/manage-api-key" target="_blank" rel="noopener">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Open serpapi.com/manage-api-key →
+      </a>
+    </div>
+
     <div class="field">
       <label>API Key</label>
       <div class="inp-w"><span class="inp-ico">🔑</span><input type="password" id="cfgSerp" placeholder="77b4••••••••••••••••••••"></div>
@@ -208,24 +276,28 @@ button:disabled{opacity:0.4;cursor:not-allowed;}
 
   <div class="channels-card">
     <div class="card-head" style="margin-bottom:8px;">
-      <div class="card-badge" style="background:linear-gradient(135deg,rgba(0,119,181,0.2),rgba(225,48,108,0.2));border:1px solid rgba(176,133,255,0.2);font-size:18px;">📱</div>
+      <div class="card-logo" style="width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,rgba(0,119,181,0.2),rgba(225,48,108,0.2));border:1px solid rgba(176,133,255,0.2);font-size:20px;display:flex;align-items:center;justify-content:center;">📱</div>
       <div class="card-head-info">
         <h3>Social Channels</h3>
-        <p>connect multiple accounts · each publishes independently</p>
+        <div class="card-sub">Connect multiple accounts · each publishes independently</div>
       </div>
     </div>
 
     <!-- ── LINKEDIN ── -->
     <div class="platform-group">
       <div class="platform-group-hdr">
-        <div class="plat-icon li">💼</div>
+        <div class="plat-logo li">
+          <svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <rect width="24" height="24" rx="4" fill="#0A66C2"/>
+            <path d="M7.5 9.5H5V18.5H7.5V9.5ZM6.25 8.5C7.08 8.5 7.75 7.83 7.75 7C7.75 6.17 7.08 5.5 6.25 5.5C5.42 5.5 4.75 6.17 4.75 7C4.75 7.83 5.42 8.5 6.25 8.5ZM19.5 18.5H17V14C17 12.9 16.1 12 15 12C13.9 12 13 12.9 13 14V18.5H10.5V9.5H13V10.76C13.57 9.93 14.56 9.5 15.5 9.5C17.71 9.5 19.5 11.29 19.5 13.5V18.5Z" fill="white"/>
+          </svg>
+        </div>
         <div>
           <div class="plat-name">LinkedIn Accounts</div>
           <div class="plat-sub">Up to 3 separate LinkedIn accounts</div>
         </div>
         <span class="plat-count" id="liCount">0 / 3 connected</span>
       </div>
-
       <div class="ch-slot" id="liSlot1">
         <div class="ch-slot-num" id="liNum1">1</div>
         <div class="live-dot off" id="liDot1"></div>
@@ -234,11 +306,13 @@ button:disabled{opacity:0.4;cursor:not-allowed;}
           <div class="ch-slot-status" id="liStatus1">Not connected</div>
         </div>
         <div class="ch-slot-actions">
-          <button class="conn-btn li" id="liBtn1" onclick="connectChannel('linkedin',1)">🔗 Connect</button>
+          <button class="conn-btn li" id="liBtn1" onclick="connectChannel('linkedin',1)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+            Connect
+          </button>
           <button class="disc-btn" id="liDisc1" style="display:none" onclick="disconnectChannel('linkedin',1)">✕</button>
         </div>
       </div>
-
       <div class="ch-slot" id="liSlot2">
         <div class="ch-slot-num" id="liNum2">2</div>
         <div class="live-dot off" id="liDot2"></div>
@@ -247,11 +321,13 @@ button:disabled{opacity:0.4;cursor:not-allowed;}
           <div class="ch-slot-status" id="liStatus2">Not connected</div>
         </div>
         <div class="ch-slot-actions">
-          <button class="conn-btn li" id="liBtn2" onclick="connectChannel('linkedin',2)">🔗 Connect</button>
+          <button class="conn-btn li" id="liBtn2" onclick="connectChannel('linkedin',2)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+            Connect
+          </button>
           <button class="disc-btn" id="liDisc2" style="display:none" onclick="disconnectChannel('linkedin',2)">✕</button>
         </div>
       </div>
-
       <div class="ch-slot" id="liSlot3">
         <div class="ch-slot-num" id="liNum3">3</div>
         <div class="live-dot off" id="liDot3"></div>
@@ -260,7 +336,10 @@ button:disabled{opacity:0.4;cursor:not-allowed;}
           <div class="ch-slot-status" id="liStatus3">Not connected</div>
         </div>
         <div class="ch-slot-actions">
-          <button class="conn-btn li" id="liBtn3" onclick="connectChannel('linkedin',3)">🔗 Connect</button>
+          <button class="conn-btn li" id="liBtn3" onclick="connectChannel('linkedin',3)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+            Connect
+          </button>
           <button class="disc-btn" id="liDisc3" style="display:none" onclick="disconnectChannel('linkedin',3)">✕</button>
         </div>
       </div>
@@ -269,14 +348,18 @@ button:disabled{opacity:0.4;cursor:not-allowed;}
     <!-- ── FACEBOOK ── -->
     <div class="platform-group">
       <div class="platform-group-hdr">
-        <div class="plat-icon fb">📘</div>
+        <div class="plat-logo fb">
+          <svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <rect width="24" height="24" rx="4" fill="#1877F2"/>
+            <path d="M16.5 12H14V10.5C14 9.95 14.45 9.5 15 9.5H16V7H14.5C12.84 7 11.5 8.34 11.5 10V12H9.5V14.5H11.5V21H14V14.5H16L16.5 12Z" fill="white"/>
+          </svg>
+        </div>
         <div>
           <div class="plat-name">Facebook Page</div>
           <div class="plat-sub">Connects to your Facebook Page</div>
         </div>
         <span class="plat-count" id="fbCount">0 / 1 connected</span>
       </div>
-
       <div class="ch-slot" id="fbSlot1">
         <div class="ch-slot-num" id="fbNum1">1</div>
         <div class="live-dot off" id="fbDot1"></div>
@@ -285,7 +368,10 @@ button:disabled{opacity:0.4;cursor:not-allowed;}
           <div class="ch-slot-status" id="fbStatus1">Not connected</div>
         </div>
         <div class="ch-slot-actions">
-          <button class="conn-btn fb" id="fbBtn1" onclick="connectChannel('facebook',1)">🔗 Connect</button>
+          <button class="conn-btn fb" id="fbBtn1" onclick="connectChannel('facebook',1)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+            Connect
+          </button>
           <button class="disc-btn" id="fbDisc1" style="display:none" onclick="disconnectChannel('facebook',1)">✕</button>
         </div>
       </div>
@@ -294,14 +380,27 @@ button:disabled{opacity:0.4;cursor:not-allowed;}
     <!-- ── INSTAGRAM ── -->
     <div class="platform-group">
       <div class="platform-group-hdr">
-        <div class="plat-icon ig">📸</div>
+        <div class="plat-logo ig">
+          <svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <radialGradient id="igSetup" cx="30%" cy="110%" r="140%">
+                <stop offset="0%" stop-color="#ffd600"/>
+                <stop offset="45%" stop-color="#ff0069"/>
+                <stop offset="100%" stop-color="#7b2ff7"/>
+              </radialGradient>
+            </defs>
+            <rect width="24" height="24" rx="6" fill="url(#igSetup)"/>
+            <rect x="6.5" y="6.5" width="11" height="11" rx="3.2" stroke="white" stroke-width="1.6" fill="none"/>
+            <circle cx="12" cy="12" r="2.8" stroke="white" stroke-width="1.5" fill="none"/>
+            <circle cx="16.3" cy="7.7" r="1" fill="white"/>
+          </svg>
+        </div>
         <div>
           <div class="plat-name">Instagram Business / Creator</div>
           <div class="plat-sub">Auto-connects when you connect Facebook</div>
         </div>
         <span class="plat-count" id="igCount">0 / 1 connected</span>
       </div>
-
       <div class="ch-slot" id="igSlot1">
         <div class="ch-slot-num" id="igNum1">1</div>
         <div class="live-dot off" id="igDot1"></div>
@@ -313,7 +412,6 @@ button:disabled{opacity:0.4;cursor:not-allowed;}
           <button class="disc-btn" id="igDisc1" style="display:none" onclick="disconnectChannel('instagram',1)">✕</button>
         </div>
       </div>
-
       <div class="ig-auto-note">
         📸 Instagram connects automatically when you connect a Facebook Page that has an Instagram Business or Creator account linked to it.<br>
         To link: <strong>Instagram app → Settings → Account → Linked Accounts → Facebook</strong>
@@ -321,9 +419,12 @@ button:disabled{opacity:0.4;cursor:not-allowed;}
     </div>
 
     <div class="note-box">
-      💼 <strong>LinkedIn</strong> — posts published directly to each connected account<br>
-      📘 <strong>Facebook</strong> — posts published to your Facebook Page<br>
-      📸 <strong>Instagram</strong> — auto-connects via Facebook (requires Instagram Business/Creator linked to your Page)
+      <svg style="display:inline;vertical-align:-2px;margin-right:6px;" width="13" height="13" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#0A66C2"/><path d="M7 9.5H5V18H7.5V9.5ZM6.25 8.5C7.08 8.5 7.75 7.83 7.75 7C7.75 6.17 7.08 5.5 6.25 5.5C5.42 5.5 4.75 6.17 4.75 7C4.75 7.83 5.42 8.5 6.25 8.5ZM19 18H17V14C17 12.9 16.1 12 15 12C13.9 12 13 12.9 13 14V18H10.5V9.5H13V10.76C13.57 9.93 14.56 9.5 15.5 9.5C17.71 9.5 19 11.29 19 13.5V18Z" fill="white"/></svg>
+      <strong>LinkedIn</strong> — posts published directly to each connected personal or company account<br>
+      <svg style="display:inline;vertical-align:-2px;margin-right:6px;" width="13" height="13" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="#1877F2"/><path d="M16 12H14V10.5C14 9.95 14.45 9.5 15 9.5H16V7H14.5C12.84 7 11.5 8.34 11.5 10V12H9.5V14.5H11.5V21H14V14.5H16L16 12Z" fill="white"/></svg>
+      <strong>Facebook</strong> — posts published to your Facebook Page (requires admin access)<br>
+      <svg style="display:inline;vertical-align:-2px;margin-right:6px;" width="13" height="13" viewBox="0 0 24 24" fill="none"><defs><radialGradient id="igN2" cx="30%" cy="110%" r="140%"><stop offset="0%" stop-color="#ffd600"/><stop offset="45%" stop-color="#ff0069"/><stop offset="100%" stop-color="#7b2ff7"/></radialGradient></defs><rect width="24" height="24" rx="5" fill="url(#igN2)"/><rect x="6.5" y="6.5" width="11" height="11" rx="3" stroke="white" stroke-width="1.5" fill="none"/><circle cx="12" cy="12" r="2.8" stroke="white" stroke-width="1.5" fill="none"/><circle cx="16.2" cy="7.8" r="1" fill="white"/></svg>
+      <strong>Instagram</strong> — requires Business or Creator account linked to your Facebook Page
     </div>
   </div>
 
@@ -340,325 +441,169 @@ button:disabled{opacity:0.4;cursor:not-allowed;}
 const API = window.location.origin + '/api';
 let savedGroq = false;
 
-// ══════════════════════════════════════════
-// LOAD ALL CHANNEL STATUSES
-// ══════════════════════════════════════════
 async function loadChannels() {
   try {
     const res  = await fetch(`${API}/channels`, { credentials: 'include' });
     const data = await res.json();
     if (!data.ok) return;
-
     for (let i = 1; i <= 3; i++) renderLinkedInSlot(i, data.linkedin[i] || {});
     renderFacebookSlot(1, data.facebook[1] || {});
     renderInstagramSlot(1, data.instagram[1] || {}, data.facebook[1] || {});
-
     const liConn = [1,2,3].filter(i => (data.linkedin[i]||{}).connected).length;
     document.getElementById('liCount').textContent = `${liConn} / 3 connected`;
     document.getElementById('liCount').style.color = liConn > 0 ? 'var(--green)' : 'var(--muted)';
-
     const fbConn = (data.facebook[1]||{}).connected ? 1 : 0;
     document.getElementById('fbCount').textContent = `${fbConn} / 1 connected`;
     document.getElementById('fbCount').style.color = fbConn ? 'var(--green)' : 'var(--muted)';
-
     const igConn = (data.instagram[1]||{}).connected ? 1 : 0;
     document.getElementById('igCount').textContent = `${igConn} / 1 connected`;
     document.getElementById('igCount').style.color = igConn ? 'var(--green)' : 'var(--muted)';
-
   } catch(e) { console.error(e); }
 }
 
 function renderLinkedInSlot(n, ch) {
-  const slot   = document.getElementById(`liSlot${n}`);
-  const dot    = document.getElementById(`liDot${n}`);
-  const name   = document.getElementById(`liName${n}`);
-  const status = document.getElementById(`liStatus${n}`);
-  const btn    = document.getElementById(`liBtn${n}`);
-  const disc   = document.getElementById(`liDisc${n}`);
-
-  if (ch.connected) {
-    slot.className = 'ch-slot connected';
-    dot.className  = 'live-dot on';
-    const typeIcon  = ch.account_type === 'organization' ? '🏢' : '👤';
-    const typeLabel = ch.account_type === 'organization' ? 'Company Page' : 'Personal';
-    name.textContent   = `${typeIcon} ${ch.name || 'LinkedIn Account ' + n}`;
-    status.textContent = `✓ ${typeLabel}${ch.expires ? ' · expires ' + new Date(ch.expires).toLocaleDateString() : ''}`;
-    btn.style.display  = 'none';
-    disc.style.display = 'block';
-  } else if (ch.expired) {
-    slot.className = 'ch-slot expired';
-    dot.className  = 'live-dot warn';
-    name.textContent   = ch.name || `LinkedIn Account ${n}`;
-    status.textContent = '⚠ Session expired — reconnect';
-    btn.innerHTML      = '🔄 Reconnect';
-    btn.style.display  = 'flex';
-    disc.style.display = 'none';
-  } else {
-    slot.className = 'ch-slot';
-    dot.className  = 'live-dot off';
-    name.textContent   = `LinkedIn Account ${n}`;
-    status.textContent = 'Not connected — click Connect to choose personal or company page';
-    btn.innerHTML      = '🔗 Connect';
-    btn.style.display  = 'flex';
-    disc.style.display = 'none';
+  const slot=document.getElementById(`liSlot${n}`),dot=document.getElementById(`liDot${n}`),name=document.getElementById(`liName${n}`),status=document.getElementById(`liStatus${n}`),btn=document.getElementById(`liBtn${n}`),disc=document.getElementById(`liDisc${n}`);
+  if(ch.connected){
+    slot.className='ch-slot connected';dot.className='live-dot on';
+    const typeIcon=ch.account_type==='organization'?'🏢':'👤';
+    const typeLabel=ch.account_type==='organization'?'Company Page':'Personal';
+    name.textContent=`${typeIcon} ${ch.name||'LinkedIn Account '+n}`;
+    status.textContent=`✓ ${typeLabel}${ch.expires?' · expires '+new Date(ch.expires).toLocaleDateString():''}`;
+    btn.style.display='none';disc.style.display='block';
+  }else if(ch.expired){
+    slot.className='ch-slot expired';dot.className='live-dot warn';
+    name.textContent=ch.name||`LinkedIn Account ${n}`;
+    status.textContent='⚠ Session expired — reconnect';
+    btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M1 4v6h6M23 20v-6h-6" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/></svg> Reconnect';
+    btn.style.display='flex';disc.style.display='none';
+  }else{
+    slot.className='ch-slot';dot.className='live-dot off';
+    name.textContent=`LinkedIn Account ${n}`;
+    status.textContent='Not connected — click Connect to choose personal or company page';
+    btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/></svg> Connect';
+    btn.style.display='flex';disc.style.display='none';
   }
 }
 
 function renderFacebookSlot(n, ch) {
-  const slot   = document.getElementById(`fbSlot${n}`);
-  const dot    = document.getElementById(`fbDot${n}`);
-  const name   = document.getElementById(`fbName${n}`);
-  const status = document.getElementById(`fbStatus${n}`);
-  const btn    = document.getElementById(`fbBtn${n}`);
-  const disc   = document.getElementById(`fbDisc${n}`);
-
-  if (ch.connected) {
-    slot.className = 'ch-slot connected';
-    dot.className  = 'live-dot on';
-    name.textContent   = ch.page_name || 'Facebook Page';
-    status.textContent = `✓ ${ch.page_name || 'Page connected'}`;
-    btn.style.display  = 'none';
-    disc.style.display = 'block';
-  } else {
-    slot.className = 'ch-slot';
-    dot.className  = 'live-dot off';
-    name.textContent   = 'Facebook Page';
-    status.textContent = 'Not connected';
-    btn.style.display  = 'flex';
-    disc.style.display = 'none';
+  const slot=document.getElementById(`fbSlot${n}`),dot=document.getElementById(`fbDot${n}`),name=document.getElementById(`fbName${n}`),status=document.getElementById(`fbStatus${n}`),btn=document.getElementById(`fbBtn${n}`),disc=document.getElementById(`fbDisc${n}`);
+  if(ch.connected){
+    slot.className='ch-slot connected';dot.className='live-dot on';
+    name.textContent=ch.page_name||'Facebook Page';
+    status.textContent=`✓ ${ch.page_name||'Page connected'}`;
+    btn.style.display='none';disc.style.display='block';
+  }else{
+    slot.className='ch-slot';dot.className='live-dot off';
+    name.textContent='Facebook Page';status.textContent='Not connected';
+    btn.style.display='flex';disc.style.display='none';
   }
 }
 
 function renderInstagramSlot(n, ig, fb) {
-  const slot   = document.getElementById(`igSlot${n}`);
-  const dot    = document.getElementById(`igDot${n}`);
-  const name   = document.getElementById(`igName${n}`);
-  const status = document.getElementById(`igStatus${n}`);
-  const disc   = document.getElementById(`igDisc${n}`);
-
-  if (ig.connected) {
-    slot.className     = 'ch-slot connected';
-    dot.className      = 'live-dot on';
-    name.textContent   = ig.username ? `@${ig.username}` : 'Instagram';
-    status.textContent = '✓ Connected via Facebook';
-    disc.style.display = 'block';
-  } else if (fb.connected) {
-    slot.className     = 'ch-slot';
-    dot.className      = 'live-dot warn';
-    name.textContent   = 'Instagram Account';
-    status.textContent = '⚠ No Instagram Business account found linked to your Facebook Page';
-    disc.style.display = 'none';
-  } else {
-    slot.className     = 'ch-slot';
-    dot.className      = 'live-dot off';
-    name.textContent   = 'Instagram Account';
-    status.textContent = 'Connect Facebook first ↑';
-    disc.style.display = 'none';
+  const slot=document.getElementById(`igSlot${n}`),dot=document.getElementById(`igDot${n}`),name=document.getElementById(`igName${n}`),status=document.getElementById(`igStatus${n}`),disc=document.getElementById(`igDisc${n}`);
+  if(ig.connected){
+    slot.className='ch-slot connected';dot.className='live-dot on';
+    name.textContent=ig.username?`@${ig.username}`:'Instagram';
+    status.textContent='✓ Connected via Facebook';disc.style.display='block';
+  }else if(fb.connected){
+    slot.className='ch-slot';dot.className='live-dot warn';
+    name.textContent='Instagram Account';
+    status.textContent='⚠ No Instagram Business account found linked to your Facebook Page';
+    disc.style.display='none';
+  }else{
+    slot.className='ch-slot';dot.className='live-dot off';
+    name.textContent='Instagram Account';status.textContent='Connect Facebook first ↑';disc.style.display='none';
   }
 }
 
-// ══════════════════════════════════════════
-// CONNECT CHANNEL — FIX: open popup FIRST
-// then navigate it after fetching the URL
-// ══════════════════════════════════════════
 async function connectChannel(platform, slot) {
-  const prefix = platform === 'linkedin' ? 'li' : platform === 'facebook' ? 'fb' : 'ig';
-  const btnEl  = document.getElementById(`${prefix}Btn${slot}`);
-  if (!btnEl) return;
-
-  const origHTML = btnEl.innerHTML;
-  btnEl.disabled = true;
-  btnEl.innerHTML = '<span class="spin">⟳</span>';
-  hideAlerts();
-  hideBanner();
-
-  // ── KEY FIX: open popup immediately inside the click handler
-  // before ANY async/await — browser treats this as a direct user gesture ──
-  const w    = 660, h = 740;
-  const left = Math.round((screen.width  - w) / 2);
-  const top  = Math.round((screen.height - h) / 2);
-  const popup = window.open(
-    '/api/auth/loading',
-    `oauth_${platform}_${slot}`,
-    `width=${w},height=${h},left=${left},top=${top},scrollbars=yes`
-  );
-
-  if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-    // Popup was blocked
-    btnEl.disabled = false;
-    btnEl.innerHTML = origHTML;
-    showBanner();
-    return;
+  const prefix=platform==='linkedin'?'li':platform==='facebook'?'fb':'ig';
+  const btnEl=document.getElementById(`${prefix}Btn${slot}`);
+  if(!btnEl)return;
+  const origHTML=btnEl.innerHTML;
+  btnEl.disabled=true;btnEl.innerHTML='<span class="spin">⟳</span>';
+  hideAlerts();hideBanner();
+  const w=660,h=740,left=Math.round((screen.width-w)/2),top=Math.round((screen.height-h)/2);
+  const popup=window.open('/api/auth/loading',`oauth_${platform}_${slot}`,`width=${w},height=${h},left=${left},top=${top},scrollbars=yes`);
+  if(!popup||popup.closed||typeof popup.closed==='undefined'){
+    btnEl.disabled=false;btnEl.innerHTML=origHTML;showBanner();return;
   }
-
-  try {
-    const res = await fetch(`${API}/auth/${platform}?slot=${slot}`, { credentials: 'include' });
-
-    if (!res.ok) {
-      popup.close();
-      btnEl.disabled = false; btnEl.innerHTML = origHTML;
-      showErr(`Server error ${res.status} — please try again.`);
-      return;
-    }
-
-    const data = await res.json();
-    btnEl.disabled = false; btnEl.innerHTML = origHTML;
-
-    if (!data.ok) {
-      popup.close();
-      showErr(data.message || 'Could not start OAuth.');
-      return;
-    }
-
-    // Navigate already-open popup to the real OAuth URL
-    popup.location.href = data.auth_url;
-
-    // Listen for success postMessage from popup
-    const handler = (e) => {
-      if (typeof e.data === 'string' && e.data.startsWith('channel_connected:')) {
-        window.removeEventListener('message', handler);
-        clearInterval(pollTimer);
-        loadChannels();
-        setTimeout(loadChannels, 1200);
-        showOk('Channel connected successfully! ✓');
+  try{
+    const res=await fetch(`${API}/auth/${platform}?slot=${slot}`,{credentials:'include'});
+    if(!res.ok){popup.close();btnEl.disabled=false;btnEl.innerHTML=origHTML;showErr(`Server error ${res.status}`);return;}
+    const data=await res.json();
+    btnEl.disabled=false;btnEl.innerHTML=origHTML;
+    if(!data.ok){popup.close();showErr(data.message||'Could not start OAuth.');return;}
+    popup.location.href=data.auth_url;
+    const handler=(e)=>{
+      if(typeof e.data==='string'&&e.data.startsWith('channel_connected:')){
+        window.removeEventListener('message',handler);clearInterval(pollTimer);
+        loadChannels();setTimeout(loadChannels,1200);showOk('Channel connected successfully! ✓');
       }
     };
-    window.addEventListener('message', handler);
-
-    // Fallback: poll for popup close
-    const pollTimer = setInterval(() => {
-      try {
-        if (popup.closed) {
-          clearInterval(pollTimer);
-          window.removeEventListener('message', handler);
-          loadChannels();
-          setTimeout(loadChannels, 1200);
-        }
-      } catch(e) {
-        clearInterval(pollTimer);
-        loadChannels();
-      }
-    }, 800);
-
-  } catch(e) {
-    try { popup.close(); } catch(_) {}
-    btnEl.disabled = false; btnEl.innerHTML = origHTML;
-    showErr('Network error: ' + e.message);
+    window.addEventListener('message',handler);
+    const pollTimer=setInterval(()=>{
+      try{if(popup.closed){clearInterval(pollTimer);window.removeEventListener('message',handler);loadChannels();setTimeout(loadChannels,1200);}}
+      catch(e){clearInterval(pollTimer);loadChannels();}
+    },800);
+  }catch(e){
+    try{popup.close();}catch(_){}
+    btnEl.disabled=false;btnEl.innerHTML=origHTML;showErr('Network error: '+e.message);
   }
 }
 
-// ══════════════════════════════════════════
-// DISCONNECT A CHANNEL
-// ══════════════════════════════════════════
 async function disconnectChannel(platform, slot) {
-  const names = { linkedin: 'LinkedIn', facebook: 'Facebook', instagram: 'Instagram' };
-  if (!confirm(`Disconnect ${names[platform]} Account ${slot}?`)) return;
-  try {
-    await fetch(`${API}/auth/${platform}/disconnect?slot=${slot}`,
-      { method: 'POST', credentials: 'include' });
-    loadChannels();
-    showOk(`${names[platform]} disconnected.`);
-  } catch(e) { showErr('Error: ' + e.message); }
+  const names={linkedin:'LinkedIn',facebook:'Facebook',instagram:'Instagram'};
+  if(!confirm(`Disconnect ${names[platform]} Account ${slot}?`))return;
+  try{
+    await fetch(`${API}/auth/${platform}/disconnect?slot=${slot}`,{method:'POST',credentials:'include'});
+    loadChannels();showOk(`${names[platform]} disconnected.`);
+  }catch(e){showErr('Error: '+e.message);}
 }
 
-// ══════════════════════════════════════════
-// SAVE GROQ / SERP KEYS
-// ══════════════════════════════════════════
 async function saveConfig() {
-  const btn = document.getElementById('saveBtn');
-  const lbl = document.getElementById('saveBtnLabel');
+  const btn=document.getElementById('saveBtn'),lbl=document.getElementById('saveBtnLabel');
   hideAlerts();
-
-  const groq = document.getElementById('cfgGroq').value.trim();
-  const serp = document.getElementById('cfgSerp').value.trim();
-
-  if (!groq && !savedGroq) {
-    showErr('Groq API key is required to generate posts.');
-    return;
-  }
-
-  btn.disabled = true; lbl.innerHTML = '<span class="spin">⟳</span> Saving...';
-  try {
-    const payload = {};
-    if (groq) payload.groq_api_key = groq;
-    if (serp) payload.serpapi_key  = serp;
-
-    const res  = await fetch(`${API}/config`, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-    if (data.ok) {
-      showOk('Saved! Redirecting to dashboard...');
-      setTimeout(goToDash, 900);
-    } else {
-      showErr(data.message || 'Save failed.');
-      btn.disabled = false; lbl.textContent = 'Save & Continue →';
-    }
-  } catch(e) {
-    showErr('Cannot reach server.');
-    btn.disabled = false; lbl.textContent = 'Save & Continue →';
-  }
+  const groq=document.getElementById('cfgGroq').value.trim();
+  const serp=document.getElementById('cfgSerp').value.trim();
+  if(!groq&&!savedGroq){showErr('Groq API key is required to generate posts.');return;}
+  btn.disabled=true;lbl.innerHTML='<span class="spin">⟳</span> Saving...';
+  try{
+    const payload={};
+    if(groq)payload.groq_api_key=groq;
+    if(serp)payload.serpapi_key=serp;
+    const res=await fetch(`${API}/config`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data=await res.json();
+    if(data.ok){showOk('Saved! Redirecting to dashboard...');setTimeout(goToDash,900);}
+    else{showErr(data.message||'Save failed.');btn.disabled=false;lbl.textContent='Save & Continue →';}
+  }catch(e){showErr('Cannot reach server.');btn.disabled=false;lbl.textContent='Save & Continue →';}
 }
 
-// ══════════════════════════════════════════
-// UI HELPERS
-// ══════════════════════════════════════════
-function showErr(msg) {
-  document.getElementById('errMsg').textContent = msg;
-  document.getElementById('errBox').classList.add('show');
-  document.getElementById('okBox').classList.remove('show');
-  document.getElementById('errBox').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-function showOk(msg) {
-  document.getElementById('okMsg').textContent = msg;
-  document.getElementById('okBox').classList.add('show');
-  document.getElementById('errBox').classList.remove('show');
-}
-function hideAlerts() {
-  document.getElementById('errBox').classList.remove('show');
-  document.getElementById('okBox').classList.remove('show');
-}
-function showBanner() {
-  document.getElementById('popupBanner').classList.add('show');
-  document.getElementById('popupBanner').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-function hideBanner() {
-  document.getElementById('popupBanner').classList.remove('show');
-}
-function goToDash() { window.location.href = '/dashboard'; }
+function showErr(msg){document.getElementById('errMsg').textContent=msg;document.getElementById('errBox').classList.add('show');document.getElementById('okBox').classList.remove('show');document.getElementById('errBox').scrollIntoView({behavior:'smooth',block:'nearest'});}
+function showOk(msg){document.getElementById('okMsg').textContent=msg;document.getElementById('okBox').classList.add('show');document.getElementById('errBox').classList.remove('show');}
+function hideAlerts(){document.getElementById('errBox').classList.remove('show');document.getElementById('okBox').classList.remove('show');}
+function showBanner(){document.getElementById('popupBanner').classList.add('show');document.getElementById('popupBanner').scrollIntoView({behavior:'smooth',block:'nearest'});}
+function hideBanner(){document.getElementById('popupBanner').classList.remove('show');}
+function goToDash(){window.location.href='/dashboard';}
 
-// ── PREFILL SAVED KEYS ──
-(async function prefill() {
-  try {
-    const res  = await fetch(`${API}/config`, { credentials: 'include' });
-    const data = await res.json();
-    if (!data.ok) return;
-    const c = data.config;
-    if (c.groq_api_key) {
-      savedGroq = true;
-      document.getElementById('cfgGroq').placeholder = 'already saved — leave blank to keep';
-    }
-    if (c.serpapi_key) {
-      document.getElementById('cfgSerp').placeholder = 'already saved — leave blank to keep';
-    }
-    if (savedGroq) document.getElementById('saveBtnLabel').textContent = 'Update & Continue →';
-  } catch(e) {}
+(async function prefill(){
+  try{
+    const res=await fetch(`${API}/config`,{credentials:'include'});
+    const data=await res.json();
+    if(!data.ok)return;
+    const c=data.config;
+    if(c.groq_api_key){savedGroq=true;document.getElementById('cfgGroq').placeholder='already saved — leave blank to keep';}
+    if(c.serpapi_key){document.getElementById('cfgSerp').placeholder='already saved — leave blank to keep';}
+    if(savedGroq)document.getElementById('saveBtnLabel').textContent='Update & Continue →';
+  }catch(e){}
 })();
 
-// ── AUTH CHECK ──
-(async function authCheck() {
-  try {
-    const res  = await fetch(`${API}/me`, { credentials: 'include' });
-    const data = await res.json();
-    if (!data.authenticated) window.location.href = '/';
-  } catch(e) {}
+(async function authCheck(){
+  try{const res=await fetch(`${API}/me`,{credentials:'include'});const data=await res.json();if(!data.authenticated)window.location.href='/';}catch(e){}
 })();
 
-// Load channels on open + poll every 4s
 loadChannels();
-setInterval(loadChannels, 4000);
+setInterval(loadChannels,4000);
 </script>
 </body>
 </html>
