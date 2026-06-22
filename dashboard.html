@@ -126,6 +126,10 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .ch-plat.li{color:rgba(100,160,255,0.7);}.ch-plat.fb{color:rgba(80,140,255,0.7);}.ch-plat.ig{color:rgba(255,100,180,0.7);}
 .ch-st{font-size:10px;font-family:var(--mono);color:var(--muted2);}
 .ch-item.ch-on .ch-st{color:var(--green);}
+.ch-name-tag{display:flex;align-items:center;gap:10px;padding:12px 16px;border:1.5px solid rgba(61,255,192,0.25);border-radius:14px;background:rgba(61,255,192,0.04);}
+.ch-name-icon{font-size:20px;flex-shrink:0;}
+.ch-name-label{font-size:13px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ch-name-plat{font-size:9px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--green);background:rgba(61,255,192,0.1);border:1px solid rgba(61,255,192,0.2);border-radius:5px;padding:2px 7px;flex-shrink:0;}
 .ch-add-btn{border:1.5px dashed var(--border2);border-radius:16px;padding:16px;background:rgba(255,255,255,0.01);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all 0.2s;opacity:0.55;}
 .ch-add-btn:hover{opacity:1;border-color:var(--p);}
 .ch-add-btn span{font-size:11px;color:var(--muted);font-family:var(--mono);}
@@ -356,7 +360,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
       <div class="ch-card-title">📡 Connected Channels</div>
       <span class="ch-chip" id="activeChip">Loading...</span>
     </div>
-    <div class="ch-sub">Toggle channels on/off for all future posts. Or pick specific channels per-subject when adding.</div>
+    <div class="ch-sub">Your connected channels. All posts go to all channels by default — or pick specific ones per post when generating.</div>
     <div class="ch-grid" id="channelGrid">
       <div style="font-size:12px;color:var(--muted);font-family:var(--mono);padding:8px;">Loading channels...</div>
     </div>
@@ -396,7 +400,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
       <div class="ch-picker-grid" id="chPickerGrid">
         <span style="font-size:11px;color:var(--muted2);font-family:var(--mono);">Loading...</span>
       </div>
-      <div class="ch-picker-note">Leave all OFF to use global channel toggles above. Toggle ON to override for this batch only.</div>
+      <div class="ch-picker-note">Leave all unselected to post to <strong>all connected channels</strong>. Select specific ones to override for this batch only.</div>
     </div>
 
     <div class="slot-schedule-note" id="slotScheduleNote">
@@ -510,27 +514,29 @@ function checkSerpKey(){const dot=document.querySelector('#badgeSerp .dot');docu
 function onFileChange(){const f=document.getElementById('imgFile').files[0];document.getElementById('fileName').textContent=f?f.name:'';document.getElementById('dropzone').classList.toggle('has-file',!!f);}
 
 // ── RENDER CHANNELS ──
-function platformIcon(p){return p==='instagram'?'📸':p==='facebook'?'📘':'💼';}
-function platformClass(p){return p==='instagram'?'ig':p==='facebook'?'fb':'li';}
 
 function renderChannels(channels){
   const grid=document.getElementById('channelGrid'),chip=document.getElementById('activeChip'),noChan=document.getElementById('noChanBanner');
-  if(!channels||!channels.length){grid.innerHTML='<div style="font-size:12px;color:var(--muted);font-family:var(--mono);padding:8px;">No channels connected yet.</div>';chip.textContent='None active';chip.style.color='var(--red)';noChan.classList.add('show');return;}
-  const activeCount=channels.filter(c=>c.enabled&&c.exists).length;
-  chip.textContent=activeCount>0?`${activeCount} posting`:'None active';chip.style.color=activeCount>0?'var(--green)':'var(--red)';
-  noChan.classList.toggle('show',channels.filter(c=>c.exists).length===0);
-  let html='';
-  channels.forEach(ch=>{
-    const plat=ch.platform||'linkedin',icon=platformIcon(plat),platCls=platformClass(plat);
-    const name=ch.name||`${plat} #${ch.slot}`,isOn=ch.exists&&ch.enabled,key=`${plat}_${ch.slot}`;
-    if(ch.exists){
-      html+=`<div class="ch-item${isOn?' ch-on':''}" id="chItem_${key}" onclick="toggleChannel('${key}','${plat}',${ch.slot})"><div class="ch-item-hdr"><span class="ch-item-name" title="${name}">${icon} ${name}</span><div class="ch-toggle"><div class="knob"></div></div></div><span class="ch-plat ${platCls}">${plat.toUpperCase()}</span><span class="ch-st" id="chSt_${key}">${isOn?'● Posting ON':'○ Posting OFF'}</span></div>`;
-    }else{
-      html+=`<div class="ch-item ch-item-empty"><div class="ch-item-hdr"><span class="ch-item-name">${icon} Not connected</span><div class="ch-toggle"><div class="knob"></div></div></div><span class="ch-plat ${platCls}">${plat.toUpperCase()}</span><span class="ch-st">○ not connected</span></div>`;
-    }
-  });
-  html+=`<div class="ch-add-btn" onclick="window.location.href='/setup'"><span style="font-size:18px;color:var(--muted)">+</span><span>Add Channel</span></div>`;
-  grid.innerHTML=html;
+  const connected=(channels||[]).filter(c=>c.exists);
+  if(!connected.length){
+    grid.innerHTML='<div style="font-size:12px;color:var(--muted);font-family:var(--mono);padding:8px;">No channels connected yet.</div>';
+    chip.textContent='None connected';chip.style.color='var(--red)';
+    noChan.classList.add('show');
+    renderChPicker(channels);return;
+  }
+  noChan.classList.remove('show');
+  chip.textContent=`${connected.length} connected`;chip.style.color='var(--green)';
+  const icons={'linkedin':'💼','facebook':'📘','instagram':'📸'};
+  grid.innerHTML=connected.map(ch=>{
+    const icon=icons[ch.platform]||'📡';
+    const name=ch.name||`${ch.platform} #${ch.slot}`;
+    const plat=ch.platform;
+    return`<div class="ch-name-tag">
+      <span class="ch-name-icon">${icon}</span>
+      <span class="ch-name-label">${name}</span>
+      <span class="ch-name-plat">${plat}</span>
+    </div>`;
+  }).join('')+`<div class="ch-add-btn" onclick="window.location.href='/setup'"><span style="font-size:18px;color:var(--muted)">+</span><span>Add Channel</span></div>`;
   renderChPicker(channels);
 }
 
