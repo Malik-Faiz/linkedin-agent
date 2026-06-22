@@ -126,10 +126,12 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .ch-plat.li{color:rgba(100,160,255,0.7);}.ch-plat.fb{color:rgba(80,140,255,0.7);}.ch-plat.ig{color:rgba(255,100,180,0.7);}
 .ch-st{font-size:10px;font-family:var(--mono);color:var(--muted2);}
 .ch-item.ch-on .ch-st{color:var(--green);}
-.ch-name-tag{display:flex;align-items:center;gap:10px;padding:12px 16px;border:1.5px solid rgba(61,255,192,0.25);border-radius:14px;background:rgba(61,255,192,0.04);}
-.ch-name-icon{font-size:20px;flex-shrink:0;}
-.ch-name-label{font-size:13px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.ch-name-plat{font-size:9px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--green);background:rgba(61,255,192,0.1);border:1px solid rgba(61,255,192,0.2);border-radius:5px;padding:2px 7px;flex-shrink:0;}
+.ch-name-tag{display:flex;align-items:center;gap:12px;padding:12px 16px;border:1.5px solid rgba(61,255,192,0.22);border-radius:14px;background:rgba(61,255,192,0.04);}
+.ch-logo-wrap{flex-shrink:0;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:rgba(255,255,255,0.05);}
+.ch-logo-wrap svg{display:block;}
+.ch-name-info{flex:1;min-width:0;}
+.ch-name-label{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);}
+.ch-name-plat{font-size:10px;font-family:var(--mono);color:var(--green);margin-top:2px;}
 .ch-add-btn{border:1.5px dashed var(--border2);border-radius:16px;padding:16px;background:rgba(255,255,255,0.01);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all 0.2s;opacity:0.55;}
 .ch-add-btn:hover{opacity:1;border-color:var(--p);}
 .ch-add-btn span{font-size:11px;color:var(--muted);font-family:var(--mono);}
@@ -485,11 +487,16 @@ function renderChPicker(channels){
   const grid=document.getElementById('chPickerGrid');
   if(!grid)return;
   if(!allChannels.length){grid.innerHTML='<span style="font-size:11px;color:var(--muted2);font-family:var(--mono);">No channels connected</span>';return;}
-  const icons={'linkedin':'💼','facebook':'📘','instagram':'📸'};
+  const platLabel={'linkedin':'LinkedIn','facebook':'Facebook','instagram':'Instagram'};
   grid.innerHTML=allChannels.map(ch=>{
     const key=`${ch.platform}_${ch.slot}`;
     const on=selectedChannels.has(key);
-    return`<div class="ch-pick-item${on?' picked':''}" id="chpick_${key}" onclick="toggleChPick('${key}')">${icons[ch.platform]||'📡'} ${ch.name||ch.platform+' #'+ch.slot}</div>`;
+    const logo=(PLATFORM_LOGOS||{})[ch.platform]||'';
+    const name=ch.name||`${ch.platform} #${ch.slot}`;
+    return`<div class="ch-pick-item${on?' picked':''}" id="chpick_${key}" onclick="toggleChPick('${key}')">
+      <span style="display:flex;align-items:center;">${logo}</span>
+      <span>${name}</span>
+    </div>`;
   }).join('');
 }
 
@@ -514,6 +521,11 @@ function checkSerpKey(){const dot=document.querySelector('#badgeSerp .dot');docu
 function onFileChange(){const f=document.getElementById('imgFile').files[0];document.getElementById('fileName').textContent=f?f.name:'';document.getElementById('dropzone').classList.toggle('has-file',!!f);}
 
 // ── RENDER CHANNELS ──
+const PLATFORM_LOGOS = {
+  linkedin: `<svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect width="24" height="24" rx="4" fill="#0A66C2"/><path d="M7.5 9.5H5V18.5H7.5V9.5ZM6.25 8.5C7.08 8.5 7.75 7.83 7.75 7C7.75 6.17 7.08 5.5 6.25 5.5C5.42 5.5 4.75 6.17 4.75 7C4.75 7.83 5.42 8.5 6.25 8.5ZM19.5 18.5H17V14C17 12.9 16.1 12 15 12C13.9 12 13 12.9 13 14V18.5H10.5V9.5H13V10.76C13.57 9.93 14.56 9.5 15.5 9.5C17.71 9.5 19.5 11.29 19.5 13.5V18.5Z" fill="white"/></svg>`,
+  facebook: `<svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect width="24" height="24" rx="4" fill="#1877F2"/><path d="M16.5 12H14V10.5C14 9.95 14.45 9.5 15 9.5H16V7H14.5C12.84 7 11.5 8.34 11.5 10V12H9.5V14.5H11.5V21H14V14.5H16L16.5 12Z" fill="white"/></svg>`,
+  instagram: `<svg width="22" height="22" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="igG" cx="30%" cy="110%" r="140%"><stop offset="0%" stop-color="#ffd600"/><stop offset="45%" stop-color="#ff0069"/><stop offset="100%" stop-color="#7b2ff7"/></radialGradient></defs><rect width="24" height="24" rx="6" fill="url(#igG)"/><rect x="6.5" y="6.5" width="11" height="11" rx="3.2" stroke="white" stroke-width="1.6" fill="none"/><circle cx="12" cy="12" r="2.8" stroke="white" stroke-width="1.5" fill="none"/><circle cx="16.3" cy="7.7" r="1" fill="white"/></svg>`,
+};
 
 function renderChannels(channels){
   const grid=document.getElementById('channelGrid'),chip=document.getElementById('activeChip'),noChan=document.getElementById('noChanBanner');
@@ -526,32 +538,21 @@ function renderChannels(channels){
   }
   noChan.classList.remove('show');
   chip.textContent=`${connected.length} connected`;chip.style.color='var(--green)';
-  const icons={'linkedin':'💼','facebook':'📘','instagram':'📸'};
   grid.innerHTML=connected.map(ch=>{
-    const icon=icons[ch.platform]||'📡';
+    const logo=PLATFORM_LOGOS[ch.platform]||'';
     const name=ch.name||`${ch.platform} #${ch.slot}`;
-    const plat=ch.platform;
+    const platLabel={'linkedin':'LinkedIn','facebook':'Facebook','instagram':'Instagram'}[ch.platform]||ch.platform;
     return`<div class="ch-name-tag">
-      <span class="ch-name-icon">${icon}</span>
-      <span class="ch-name-label">${name}</span>
-      <span class="ch-name-plat">${plat}</span>
+      <div class="ch-logo-wrap">${logo}</div>
+      <div class="ch-name-info">
+        <div class="ch-name-label">${name}</div>
+        <div class="ch-name-plat">${platLabel}</div>
+      </div>
     </div>`;
   }).join('')+`<div class="ch-add-btn" onclick="window.location.href='/setup'"><span style="font-size:18px;color:var(--muted)">+</span><span>Add Channel</span></div>`;
   renderChPicker(channels);
 }
 
-async function toggleChannel(key,platform,slot){
-  const item=document.getElementById(`chItem_${key}`),label=document.getElementById(`chSt_${key}`);
-  if(!item)return;
-  const turningOn=!item.classList.contains('ch-on');
-  item.classList.toggle('ch-on',turningOn);
-  if(label)label.textContent=turningOn?'● Posting ON':'○ Posting OFF';
-  try{
-    const res=await fetch(`${API}/channel/toggle`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({platform,slot,enabled:turningOn})});
-    const data=await res.json();
-    if(!data.ok){item.classList.toggle('ch-on',!turningOn);if(label)label.textContent=!turningOn?'● Posting ON':'○ Posting OFF';}
-  }catch(e){item.classList.toggle('ch-on',!turningOn);if(label)label.textContent=!turningOn?'● Posting ON':'○ Posting OFF';}
-}
 
 // ── BADGES ──
 function updateBadges(cfg,accounts){
