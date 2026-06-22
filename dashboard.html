@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"> 
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LinkedIn Agent · Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -130,30 +130,11 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .ch-add-btn:hover{opacity:1;border-color:var(--p);}
 .ch-add-btn span{font-size:11px;color:var(--muted);font-family:var(--mono);}
 
-/* TWO COL */
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
-.card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:22px;}
+/* GENERATE CARD */
+.card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:22px;margin-bottom:16px;}
 .card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
 .card-hdr h2{font-size:15px;font-weight:700;letter-spacing:-0.3px;}
 .chip{font-size:11px;font-family:var(--mono);background:var(--card);border:1px solid var(--border2);border-radius:7px;padding:3px 10px;color:var(--muted);}
-
-/* QUEUE */
-.next-badge{display:flex;align-items:center;gap:8px;background:rgba(255,204,92,0.07);border:1px solid rgba(255,204,92,0.18);border-radius:10px;padding:9px 12px;font-size:12px;color:var(--amber);margin-bottom:14px;font-family:var(--mono);}
-.qi{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;font-size:13px;transition:background 0.15s;position:relative;}
-.qi:hover{background:var(--card-h);}
-.qi.next{background:rgba(176,133,255,0.06);border:1px solid rgba(176,133,255,0.12);}
-.qi-n{font-family:var(--mono);font-size:11px;color:var(--muted2);min-width:22px;flex-shrink:0;}
-.qi-t{flex:1;line-height:1.3;font-size:12.5px;}
-.qi-tag{font-size:9px;font-family:var(--mono);border-radius:5px;padding:2px 7px;white-space:nowrap;flex-shrink:0;}
-.tag-img{background:rgba(176,133,255,0.15);color:var(--p);}
-.tag-auto{background:rgba(126,232,255,0.12);color:var(--p3);}
-.tag-txt{background:rgba(61,255,192,0.1);color:var(--green);}
-.qi-del{flex-shrink:0;width:22px;height:22px;border-radius:6px;border:none;background:transparent;color:var(--muted2);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all 0.15s;opacity:0;}
-.qi:hover .qi-del{opacity:1;}
-.qi-del:hover{background:rgba(255,96,96,0.15);color:var(--red);}
-.empty-q{text-align:center;padding:28px;color:var(--muted);font-size:13px;}
-
-/* ADD SUBJECTS */
 .mode-sel{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;}
 .mode-opt{padding:10px 6px;border-radius:11px;border:1.5px solid var(--border2);background:rgba(255,255,255,0.02);color:var(--muted);font-family:var(--mono);font-size:10px;cursor:pointer;transition:all 0.22s;text-align:center;line-height:1.6;}
 .mode-opt .mi{display:block;font-size:17px;margin-bottom:4px;}
@@ -161,7 +142,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .mode-opt.sel-t{border-color:var(--green);background:rgba(61,255,192,0.06);color:var(--green);}
 .mode-opt.sel-a{border-color:var(--p3);background:rgba(126,232,255,0.06);color:var(--p3);}
 .mode-opt.sel-m{border-color:var(--p);background:rgba(176,133,255,0.08);color:var(--p);}
-.subj-ta{width:100%;background:rgba(0,0,0,0.3);border:1.5px solid var(--border2);border-radius:12px;padding:12px 14px;color:var(--text);font-family:var(--mono);font-size:12px;resize:vertical;min-height:88px;outline:none;transition:all 0.2s;}
+.subj-ta{width:100%;background:rgba(0,0,0,0.3);border:1.5px solid var(--border2);border-radius:12px;padding:12px 14px;color:var(--text);font-family:var(--mono);font-size:12px;resize:vertical;min-height:100px;outline:none;transition:all 0.2s;}
 .subj-ta:focus{border-color:rgba(176,133,255,0.4);background:rgba(176,133,255,0.04);box-shadow:0 0 0 3px rgba(176,133,255,0.08);}
 .subj-ta::placeholder{color:var(--muted2);}
 .mode-panel{display:none;}
@@ -173,8 +154,6 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .upload-zone.has-file{border-color:var(--p);background:rgba(176,133,255,0.06);}
 .upload-zone p{font-size:12px;color:var(--muted);font-family:var(--mono);margin-top:8px;}
 .upload-fname{color:var(--p);font-size:11px;margin-top:4px;}
-
-/* CHANNEL PICKER for subjects */
 .ch-picker{margin-top:12px;background:rgba(176,133,255,0.04);border:1.5px solid rgba(176,133,255,0.2);border-radius:12px;padding:14px;}
 .ch-picker-title{font-size:11px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--p);margin-bottom:10px;}
 .ch-picker-grid{display:flex;flex-wrap:wrap;gap:8px;}
@@ -183,16 +162,12 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .ch-pick-item.picked{border-color:rgba(61,255,192,0.4);background:rgba(61,255,192,0.06);color:var(--green);}
 .ch-pick-item.picked::before{content:'✓ ';}
 .ch-picker-note{font-size:10px;color:var(--muted2);font-family:var(--mono);margin-top:8px;line-height:1.6;}
-
-.add-btn{margin-top:14px;width:100%;padding:13px;border-radius:12px;background:linear-gradient(135deg,var(--p),var(--p2));border:none;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity 0.2s,transform 0.15s;box-shadow:0 6px 20px rgba(176,133,255,0.28);}
-.add-btn:hover:not(:disabled){opacity:0.9;transform:translateY(-1px);}
-.add-btn:disabled{opacity:0.4;cursor:not-allowed;}
-
-/* RUN BUTTON */
-.run-btn{width:100%;padding:18px;border-radius:16px;background:linear-gradient(135deg,var(--p),#d060f0,var(--p2));border:none;color:#fff;font-family:var(--font);font-size:16px;font-weight:800;cursor:pointer;letter-spacing:-0.5px;display:flex;align-items:center;justify-content:center;gap:10px;position:relative;overflow:hidden;box-shadow:0 12px 40px rgba(176,133,255,0.35);transition:opacity 0.2s,transform 0.15s;margin-bottom:16px;}
-.run-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,0.15),transparent);}
-.run-btn:hover:not(:disabled){opacity:0.9;transform:translateY(-1.5px);}
-.run-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.gen-btn{margin-top:14px;width:100%;padding:14px;border-radius:12px;background:linear-gradient(135deg,var(--p),var(--p2));border:none;color:#fff;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity 0.2s,transform 0.15s;box-shadow:0 6px 20px rgba(176,133,255,0.28);}
+.gen-btn:hover:not(:disabled){opacity:0.9;transform:translateY(-1px);}
+.gen-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.gen-success{display:none;margin-top:12px;background:rgba(61,255,192,0.07);border:1px solid rgba(61,255,192,0.22);border-radius:11px;padding:12px 14px;font-size:12px;font-family:var(--mono);color:var(--green);line-height:1.6;}
+.gen-success.show{display:flex;align-items:center;gap:8px;}
+.slot-schedule-note{margin-top:10px;background:rgba(176,133,255,0.05);border:1px solid rgba(176,133,255,0.18);border-radius:10px;padding:10px 14px;font-size:11px;font-family:var(--mono);color:var(--muted2);line-height:1.6;}
 
 /* ════ REVIEW QUEUE ════ */
 .rv-url-inp{width:100%;background:rgba(0,0,0,0.3);border:1.5px solid rgba(176,133,255,0.15);border-radius:10px;padding:10px 12px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;transition:all 0.2s;}
@@ -203,10 +178,14 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .review-hdr h2{font-size:15px;font-weight:700;letter-spacing:-0.3px;}
 .review-empty{text-align:center;padding:28px;color:var(--muted);font-size:13px;font-family:var(--mono);}
 .rv-item{background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:20px;margin-bottom:12px;position:relative;}
-.rv-item.editing{border-color:rgba(176,133,255,0.4);background:rgba(176,133,255,0.03);}
+.rv-item.rv-generating{border-color:rgba(176,133,255,0.3);background:rgba(176,133,255,0.03);}
+.rv-item.rv-failed{border-color:rgba(255,96,96,0.3);background:rgba(255,96,96,0.03);}
 .rv-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
 .rv-subject{font-size:13px;font-weight:700;color:var(--text);}
-.rv-countdown{font-size:11px;font-family:var(--mono);color:var(--amber);background:rgba(255,204,92,0.08);border:1px solid rgba(255,204,92,0.2);border-radius:7px;padding:3px 10px;white-space:nowrap;}
+.rv-slot-badge{font-size:11px;font-family:var(--mono);color:var(--amber);background:rgba(255,204,92,0.08);border:1px solid rgba(255,204,92,0.2);border-radius:7px;padding:3px 10px;white-space:nowrap;}
+.rv-slot-badge.soon{color:var(--green);background:rgba(61,255,192,0.08);border-color:rgba(61,255,192,0.25);}
+.rv-gen-body{display:flex;align-items:center;gap:12px;padding:20px;color:var(--p);font-family:var(--mono);font-size:12px;}
+.rv-fail-body{padding:12px;color:var(--red);font-family:var(--mono);font-size:12px;background:rgba(255,96,96,0.05);border-radius:10px;}
 .rv-post-preview{font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--muted);background:rgba(0,0,0,0.2);border-radius:10px;padding:12px;max-height:120px;overflow-y:auto;margin-bottom:12px;white-space:pre-wrap;word-break:break-word;}
 .rv-post-preview::-webkit-scrollbar{width:3px;}
 .rv-post-preview::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
@@ -224,8 +203,6 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .rv-btn.discard:hover{background:rgba(255,96,96,0.18);}
 .rv-btn.save{background:rgba(126,232,255,0.12);border:1.5px solid rgba(126,232,255,0.3);color:var(--p3);}
 .rv-btn.save:hover{background:rgba(126,232,255,0.22);}
-
-/* Edit mode fields */
 .rv-edit-area{display:none;margin-top:12px;}
 .rv-edit-area.show{display:block;}
 .rv-textarea{width:100%;background:rgba(0,0,0,0.3);border:1.5px solid rgba(176,133,255,0.25);border-radius:10px;padding:12px;color:var(--text);font-family:var(--mono);font-size:12px;resize:vertical;min-height:160px;outline:none;line-height:1.6;transition:border-color 0.2s;}
@@ -234,17 +211,11 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .rv-img-edit{margin-top:10px;border:2px dashed var(--border2);border-radius:10px;padding:14px;text-align:center;cursor:pointer;transition:all 0.2s;}
 .rv-img-edit:hover{border-color:var(--p);background:rgba(176,133,255,0.04);}
 .rv-img-edit p{font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:6px;}
-.rv-save-msg{font-size:11px;font-family:var(--mono);color:var(--p3);margin-top:8px;display:none;}
-.rv-save-msg.show{display:block;}
-
-/* Channel override in review */
 .rv-channels{margin-top:10px;}
 .rv-ch-label{font-size:10px;font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin-bottom:6px;}
 .rv-ch-grid{display:flex;flex-wrap:wrap;gap:6px;}
 .rv-ch-tag{padding:4px 10px;border-radius:7px;font-size:10px;font-family:var(--mono);border:1.5px solid var(--border2);background:rgba(255,255,255,0.02);cursor:pointer;transition:all 0.2s;color:var(--muted2);}
 .rv-ch-tag.on{border-color:rgba(61,255,192,0.35);background:rgba(61,255,192,0.07);color:var(--green);}
-
-
 
 /* LOG */
 .log-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:20px 22px;}
@@ -258,17 +229,15 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 .lok{color:var(--green);}.linfo{color:var(--p3);}.lwarn{color:var(--amber);}.lerr{color:var(--red);}
 .spin{animation:sp 0.8s linear infinite;display:inline-block;}
 @keyframes sp{to{transform:rotate(360deg);}}
-
 .section-divider{display:flex;align-items:center;gap:14px;margin:24px 0 16px;}
 .section-divider span{font-size:10px;font-family:var(--mono);letter-spacing:3px;text-transform:uppercase;color:var(--p);white-space:nowrap;}
 .section-divider::before,.section-divider::after{content:'';flex:1;height:1px;background:var(--border2);}
 
 @media(max-width:720px){
   .stats-row{grid-template-columns:1fr 1fr;}
-  .two-col{grid-template-columns:1fr;}
-  .profile-sections{grid-template-columns:1fr;}
   .dnum{font-size:44px;min-width:68px;}
   .page{padding:20px 16px 60px;}
+  .mode-sel{grid-template-columns:1fr 1fr 1fr;}
 }
 </style>
 </head>
@@ -281,7 +250,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
   <div class="topbar">
     <div class="brand">
       <div class="brand-icon">Li</div>
-      <div class="brand-info"><h1>LinkedIn Agent</h1><p id="headerSub">auto-scheduler · timezone-aware</p></div>
+      <div class="brand-info"><h1>LinkedIn Agent</h1><p id="headerSub">auto-scheduler · slot-aware</p></div>
     </div>
     <div class="topbar-right">
       <div class="status-pill"><div class="pdot" id="statusDot"></div><span id="statusLabel">Connecting...</span></div>
@@ -299,12 +268,12 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
   <div class="banner warn" id="expiryBanner">⏰ Session expires in <strong id="expiryCountdown" style="margin-left:4px;">—</strong>. Please re-login.</div>
   <div class="banner err"  id="connBanner">⚠ Cannot reach server.</div>
   <div class="banner warn" id="noChanBanner">⚠ No channels connected — <span style="cursor:pointer;text-decoration:underline" onclick="window.location.href='/setup'">go to Channels setup →</span></div>
-  <div class="banner warn" id="noApiBanner">⚠ No Groq API key set — posts can't be generated yet. <span style="cursor:pointer;text-decoration:underline" onclick="window.location.href='/setup'">Add one in Setup →</span></div>
+  <div class="banner warn" id="noApiBanner">⚠ No Groq API key set — posts can't be generated yet. <span style="cursor:pointer;text-decoration:underline" onclick="window.location.href='/setup'">Add key in Setup →</span></div>
   <div class="banner info" id="tzBanner"><span id="tzText">Detecting timezone...</span></div>
 
   <!-- TIMER -->
   <div class="timer-card">
-    <div class="tc-eye">⏱ next auto-run countdown</div>
+    <div class="tc-eye">⏱ next slot countdown</div>
     <div class="timer-digits">
       <div class="dblock"><span class="dnum" id="th">00</span><div class="dlabel">Hours</div></div>
       <div class="colon">:</div>
@@ -318,7 +287,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
     <!-- SCHEDULE SETTINGS -->
     <div class="sched-box">
       <div class="sched-label-main">⏰ Daily Posting Schedule</div>
-      <div class="sched-hint-main">Set 1–3 time slots. Each slot posts one subject from the queue automatically.</div>
+      <div class="sched-hint-main">Set 1–3 time slots per day. Posts in the review queue are auto-assigned to upcoming slots in order — day 1 fills first, then day 2, and so on.</div>
       <div class="sched-slots" id="schedSlots">
         <div class="sched-slot" id="slotRow1">
           <span class="slot-badge">Slot 1</span>
@@ -334,7 +303,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
         </div>
         <div class="sched-slot" id="slotRow2" style="display:none">
           <span class="slot-badge">Slot 2</span>
-          <input type="number" class="sched-time-inp" id="slot2h" min="0" max="23" value="15" placeholder="HH">
+          <input type="number" class="sched-time-inp" id="slot2h" min="0" max="23" value="13" placeholder="HH">
           <span class="sched-time-unit">:</span>
           <select class="sched-min-sel" id="slot2m">
             <option value="0">00</option><option value="5">05</option><option value="10">10</option>
@@ -346,7 +315,7 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
         </div>
         <div class="sched-slot" id="slotRow3" style="display:none">
           <span class="slot-badge">Slot 3</span>
-          <input type="number" class="sched-time-inp" id="slot3h" min="0" max="23" value="21" placeholder="HH">
+          <input type="number" class="sched-time-inp" id="slot3h" min="0" max="23" value="18" placeholder="HH">
           <span class="sched-time-unit">:</span>
           <select class="sched-min-sel" id="slot3m">
             <option value="0">00</option><option value="5">05</option><option value="10">10</option>
@@ -376,8 +345,8 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 
   <!-- STATS -->
   <div class="stats-row">
-    <div class="stat-card"><div class="sc-label">Posts Today</div><div class="sc-val cg" id="todayCount">0</div><div class="sc-sub">posted today</div></div>
-    <div class="stat-card"><div class="sc-label">Subjects Left</div><div class="sc-val cp" id="subjLeft">—</div><div class="sc-sub">in queue</div></div>
+    <div class="stat-card"><div class="sc-label">Posts Today</div><div class="sc-val cg" id="todayCount">0</div><div class="sc-sub">published today</div></div>
+    <div class="stat-card"><div class="sc-label">In Review</div><div class="sc-val cp" id="inReviewCount">0</div><div class="sc-sub">pending · generating</div></div>
     <div class="stat-card"><div class="sc-label">All-Time Sent</div><div class="sc-val cb" id="totalRun">0</div><div class="sc-sub">across all channels</div></div>
   </div>
 
@@ -393,75 +362,66 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
     </div>
   </div>
 
-  <!-- TWO COL: Queue + Add -->
-  <div class="two-col">
-    <!-- QUEUE -->
-    <div class="card">
-      <div class="card-hdr"><h2>Subject Queue</h2><span class="chip" id="queueChip">0 subjects</span></div>
-      <div class="next-badge">⏰ Next subject fires at your scheduled time</div>
-      <div id="subjectList"></div>
+  <!-- GENERATE POSTS CARD (full width) -->
+  <div class="card">
+    <div class="card-hdr">
+      <h2>✨ Generate Posts</h2>
+      <span class="chip">one subject per line</span>
     </div>
 
-    <!-- ADD SUBJECTS -->
-    <div class="card">
-      <div class="card-hdr"><h2>Add Subjects</h2><span class="chip">one per line</span></div>
+    <div class="mode-sel">
+      <button class="mode-opt sel-t" id="modeText"   onclick="setMode('no_image')"><span class="mi">Aa</span>Text Only</button>
+      <button class="mode-opt"       id="modeAuto"   onclick="setMode('auto_image')"><span class="mi">✨</span>Auto Image</button>
+      <button class="mode-opt"       id="modeManual" onclick="setMode('manual_image')"><span class="mi">↑</span>Upload Img</button>
+    </div>
 
-      <div class="mode-sel" id="modeSel">
-        <button class="mode-opt sel-t" id="modeText"   onclick="setMode('no_image')"><span class="mi">Aa</span>Text Only</button>
-        <button class="mode-opt"       id="modeAuto"   onclick="setMode('auto_image')"><span class="mi">✨</span>Auto Image</button>
-        <button class="mode-opt"       id="modeManual" onclick="setMode('manual_image')"><span class="mi">↑</span>Upload Img</button>
+    <textarea class="subj-ta" id="newSubjects" placeholder="AI tools for marketers&#10;Remote leadership tips&#10;Personal branding in 2025&#10;&#10;Each line = one post. Posts are generated immediately and assigned to your next available slots in order."></textarea>
+
+    <div class="mode-panel" id="panelAuto">
+      <div class="auto-note">✨ SerpAPI will auto-fetch a relevant image for each post.</div>
+      <div class="serp-warn" id="serpWarn">⚠ <strong>SerpAPI key not set.</strong> Posts will be sent without images. <span style="cursor:pointer;text-decoration:underline" onclick="window.location.href='/setup'">Add key in Setup →</span></div>
+    </div>
+    <div class="mode-panel" id="panelManual">
+      <div class="upload-zone" id="dropzone" onclick="document.getElementById('imgFile').click()">
+        <div style="font-size:26px;color:var(--muted)">↑</div>
+        <p>Click to select an image (shared across all subjects in this batch)</p>
+        <div class="upload-fname" id="fileName"></div>
       </div>
+      <input type="file" id="imgFile" accept="image/*" style="display:none" onchange="onFileChange()">
+    </div>
 
-      <textarea class="subj-ta" id="newSubjects" placeholder="AI tools for marketers&#10;Remote leadership tips&#10;Personal branding in 2025"></textarea>
-
-      <div class="mode-panel" id="panelAuto">
-        <div class="auto-note">✨ SerpAPI auto-fetches a relevant image for each subject.</div>
-        <div class="serp-warn" id="serpWarn">⚠ <strong>SerpAPI key not set.</strong> Posts sent without images.<br><span style="cursor:pointer;text-decoration:underline" onclick="window.location.href='/setup'">Add key in Setup →</span></div>
+    <!-- CHANNEL PICKER -->
+    <div class="ch-picker" id="chPicker">
+      <div class="ch-picker-title">📡 Post to which channels?</div>
+      <div class="ch-picker-grid" id="chPickerGrid">
+        <span style="font-size:11px;color:var(--muted2);font-family:var(--mono);">Loading...</span>
       </div>
-      <div class="mode-panel" id="panelManual">
-        <div class="upload-zone" id="dropzone" onclick="document.getElementById('imgFile').click()">
-          <div style="font-size:26px;color:var(--muted)">↑</div>
-          <p>Click to select an image</p>
-          <div class="upload-fname" id="fileName"></div>
-        </div>
-        <input type="file" id="imgFile" accept="image/*" style="display:none" onchange="onFileChange()">
-      </div>
+      <div class="ch-picker-note">Leave all OFF to use global channel toggles above. Toggle ON to override for this batch only.</div>
+    </div>
 
-      <!-- PER-SUBJECT CHANNEL PICKER -->
-      <div class="ch-picker" id="chPicker">
-        <div class="ch-picker-title">📡 Post to which channels?</div>
-        <div class="ch-picker-grid" id="chPickerGrid">
-          <span style="font-size:11px;color:var(--muted2);font-family:var(--mono);">Loading...</span>
-        </div>
-        <div class="ch-picker-note">Leave all OFF to use global channel toggles above. Toggle ON to override for these subjects only.</div>
-      </div>
+    <div class="slot-schedule-note" id="slotScheduleNote">
+      📅 Posts are assigned to upcoming slots automatically. With 3 slots/day, 7 posts fill: day 1 (slots 1–3), day 2 (slots 4–6), day 3 (slot 7).
+    </div>
 
-      <button class="add-btn" id="addBtn" onclick="addSubjects()">
-        <span id="addLabel">+ Add to Queue</span>
-      </button>
+    <button class="gen-btn" id="genBtn" onclick="generatePosts()">
+      <span id="genBtnLabel">⚡ Generate &amp; Schedule Posts</span>
+    </button>
+    <div class="gen-success" id="genSuccess">
+      ✓ <span id="genSuccessText"></span>
     </div>
   </div>
 
-  <!-- RUN -->
-  <button class="run-btn" id="runBtn" onclick="triggerManual()">
-    <span id="runIcon">▶</span>
-    <span id="runLabel">Run Batch Now — Manual Trigger</span>
-  </button>
-
-  <!-- ════ REVIEW QUEUE ════ -->
+  <!-- REVIEW QUEUE -->
   <div class="section-divider" id="reviewAnchor"><span>📋 Post Review Queue</span></div>
-
   <div class="review-section" id="reviewSection">
     <div class="review-hdr">
-      <h2 id="reviewTitle">Pending Review</h2>
+      <h2>Scheduled Posts</h2>
       <span class="chip" id="reviewChip">0 pending</span>
     </div>
     <div id="reviewList">
-      <div class="review-empty">📭 No posts pending review</div>
+      <div class="review-empty">📭 No posts scheduled — generate some above</div>
     </div>
   </div>
-
-
 
   <!-- LOG -->
   <div class="log-card">
@@ -476,8 +436,8 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 const API = window.location.origin + '/api';
 const SK = 'li_session', WB = 1800000;
 let nextTarget = null, connected = false, prevLogLen = 0, ivals = [], sessW = null;
-let allChannels = [];   // connected channels for pickers
-let selectedChannels = new Set();  // per-subject channel picker
+let allChannels = [];
+let selectedChannels = new Set();
 
 function getS(){try{return JSON.parse(localStorage.getItem(SK))||null;}catch{return null;}}
 function isV(){const s=getS();return s&&Date.now()<s.expiresAt;}
@@ -486,70 +446,55 @@ function clearS(){localStorage.removeItem(SK);}
 function pad(n){return String(n).padStart(2,'0');}
 function tick(el,v){if(el&&el.textContent!==v){el.classList.add('tick');el.textContent=v;setTimeout(()=>el.classList.remove('tick'),100);}}
 
-// ── TIMER — uses server-sent all_slots array, finds next upcoming ──
-let allSlotsData = [];
-
+// ── TIMER ──
 function updateCountdown(){
   if(!nextTarget)return;
-  const diff = nextTarget - new Date();
+  const diff=nextTarget-new Date();
   if(diff<=0){['th','tm','ts'].forEach(id=>tick(document.getElementById(id),'00'));return;}
   tick(document.getElementById('th'),pad(Math.floor(diff/3600000)));
   tick(document.getElementById('tm'),pad(Math.floor((diff%3600000)/60000)));
   tick(document.getElementById('ts'),pad(Math.floor((diff%60000)/1000)));
-  // Progress bar: position within the day
-  document.getElementById('progFill').style.width = Math.min(100,((86400000-diff)/86400000*100)).toFixed(2)+'%';
+  document.getElementById('progFill').style.width=Math.min(100,((86400000-diff)/86400000*100)).toFixed(2)+'%';
 }
 
 function renderSlotsInfo(slots){
   if(!slots||!slots.length)return;
-  allSlotsData = slots;
-  // Timer counts down to first (soonest) slot
-  nextTarget = new Date(slots[0].utc_iso);
-
-  const metaEl = document.getElementById('metaNextSlot');
-  if(metaEl) metaEl.textContent = slots[0].local_label;
-
-  const list = document.getElementById('slotsList');
+  nextTarget=new Date(slots[0].utc_iso);
+  const metaEl=document.getElementById('metaNextSlot');
+  if(metaEl)metaEl.textContent=slots[0].local_label;
+  const list=document.getElementById('slotsList');
   if(!list)return;
-  list.innerHTML = slots.map((s,i)=>{
-    const h = Math.floor(s.seconds_left/3600),m=Math.floor((s.seconds_left%3600)/60),sec=s.seconds_left%60;
-    const label = h>0?`${h}h ${pad(m)}m`:m>0?`${m}m ${pad(sec)}s`:`${pad(sec)}s`;
-    return `<div class="slot-pill${i===0?' next-up':''}">Slot ${i+1}: ${s.local_label} (in ${label})</div>`;
+  list.innerHTML=slots.map((s,i)=>{
+    const h=Math.floor(s.seconds_left/3600),m=Math.floor((s.seconds_left%3600)/60),sec=s.seconds_left%60;
+    const label=h>0?`${h}h ${pad(m)}m`:m>0?`${m}m ${pad(sec)}s`:`${pad(sec)}s`;
+    return`<div class="slot-pill${i===0?' next-up':''}">Slot ${i+1}: ${s.local_label} (in ${label})</div>`;
   }).join('');
 }
 
 function formatOffset(h){if(h===null||h===undefined)return'UTC';const sign=h>=0?'+':'-',abs=Math.abs(h),hh=Math.floor(abs),mm=Math.round((abs-hh)*60);return mm?`UTC${sign}${hh}:${String(mm).padStart(2,'0')}`:`UTC${sign}${hh}`;}
-function updateTzBanner(offset){const tz=Intl.DateTimeFormat().resolvedOptions().timeZone,fmt=formatOffset(offset??-(new Date().getTimezoneOffset()/60));document.getElementById('tzText').textContent=`🌍 ${tz?tz+' (':''}${fmt}${tz?')':''} · Scheduler fires at your set times`;}
+function updateTzBanner(offset){const tz=Intl.DateTimeFormat().resolvedOptions().timeZone,fmt=formatOffset(offset??-(new Date().getTimezoneOffset()/60));document.getElementById('tzText').textContent=`🌍 ${tz?tz+' (':''}${fmt}${tz?')':''} · Posts auto-publish at your scheduled slots`;}
 
-// ── CHANNEL PICKER for subjects ──
+// ── CHANNEL PICKER ──
 function renderChPicker(channels){
-  allChannels = (channels||[]).filter(c=>c.exists);
-  const grid = document.getElementById('chPickerGrid');
+  allChannels=(channels||[]).filter(c=>c.exists);
+  const grid=document.getElementById('chPickerGrid');
   if(!grid)return;
-  if(!allChannels.length){
-    grid.innerHTML='<span style="font-size:11px;color:var(--muted2);font-family:var(--mono);">No channels connected</span>';
-    return;
-  }
+  if(!allChannels.length){grid.innerHTML='<span style="font-size:11px;color:var(--muted2);font-family:var(--mono);">No channels connected</span>';return;}
   const icons={'linkedin':'💼','facebook':'📘','instagram':'📸'};
-  grid.innerHTML = allChannels.map(ch=>{
+  grid.innerHTML=allChannels.map(ch=>{
     const key=`${ch.platform}_${ch.slot}`;
-    const on = selectedChannels.has(key);
-    return `<div class="ch-pick-item${on?' picked':''}" id="chpick_${key}" onclick="toggleChPick('${key}')">${icons[ch.platform]||'📡'} ${ch.name||ch.platform+' #'+ch.slot}</div>`;
+    const on=selectedChannels.has(key);
+    return`<div class="ch-pick-item${on?' picked':''}" id="chpick_${key}" onclick="toggleChPick('${key}')">${icons[ch.platform]||'📡'} ${ch.name||ch.platform+' #'+ch.slot}</div>`;
   }).join('');
 }
 
 function toggleChPick(key){
-  if(selectedChannels.has(key)){
-    selectedChannels.delete(key);
-    document.getElementById(`chpick_${key}`)?.classList.remove('picked');
-  }else{
-    selectedChannels.add(key);
-    document.getElementById(`chpick_${key}`)?.classList.add('picked');
-  }
+  if(selectedChannels.has(key)){selectedChannels.delete(key);document.getElementById(`chpick_${key}`)?.classList.remove('picked');}
+  else{selectedChannels.add(key);document.getElementById(`chpick_${key}`)?.classList.add('picked');}
 }
 
 // ── MODE ──
-let currentMode = 'no_image';
+let currentMode='no_image';
 function setMode(m){
   currentMode=m;
   document.getElementById('modeText').className='mode-opt'+(m==='no_image'?' sel-t':'');
@@ -557,12 +502,9 @@ function setMode(m){
   document.getElementById('modeManual').className='mode-opt'+(m==='manual_image'?' sel-m':'');
   document.getElementById('panelAuto').classList.toggle('show',m==='auto_image');
   document.getElementById('panelManual').classList.toggle('show',m==='manual_image');
-  const labels={no_image:'+ Add to Queue',auto_image:'+ Add — Auto Image',manual_image:'+ Add — With Image'};
-  document.getElementById('addLabel').textContent=labels[m];
   if(m==='auto_image')checkSerpKey();
   else document.getElementById('serpWarn').style.display='none';
 }
-
 function checkSerpKey(){const dot=document.querySelector('#badgeSerp .dot');document.getElementById('serpWarn').style.display=(dot&&dot.classList.contains('dwarn'))?'block':'none';}
 function onFileChange(){const f=document.getElementById('imgFile').files[0];document.getElementById('fileName').textContent=f?f.name:'';document.getElementById('dropzone').classList.toggle('has-file',!!f);}
 
@@ -604,26 +546,6 @@ async function toggleChannel(key,platform,slot){
   }catch(e){item.classList.toggle('ch-on',!turningOn);if(label)label.textContent=!turningOn?'● Posting ON':'○ Posting OFF';}
 }
 
-// ── RENDER SUBJECTS ──
-function renderSubjects(subjects){
-  document.getElementById('subjLeft').textContent=subjects.length;
-  document.getElementById('queueChip').textContent=subjects.length+' subject'+(subjects.length!==1?'s':'');
-  const box=document.getElementById('subjectList');
-  if(!subjects.length){box.innerHTML='<div class="empty-q">📭<br>Queue empty — add subjects above</div>';return;}
-  box.innerHTML=subjects.map((s,i)=>{
-    const isN=i<2,hasM=s.includes('| IMG:'),hasA=s.toLowerCase().includes('(create image)');
-    const hasCh=s.includes('| CHANNELS:');
-    let clean=s.split('| IMG:')[0].split('| CHANNELS:')[0].replace('(create image)','').trim();
-    const tag=hasM?`<span class="qi-tag tag-img">img</span>`:hasA?`<span class="qi-tag tag-auto">auto</span>`:`<span class="qi-tag tag-txt">post</span>`;
-    const chTag=hasCh?`<span class="qi-tag" style="background:rgba(255,204,92,0.1);color:var(--amber)">targeted</span>`:'';
-    return`<div class="qi${isN?' next':''}"><span class="qi-n">${pad(i+1)}</span><span class="qi-t" style="color:${isN?'var(--text)':'var(--muted)'}">${clean}</span>${tag}${chTag}<button class="qi-del" onclick="deleteSubject(${i})" title="Delete">✕</button></div>`;
-  }).join('');
-}
-
-async function deleteSubject(index){
-  try{const res=await fetch(`${API}/subjects/delete`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({index})});const data=await res.json();if(data.ok)fetchStatus();else alert(data.message||'Failed.');}catch(e){alert('Cannot reach server.');}
-}
-
 // ── BADGES ──
 function updateBadges(cfg,accounts){
   const set=(id,ok)=>{const el=document.getElementById(id);if(!el)return;el.querySelector('.dot').className='dot '+(ok?'dok':'dwarn');};
@@ -640,73 +562,105 @@ function renderLogs(logs){
 }
 
 // ── REVIEW QUEUE ──
-let reviewData = [];
-let editingIds = new Set(); // tracks which review items have edit panel open
+let reviewData=[];
+let editingIds=new Set();
 
 function scrollToReview(){
-  const el = document.getElementById('reviewAnchor');
-  if(!el) return;
-  const y = el.getBoundingClientRect().top + window.pageYOffset - 20;
-  window.scrollTo({top: y, behavior: 'smooth'});
+  const el=document.getElementById('reviewAnchor');
+  if(!el)return;
+  window.scrollTo({top:el.getBoundingClientRect().top+window.pageYOffset-20,behavior:'smooth'});
 }
 
-function fmtCountdown(isoStr){
+function fmtSlotLabel(isoStr){
+  if(!isoStr)return'—';
   const diff=new Date(isoStr)-new Date();
-  if(diff<=0)return'auto-publishing now...';
-  const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000),s=Math.floor((diff%60000)/1000);
-  if(h>0)return`auto-publishes in ${h}h ${pad(m)}m`;
-  if(m>0)return`auto-publishes in ${m}m ${pad(s)}s`;
-  return`auto-publishes in ${pad(s)}s`;
+  if(diff<=0)return'publishing now...';
+  const d=new Date(isoStr);
+  const localTime=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const localDate=d.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
+  const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000);
+  const inStr=h>=24?`${Math.floor(h/24)}d ${h%24}h`:h>0?`${h}h ${pad(m)}m`:`${m}m`;
+  return`${localDate} ${localTime} · in ${inStr}`;
 }
 
 function renderReview(queue){
-  reviewData = queue||[];
-  const pending = reviewData.filter(r=>r.status==='pending');
+  reviewData=queue||[];
+  const active=reviewData.filter(r=>r.status==='pending'||r.status==='generating'||r.status==='failed');
 
-  // Always update badge + chip regardless of edit state
-  const chip  = document.getElementById('reviewChip');
-  const badge = document.getElementById('reviewBadge');
-  if(chip){ chip.textContent=`${pending.length} pending`; chip.style.color=pending.length>0?'var(--amber)':'var(--muted)'; }
-  if(badge){ badge.textContent=pending.length; badge.classList.toggle('show',pending.length>0); }
+  const chip=document.getElementById('reviewChip');
+  const badge=document.getElementById('reviewBadge');
+  const inReviewEl=document.getElementById('inReviewCount');
+  const pending=active.filter(r=>r.status==='pending').length;
+  const generating=active.filter(r=>r.status==='generating').length;
 
-  // If ANY item is currently being edited, skip re-rendering the list entirely
-  // (prevents edit area from closing every 3s due to polling)
-  if(editingIds.size > 0){
-    // Just update countdowns inline without touching the DOM structure
-    pending.forEach(r=>{
-      const cd = document.getElementById(`rvc_${r.id}`);
-      if(cd) cd.textContent = fmtCountdown(r.auto_publish_at);
+  if(chip){chip.textContent=`${pending} pending${generating>0?' · '+generating+' generating':''}`;chip.style.color=active.length>0?'var(--amber)':'var(--muted)';}
+  if(badge){badge.textContent=pending+generating;badge.classList.toggle('show',pending+generating>0);}
+  if(inReviewEl)inReviewEl.textContent=active.length;
+
+  // Don't re-render if editing
+  if(editingIds.size>0){
+    active.forEach(r=>{
+      const cd=document.getElementById(`rvc_${r.id}`);
+      if(cd)cd.textContent=fmtSlotLabel(r.auto_publish_at);
     });
     return;
   }
 
-  const list = document.getElementById('reviewList');
-  if(!pending.length){ list.innerHTML='<div class="review-empty">📭 No posts pending review — posts will appear here after generation</div>'; return; }
+  const list=document.getElementById('reviewList');
+  if(!active.length){list.innerHTML='<div class="review-empty">📭 No posts scheduled — generate some above</div>';return;}
 
   const icons={'linkedin':'💼','facebook':'📘','instagram':'📸'};
-  list.innerHTML=pending.map(item=>{
-    const channels = (item.target_channels||[]).map(k=>{
-      const parts=k.split('_');
-      const plat=parts[0],slot=parts[1];
-      const icon=icons[plat]||'📡';
-      return `<span class="rv-ch-tag on" data-rv="${item.id}" data-ch="${k}">${icon} ${plat} #${slot}</span>`;
-    }).join('') || '<span style="font-size:11px;color:var(--muted2);font-family:var(--mono);">All global channels</span>';
 
-    const imgHtml = item.image_url
-      ? `<div class="rv-img-row">
+  list.innerHTML=active.map(item=>{
+    const slotLabel=fmtSlotLabel(item.auto_publish_at);
+    const diff=new Date(item.auto_publish_at)-new Date();
+    const isSoon=diff>0&&diff<3600000;
+
+    if(item.status==='generating'){
+      return`<div class="rv-item rv-generating" id="rvi_${item.id}">
+        <div class="rv-top">
+          <div class="rv-subject">📝 ${item.subject}</div>
+          <div class="rv-slot-badge${isSoon?' soon':''}" id="rvc_${item.id}">${slotLabel}</div>
+        </div>
+        <div class="rv-gen-body"><span class="spin">⟳</span> Generating post with AI... this takes a few seconds.</div>
+      </div>`;
+    }
+
+    if(item.status==='failed'){
+      return`<div class="rv-item rv-failed" id="rvi_${item.id}">
+        <div class="rv-top">
+          <div class="rv-subject">📝 ${item.subject}</div>
+          <div class="rv-slot-badge" id="rvc_${item.id}" style="color:var(--red);border-color:rgba(255,96,96,0.3);background:rgba(255,96,96,0.08);">Failed</div>
+        </div>
+        <div class="rv-fail-body">⚠ Post generation failed — Groq API error. Please discard and try again.</div>
+        <div class="rv-actions" style="margin-top:12px;">
+          <button class="rv-btn discard" onclick="discardReview('${item.id}')">✕ Discard</button>
+        </div>
+      </div>`;
+    }
+
+    // pending
+    const channels=(item.target_channels||[]).map(k=>{
+      const parts=k.split('_');
+      const icon=icons[parts[0]]||'📡';
+      return`<span class="rv-ch-tag on" data-rv="${item.id}" data-ch="${k}">${icon} ${parts[0]} #${parts[1]}</span>`;
+    }).join('')||'<span style="font-size:11px;color:var(--muted2);font-family:var(--mono);">All global channels</span>';
+
+    const imgHtml=item.image_url
+      ?`<div class="rv-img-row">
            <img src="${item.image_url}" class="rv-img-preview" alt="post image"
                 id="rvimgprev_${item.id}"
                 onclick="window.open('${item.image_url}','_blank')"
                 onerror="this.style.display='none';document.getElementById('rvimgbroken_${item.id}').style.display='flex';">
-           <div class="rv-img-broken" id="rvimgbroken_${item.id}">⚠ Image failed to load — the URL may be broken or blocked: ${item.image_url}</div>
+           <div class="rv-img-broken" id="rvimgbroken_${item.id}">⚠ Image failed to load — URL may be broken: ${item.image_url}</div>
            <div class="rv-img-url-line">${item.image_url}</div>
          </div>`
-      : `<div class="rv-img-row" style="color:var(--muted2);font-size:11px;font-family:var(--mono);">🖼 No image</div>`;
+      :`<div class="rv-img-row" style="color:var(--muted2);font-size:11px;font-family:var(--mono);">🖼 No image</div>`;
 
-    return `<div class="rv-item" id="rvi_${item.id}">
+    return`<div class="rv-item" id="rvi_${item.id}">
       <div class="rv-top">
         <div class="rv-subject">📝 ${item.subject}</div>
-        <div class="rv-countdown" id="rvc_${item.id}">${fmtCountdown(item.auto_publish_at)}</div>
+        <div class="rv-slot-badge${isSoon?' soon':''}" id="rvc_${item.id}">${slotLabel}</div>
       </div>
       <div class="rv-post-preview" id="rvp_${item.id}">${item.post_text}</div>
       ${imgHtml}
@@ -725,7 +679,6 @@ function renderReview(queue){
         <input type="file" id="rvimg_${item.id}" accept="image/*" style="display:none" onchange="onRvImgChange('${item.id}')">
         <div style="font-size:10px;color:var(--muted2);font-family:var(--mono);margin-top:8px;">Or enter image URL:</div>
         <input class="rv-url-inp" type="url" id="rvimgurl_${item.id}" placeholder="https://..." value="${item.image_url||''}" style="margin-top:6px;">
-        <div class="rv-save-msg" id="rvsavemsg_${item.id}">✓ Saved — still pending review</div>
       </div>
       <div class="rv-actions" style="margin-top:12px;">
         <button class="rv-btn publish" onclick="publishReview('${item.id}')">✓ Publish Now</button>
@@ -736,118 +689,73 @@ function renderReview(queue){
     </div>`;
   }).join('');
 
-  // Attach channel tag toggle listeners
   document.querySelectorAll('.rv-ch-tag[data-rv]').forEach(tag=>{
-    tag.addEventListener('click', e=>{ e.stopPropagation(); tag.classList.toggle('on'); });
+    tag.addEventListener('click',e=>{e.stopPropagation();tag.classList.toggle('on');});
   });
 }
 
+// Update slot countdowns every second
+setInterval(()=>{
+  reviewData.filter(r=>r.status==='pending'||r.status==='generating').forEach(r=>{
+    const el=document.getElementById(`rvc_${r.id}`);
+    if(el)el.textContent=fmtSlotLabel(r.auto_publish_at);
+  });
+},1000);
+
 function updateCharCount(id){
-  const ta=document.getElementById(`rvta_${id}`);
-  const cc=document.getElementById(`rvcc_${id}`);
+  const ta=document.getElementById(`rvta_${id}`),cc=document.getElementById(`rvcc_${id}`);
   if(ta&&cc){cc.textContent=`${ta.value.length} / 3000 chars`;cc.style.color=ta.value.length>3000?'var(--red)':'var(--muted2)';}
 }
 
-function toggleEdit(event, id){
-  if(event) event.stopPropagation();
-  const ea  = document.getElementById(`rve_${id}`);
-  const btn = document.getElementById(`rvebtn_${id}`);
-  const saveBtn = document.getElementById(`rvsavebtn_${id}`);
-  if(!ea) return;
-  const isOpen = ea.classList.toggle('show');
-  if(isOpen){
-    editingIds.add(id);
-    if(btn) btn.textContent = '✕ Cancel Edit';
-    if(saveBtn) saveBtn.style.display = 'flex';
-    // Sync textarea with current preview text (in case it changed)
-    const ta = document.getElementById(`rvta_${id}`);
-    const pv = document.getElementById(`rvp_${id}`);
-    if(ta && pv && !ta.value.trim()) ta.value = pv.textContent;
-    updateCharCount(id);
-  } else {
-    editingIds.delete(id);
-    if(btn) btn.textContent = '✏ Edit';
-    if(saveBtn) saveBtn.style.display = 'none';
-  }
+function toggleEdit(event,id){
+  if(event)event.stopPropagation();
+  const ea=document.getElementById(`rve_${id}`),btn=document.getElementById(`rvebtn_${id}`),saveBtn=document.getElementById(`rvsavebtn_${id}`);
+  if(!ea)return;
+  const isOpen=ea.classList.toggle('show');
+  if(isOpen){editingIds.add(id);if(btn)btn.textContent='✕ Cancel Edit';if(saveBtn)saveBtn.style.display='flex';updateCharCount(id);}
+  else{editingIds.delete(id);if(btn)btn.textContent='✏ Edit';if(saveBtn)saveBtn.style.display='none';}
 }
 
-function onRvImgChange(id){
-  const f=document.getElementById(`rvimg_${id}`)?.files[0];
-  if(f)document.getElementById(`rvfn_${id}`).textContent=f.name;
-}
+function onRvImgChange(id){const f=document.getElementById(`rvimg_${id}`)?.files[0];if(f)document.getElementById(`rvfn_${id}`).textContent=f.name;}
 
 async function buildEditPayload(id){
   let payload={};
-  const ta=document.getElementById(`rvta_${id}`);
-  if(ta)payload.post_text=ta.value;
-  // Handle new image upload
+  const ta=document.getElementById(`rvta_${id}`);if(ta)payload.post_text=ta.value;
   const imgFile=document.getElementById(`rvimg_${id}`)?.files[0];
   const imgUrlInp=document.getElementById(`rvimgurl_${id}`);
   if(imgFile){
-    // Upload image first
     const b64=await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(imgFile);});
-    try{
-      const up=await fetch(`${API}/review/${id}/update_image`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_base64:b64,filename:imgFile.name})});
-      const ud=await up.json();
-      if(ud.ok)payload.image_url=ud.image_url;
-    }catch(e){}
-  }else if(imgUrlInp&&imgUrlInp.value.trim()){
-    payload.image_url=imgUrlInp.value.trim();
-  }
-  // Channel overrides from rv-ch-tags
+    try{const up=await fetch(`${API}/review/${id}/update_image`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_base64:b64,filename:imgFile.name})});const ud=await up.json();if(ud.ok)payload.image_url=ud.image_url;}catch(e){}
+  }else if(imgUrlInp&&imgUrlInp.value.trim()){payload.image_url=imgUrlInp.value.trim();}
   const tags=document.querySelectorAll(`#rvch_${id} .rv-ch-tag[data-ch]`);
-  if(tags.length){
-    const onChannels=[...tags].filter(t=>t.classList.contains('on')).map(t=>t.dataset.ch);
-    if(onChannels.length)payload.target_channels=onChannels;
-  }
+  if(tags.length){const onCh=[...tags].filter(t=>t.classList.contains('on')).map(t=>t.dataset.ch);if(onCh.length)payload.target_channels=onCh;}
   return payload;
 }
 
-async function saveReview(event, id){
-  if(event) event.stopPropagation();
-  const saveBtn = document.getElementById(`rvsavebtn_${id}`);
-  const msgEl   = document.getElementById(`rvsavemsg_${id}`);
-  const origHTML = saveBtn ? saveBtn.innerHTML : '';
-  if(saveBtn){ saveBtn.disabled=true; saveBtn.innerHTML='<span class="spin">⟳</span> Saving...'; }
+async function saveReview(event,id){
+  if(event)event.stopPropagation();
+  const saveBtn=document.getElementById(`rvsavebtn_${id}`),origHTML=saveBtn?saveBtn.innerHTML:'';
+  if(saveBtn){saveBtn.disabled=true;saveBtn.innerHTML='<span class="spin">⟳</span> Saving...';}
   try{
-    const payload = await buildEditPayload(id);
-    const res = await fetch(`${API}/review/${id}/save`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    const data = await res.json();
+    const payload=await buildEditPayload(id);
+    const res=await fetch(`${API}/review/${id}/save`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data=await res.json();
     if(data.ok){
-      // Update the preview text in place so it reflects saved edits
-      const pv = document.getElementById(`rvp_${id}`);
-      if(pv && payload.post_text) pv.textContent = payload.post_text;
-      // Update reviewData cache too
-      const item = reviewData.find(r=>r.id===id);
-      if(item){
-        if(payload.post_text!==undefined) item.post_text = payload.post_text;
-        if(payload.image_url!==undefined) item.image_url = payload.image_url;
-        if(payload.target_channels!==undefined) item.target_channels = payload.target_channels;
-      }
-      // Close the edit panel now that the save succeeded
-      const ea  = document.getElementById(`rve_${id}`);
-      const btn = document.getElementById(`rvebtn_${id}`);
-      if(ea) ea.classList.remove('show');
-      if(btn) btn.textContent = '✏ Edit';
-      if(saveBtn) saveBtn.style.display = 'none';
+      const pv=document.getElementById(`rvp_${id}`);if(pv&&payload.post_text)pv.textContent=payload.post_text;
+      const item=reviewData.find(r=>r.id===id);
+      if(item){if(payload.post_text!==undefined)item.post_text=payload.post_text;if(payload.image_url!==undefined)item.image_url=payload.image_url;if(payload.target_channels!==undefined)item.target_channels=payload.target_channels;}
+      const ea=document.getElementById(`rve_${id}`),btn=document.getElementById(`rvebtn_${id}`);
+      if(ea)ea.classList.remove('show');if(btn)btn.textContent='✏ Edit';if(saveBtn)saveBtn.style.display='none';
       editingIds.delete(id);
-    } else {
-      alert(data.message||'Save failed.');
-    }
-  }catch(e){
-    alert('Cannot reach server.');
-  } finally {
-    if(saveBtn){ saveBtn.disabled=false; saveBtn.innerHTML=origHTML||'💾 Save'; }
-  }
+    }else{alert(data.message||'Save failed.');}
+  }catch(e){alert('Cannot reach server.');}
+  finally{if(saveBtn){saveBtn.disabled=false;saveBtn.innerHTML=origHTML||'💾 Save';}}
 }
 
 async function publishReview(id){
   const editArea=document.getElementById(`rve_${id}`);
-  const isEditing=editArea?.classList.contains('show');
   let payload={};
-  if(isEditing){
-    payload = await buildEditPayload(id);
-  }
+  if(editArea?.classList.contains('show'))payload=await buildEditPayload(id);
   try{
     const res=await fetch(`${API}/review/${id}/publish`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     const data=await res.json();
@@ -857,7 +765,7 @@ async function publishReview(id){
 }
 
 async function discardReview(id){
-  if(!confirm('Discard this post? It will not be published.'))return;
+  if(!confirm('Discard this post?'))return;
   try{
     const res=await fetch(`${API}/review/${id}/discard`,{method:'POST',credentials:'include'});
     const data=await res.json();
@@ -865,29 +773,38 @@ async function discardReview(id){
   }catch(e){}
 }
 
-// Update review countdowns every second
-setInterval(()=>{
-  reviewData.filter(r=>r.status==='pending').forEach(r=>{
-    const el=document.getElementById(`rvc_${r.id}`);
-    if(el)el.textContent=fmtCountdown(r.auto_publish_at);
-  });
-},1000);
-
 // ── SCHEDULE SETTINGS ──
 let activeSlots=1,schedLoaded=false;
-function to12h(h,m){const mm=String(m||0).padStart(2,'0');if(h===0)return`12:${mm} AM`;if(h<12)return`${h}:${mm} AM`;if(h===12)return`12:${mm} PM`;return`${h-12}:${mm} PM`;}
 function addSlot(){if(activeSlots>=3)return;activeSlots++;document.getElementById(`slotRow${activeSlots}`).style.display='flex';if(activeSlots>=3)document.getElementById('addSlotBtn').style.display='none';}
-function removeSlot(n){document.getElementById(`slotRow${n}`).style.display='none';if(n===2&&activeSlots===3){document.getElementById('slot2h').value=document.getElementById('slot3h').value;document.getElementById('slot2m').value=document.getElementById('slot3m').value;document.getElementById('slotRow3').style.display='none';activeSlots=1;}else if(n===3){activeSlots=2;}else if(n===2){activeSlots=1;}document.getElementById('addSlotBtn').style.display='flex';}
-function getSlotValues(){const slots=[];for(let i=1;i<=3;i++){const row=document.getElementById(`slotRow${i}`);if(row&&row.style.display!=='none'){const h=Math.max(0,Math.min(23,parseInt(document.getElementById(`slot${i}h`).value)||0));const m=parseInt(document.getElementById(`slot${i}m`).value)||0;slots.push({h,m});}}const seen=new Set();return slots.filter(s=>{const k=`${s.h}:${s.m}`;if(seen.has(k))return false;seen.add(k);return true;}).sort((a,b)=>a.h*60+a.m-(b.h*60+b.m));}
+function removeSlot(n){
+  document.getElementById(`slotRow${n}`).style.display='none';
+  if(n===2&&activeSlots===3){document.getElementById('slot2h').value=document.getElementById('slot3h').value;document.getElementById('slot2m').value=document.getElementById('slot3m').value;document.getElementById('slotRow3').style.display='none';activeSlots=1;}
+  else if(n===3){activeSlots=2;}else if(n===2){activeSlots=1;}
+  document.getElementById('addSlotBtn').style.display='flex';
+}
+function getSlotValues(){
+  const slots=[];
+  for(let i=1;i<=3;i++){const row=document.getElementById(`slotRow${i}`);if(row&&row.style.display!=='none'){const h=Math.max(0,Math.min(23,parseInt(document.getElementById(`slot${i}h`).value)||0));const m=parseInt(document.getElementById(`slot${i}m`).value)||0;slots.push({h,m});}}
+  const seen=new Set();
+  return slots.filter(s=>{const k=`${s.h}:${s.m}`;if(seen.has(k))return false;seen.add(k);return true;}).sort((a,b)=>a.h*60+a.m-(b.h*60+b.m));
+}
 async function saveSchedule(){
   const slots=getSlotValues(),savedEl=document.getElementById('schedSaved'),btnEl=document.getElementById('schedSaveBtn');
-  if(slots.length===0){alert('Add at least one time slot.');return;}
-  try{const res=await fetch(`${API}/config`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({time_slots:slots})});const data=await res.json();if(data.ok){savedEl.style.display='inline';btnEl.textContent='✓ Saved';setTimeout(()=>{savedEl.style.display='none';btnEl.textContent='Save Schedule';},2000);fetchStatus();}}catch(e){console.error('Schedule save failed',e);}
+  if(!slots.length){alert('Add at least one time slot.');return;}
+  try{
+    const res=await fetch(`${API}/config`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({time_slots:slots})});
+    const data=await res.json();
+    if(data.ok){savedEl.style.display='inline';btnEl.textContent='✓ Saved';setTimeout(()=>{savedEl.style.display='none';btnEl.textContent='Save Schedule';},2000);fetchStatus();}
+  }catch(e){console.error('Schedule save failed',e);}
 }
 function loadScheduleSettings(timeSlots){
   if(!timeSlots||!timeSlots.length)timeSlots=[{h:8,m:0}];
   timeSlots=timeSlots.slice(0,3);
-  for(let i=1;i<=3;i++){const row=document.getElementById(`slotRow${i}`),inpH=document.getElementById(`slot${i}h`),inpM=document.getElementById(`slot${i}m`);if(i<=timeSlots.length){const s=timeSlots[i-1];if(row)row.style.display='flex';if(inpH)inpH.value=s.h!==undefined?s.h:s;if(inpM)inpM.value=s.m!==undefined?s.m:0;}else{if(row)row.style.display='none';}}
+  for(let i=1;i<=3;i++){
+    const row=document.getElementById(`slotRow${i}`),inpH=document.getElementById(`slot${i}h`),inpM=document.getElementById(`slot${i}m`);
+    if(i<=timeSlots.length){const s=timeSlots[i-1];if(row)row.style.display='flex';if(inpH)inpH.value=s.h!==undefined?s.h:s;if(inpM)inpM.value=s.m!==undefined?s.m:0;}
+    else{if(row)row.style.display='none';}
+  }
   activeSlots=timeSlots.length;
   document.getElementById('addSlotBtn').style.display=activeSlots>=3?'none':'flex';
 }
@@ -900,64 +817,64 @@ async function fetchStatus(){
     const data=await res.json();
     connected=true;
     document.getElementById('connBanner').classList.remove('show');
-    // Timer: use server's all_slots
     if(data.all_slots&&data.all_slots.length)renderSlotsInfo(data.all_slots);
     else if(data.next_run_iso)nextTarget=new Date(data.next_run_iso);
-    const dot=document.getElementById('statusDot');
-    dot.className='pdot'+(data.running?' amber':'');
-    document.getElementById('statusLabel').textContent=data.running?'Running':'Waiting';
-    document.getElementById('todayCount').textContent=data.today_count;
-    document.getElementById('totalRun').textContent=data.total_run;
-    const runBtn=document.getElementById('runBtn');
-    runBtn.disabled=data.running;
-    document.getElementById('runIcon').textContent=data.running?'⟳':'▶';
-    document.getElementById('runIcon').className=data.running?'spin':'';
-    document.getElementById('runLabel').textContent=data.running?'Batch Running — Posts going to Review Queue...':'Run Batch Now — Manual Trigger';
-    renderSubjects(data.subjects||[]);
-    renderLogs(data.logs||[]);
+    document.getElementById('statusDot').className='pdot';
+    document.getElementById('statusLabel').textContent='Active';
+    document.getElementById('todayCount').textContent=data.today_count||0;
+    document.getElementById('totalRun').textContent=data.total_run||0;
     if(data.config||data.accounts)updateBadges(data.config,data.accounts);
     const noApiBanner=document.getElementById('noApiBanner');
-    if(noApiBanner)noApiBanner.classList.toggle('show', !(data.config&&data.config.groq_api_key));
+    if(noApiBanner)noApiBanner.classList.toggle('show',!(data.config&&data.config.groq_api_key));
     if(data.channels_info)renderChannels(data.channels_info);
     updateTzBanner(data.utc_offset);
     if(data.time_slots&&!schedLoaded){loadScheduleSettings(data.time_slots);schedLoaded=true;}
     if(data.review_queue)renderReview(data.review_queue);
-
   }catch(e){
     if(connected){connected=false;document.getElementById('connBanner').classList.add('show');document.getElementById('statusLabel').textContent='Offline';}
   }
 }
 
-// ── ADD SUBJECTS ──
-async function addSubjects(){
-  const ta=document.getElementById('newSubjects'),btn=document.getElementById('addBtn');
+// ── GENERATE POSTS ──
+async function generatePosts(){
+  const ta=document.getElementById('newSubjects'),btn=document.getElementById('genBtn'),successEl=document.getElementById('genSuccess');
   const lines=ta.value.split('\n').map(s=>s.trim()).filter(Boolean);
   if(!lines.length)return;
   if(currentMode==='manual_image'&&!document.getElementById('imgFile').files.length){alert('Please select an image first.');return;}
-  const orig=btn.innerHTML;btn.disabled=true;btn.innerHTML='<span class="spin">⟳</span> Processing...';
+
+  const orig=btn.innerHTML;
+  btn.disabled=true;
+  btn.innerHTML='<span class="spin">⟳</span> Starting generation...';
+  successEl.classList.remove('show');
+
   let payload={subjects:lines,mode:currentMode};
-  // Per-subject channel targeting
   if(selectedChannels.size>0)payload.target_channels=[...selectedChannels];
+
   if(currentMode==='manual_image'){
     const file=document.getElementById('imgFile').files[0];
     payload.filename=file.name;
     payload.image_base64=await new Promise(r=>{const fr=new FileReader();fr.onload=e=>r(e.target.result);fr.readAsDataURL(file);});
   }
+
   try{
     const res=await fetch(`${API}/subjects`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     const data=await res.json();
-    if(data.ok){ta.value='';document.getElementById('imgFile').value='';document.getElementById('fileName').textContent='';document.getElementById('dropzone').classList.remove('has-file');selectedChannels.clear();renderChPicker(allChannels);fetchStatus();}
-    else alert(data.message||'Failed.');
+    if(data.ok){
+      ta.value='';
+      document.getElementById('imgFile').value='';
+      document.getElementById('fileName').textContent='';
+      document.getElementById('dropzone').classList.remove('has-file');
+      selectedChannels.clear();
+      renderChPicker(allChannels);
+      document.getElementById('genSuccessText').textContent=`${data.generating} post(s) being generated — they'll appear in the review queue below as they're ready. Slots assigned automatically.`;
+      successEl.classList.add('show');
+      setTimeout(()=>successEl.classList.remove('show'),8000);
+      // Scroll to review after a moment
+      setTimeout(()=>{scrollToReview();fetchStatus();},800);
+    }else{alert(data.message||'Failed.');}
   }catch(e){alert('Cannot reach server.');}
   finally{btn.innerHTML=orig;btn.disabled=false;}
 }
-
-async function triggerManual(){
-  try{const res=await fetch(`${API}/run`,{method:'POST',credentials:'include'});const data=await res.json();if(!data.ok)alert(data.message);else{fetchStatus();setTimeout(fetchStatus,2000);}}
-  catch(e){alert('Cannot reach server.');}
-}
-
-
 
 // ── SESSION WATCH ──
 function fmtLeft(ms){const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000),s=Math.floor((ms%60000)/1000);return h>0?`${h}h ${m}m`:m>0?`${m}m ${s}s`:`${s}s`;}
@@ -985,7 +902,6 @@ async function doLogout(){
     ivals.push(setInterval(fetchStatus,3000));
     sessW=setInterval(watchSession,10000);
     watchSession();
-    // Scroll to review if hash
     if(window.location.hash==='#review')setTimeout(scrollToReview,800);
   }catch(e){window.location.href='/';}
 })();
