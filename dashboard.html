@@ -435,9 +435,10 @@ body::after{content:'';position:fixed;inset:0;z-index:1000;pointer-events:none;o
 <script>
 const API = window.location.origin + '/api';
 const SK = 'li_session', WB = 1800000;
-let nextTarget = null, connected = false, prevLogLen = 0, ivals = [], sessW = null;
+let nextTarget = null, connected = false, ivals = [], sessW = null;
 let allChannels = [];
 let selectedChannels = new Set();
+let lastLogHash = '';
 
 function getS(){try{return JSON.parse(localStorage.getItem(SK))||null;}catch{return null;}}
 function isV(){const s=getS();return s&&Date.now()<s.expiresAt;}
@@ -554,8 +555,10 @@ function updateBadges(cfg,accounts){
 }
 
 function renderLogs(logs){
-  if(!logs||logs.length===prevLogLen)return;
-  prevLogLen=logs.length;
+  if(!logs||!logs.length)return;
+  const hash=logs.map(l=>l.time+l.msg).join('|');
+  if(hash===lastLogHash)return;
+  lastLogHash=hash;
   const box=document.getElementById('logBox');
   box.innerHTML=logs.map(l=>`<div class="ll"><span class="lt">[${l.time}]</span>&nbsp;<span class="l${l.level==='ok'?'ok':l.level==='error'?'err':l.level==='warn'?'warn':'info'}">${l.msg}</span></div>`).join('');
   box.scrollTop=box.scrollHeight;
@@ -830,6 +833,7 @@ async function fetchStatus(){
     updateTzBanner(data.utc_offset);
     if(data.time_slots&&!schedLoaded){loadScheduleSettings(data.time_slots);schedLoaded=true;}
     if(data.review_queue)renderReview(data.review_queue);
+    if(data.logs)renderLogs(data.logs);
   }catch(e){
     if(connected){connected=false;document.getElementById('connBanner').classList.add('show');document.getElementById('statusLabel').textContent='Offline';}
   }
