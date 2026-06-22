@@ -527,14 +527,15 @@ def publish_to_instagram(username, text, image_url=None):
         return False
 
 def publish_to_channels(username, text, image_url=None, target_channels=None):
-    cfg        = load_config(username)
-    ch_enabled = cfg.get("channel_enabled", {})
-    success    = 0
+    cfg     = load_config(username)
+    success = 0
 
     def channel_allowed(key):
-        if target_channels is not None:
+        # If specific channels were selected for this post, only use those
+        if target_channels is not None and len(target_channels) > 0:
             return key in target_channels
-        return ch_enabled.get(key, True)
+        # Otherwise post to ALL connected channels
+        return True
 
     for slot in [1, 2, 3]:
         if cfg.get(f"linkedin_{slot}_access_token"):
@@ -1064,24 +1065,6 @@ def get_channels():
         "direct_env_set": bool(IG_APP_ID and IG_APP_SECRET),
     }}
     return jsonify({"ok": True, "linkedin": linkedin, "facebook": facebook, "instagram": instagram})
-
-@app.route("/api/channel/toggle", methods=["POST"])
-@require_auth
-def channel_toggle(username):
-    data     = request.get_json()
-    platform = data.get("platform", "")
-    slot     = int(data.get("slot", 1))
-    enabled  = bool(data.get("enabled", True))
-    if platform not in ("linkedin", "facebook", "instagram"):
-        return jsonify({"ok": False, "message": "Unknown platform"}), 400
-    key = f"{platform}_{slot}"
-    cfg = load_config(username)
-    if "channel_enabled" not in cfg:
-        cfg["channel_enabled"] = {}
-    cfg["channel_enabled"][key] = enabled
-    save_config(username, cfg)
-    add_log(username, f"Channel {platform} #{slot} {'enabled' if enabled else 'disabled'}", "info")
-    return jsonify({"ok": True, "key": key, "enabled": enabled})
 
 # ════════════════════════════════════════════════════════════════════════════════
 #  STATUS
