@@ -15,14 +15,12 @@ from flask_cors import CORS
 
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 
-# ─── PATHS ───────────────────────────────────────────────────────────────────
 _DATA_ROOT    = "/data" if os.path.isdir("/data") else "."
 USERS_FILE    = os.path.join(_DATA_ROOT, "users.json")
 USER_DATA_DIR = os.path.join(_DATA_ROOT, "user_data")
 
-TARGET_HOUR = 8  # fallback default slot hour
+TARGET_HOUR = 8
 
-# ─── OAUTH APP CREDENTIALS ───────────────────────────────────────────────────
 LI_CLIENT_ID     = os.environ.get("LINKEDIN_CLIENT_ID", "")
 LI_CLIENT_SECRET = os.environ.get("LINKEDIN_CLIENT_SECRET", "")
 LI_REDIRECT_URI  = os.environ.get("LINKEDIN_REDIRECT_URI", "")
@@ -35,12 +33,10 @@ IG_APP_ID        = os.environ.get("INSTAGRAM_APP_ID", "")
 IG_APP_SECRET    = os.environ.get("INSTAGRAM_APP_SECRET", "")
 IG_REDIRECT_URI  = os.environ.get("INSTAGRAM_REDIRECT_URI", "")
 
-# ─── GOOGLE OAUTH ─────────────────────────────────────────────────────────────
 GOOGLE_CLIENT_ID     = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_REDIRECT_URI  = os.environ.get("GOOGLE_REDIRECT_URI", "")
 
-# ─── AI PROMPT ────────────────────────────────────────────────────────────────
 SYSTEM_PROMPT_POST = """You are an expert LinkedIn ghostwriter.
 Write a highly engaging, professional LinkedIn post based on the user's subject.
 IMPORTANT: Your response must be between 2800 and 3000 characters total. Count carefully.
@@ -51,20 +47,17 @@ IMPORTANT: Your response must be between 2800 and 3000 characters total. Count c
 5. 3 to 5 relevant hashtags.
 Do not exceed 3000 characters. Do not go below 2800 characters."""
 
-# ─── APP SETUP ────────────────────────────────────────────────────────────────
 app = Flask(__name__, static_folder="static")
 app.secret_key = secrets.token_hex(32)
 CORS(app, supports_credentials=True)
 os.makedirs(USER_DATA_DIR, exist_ok=True)
 
-# ─── HTML LOADER ──────────────────────────────────────────────────────────────
 def load_html(name):
     path = os.path.join(os.path.dirname(__file__), name)
     if os.path.exists(path):
         return open(path, encoding="utf-8").read()
     return f"<h1>{name} not found</h1>"
 
-# ─── ENCRYPTION ───────────────────────────────────────────────────────────────
 SENSITIVE_FIELDS = {
     "groq_api_key", "serpapi_key",
     "linkedin_1_access_token", "linkedin_2_access_token", "linkedin_3_access_token",
@@ -116,7 +109,6 @@ def _decrypt_cfg(cfg):
             out[k] = v
     return out
 
-# ─── USER HELPERS ─────────────────────────────────────────────────────────────
 def load_users():
     if not os.path.exists(USERS_FILE):
         return {}
@@ -200,7 +192,6 @@ def save_review_queue(username, queue):
     with open(user_review_path(username), "w", encoding="utf-8") as f:
         json.dump(queue, f, indent=2)
 
-# Per-user review queue lock to prevent race conditions from concurrent threads
 _review_locks = {}
 _review_locks_lock = threading.Lock()
 
@@ -230,7 +221,6 @@ def add_log(username, msg, level="info"):
         state["logs"] = state["logs"][-100:]
     print(f"[{username}][{entry['time']}][{level.upper()}] {msg}")
 
-# ─── AUTH DECORATOR ───────────────────────────────────────────────────────────
 def require_auth(f):
     from functools import wraps
     @wraps(f)
@@ -241,9 +231,7 @@ def require_auth(f):
         return f(*args, username=username, **kwargs)
     return decorated
 
-# ─── SLOT HELPERS ─────────────────────────────────────────────────────────────
 def _parse_raw_slots(raw_slots):
-    """Convert raw config slots to list of (hour, minute) tuples."""
     slots = []
     if not isinstance(raw_slots, list) or not raw_slots:
         return [(TARGET_HOUR, 0)]
@@ -255,7 +243,6 @@ def _parse_raw_slots(raw_slots):
     return slots if slots else [(TARGET_HOUR, 0)]
 
 def get_all_next_slots(username):
-    """Return list of upcoming slot info dicts for the dashboard timer."""
     cfg      = load_config(username)
     offset   = cfg.get("utc_offset_hours", 0)
     now_utc  = datetime.utcnow()
@@ -275,18 +262,12 @@ def get_all_next_slots(username):
     return result
 
 def get_next_run_time_for_user(username):
-    """Return UTC datetime of the next scheduled slot."""
     slots = get_all_next_slots(username)
     if slots:
         return datetime.fromisoformat(slots[0]["utc_iso"].rstrip("Z"))
     return datetime.utcnow() + timedelta(hours=24)
 
 def get_next_available_slot(username, additional_reserved=None):
-    """
-    Find the next slot datetime (UTC ISO string) that is not already
-    occupied by a pending or generating review item.
-    additional_reserved: list of UTC ISO strings already reserved in this batch.
-    """
     cfg    = load_config(username)
     offset = cfg.get("utc_offset_hours", 0)
     now_utc  = datetime.utcnow()
@@ -295,8 +276,6 @@ def get_next_available_slot(username, additional_reserved=None):
         _parse_raw_slots(cfg.get("time_slots", [{"h": TARGET_HOUR, "m": 0}])),
         key=lambda x: x[0] * 60 + x[1]
     )
-
-    # Collect all already-assigned slot times
     queue = load_review_queue(username)
     assigned = set()
     for item in queue:
@@ -307,8 +286,6 @@ def get_next_available_slot(username, additional_reserved=None):
     if additional_reserved:
         for ar in additional_reserved:
             assigned.add(ar)
-
-    # Walk forward day by day, slot by slot, until we find a free one
     user_today = user_now.date()
     for day_offset in range(90):
         check_date = user_today + timedelta(days=day_offset)
@@ -316,15 +293,60 @@ def get_next_available_slot(username, additional_reserved=None):
             slot_local = datetime(check_date.year, check_date.month, check_date.day, sh, sm, 0)
             slot_utc   = slot_local - timedelta(hours=offset)
             if slot_utc <= now_utc:
-                continue  # already past
+                continue
             slot_str = slot_utc.isoformat() + "Z"
             if slot_str not in assigned:
                 return slot_str
-
-    # Absolute fallback
     return (now_utc + timedelta(hours=24)).isoformat() + "Z"
 
-# ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+# ─── REPACK SLOTS ─────────────────────────────────────────────────────────────
+def repack_pending_slots(username, queue):
+    """
+    After a manual publish or discard, re-assign all remaining pending/generating
+    posts to the earliest available slots in order, so no gaps remain in the schedule.
+    Must be called INSIDE get_review_lock(username) with queue already loaded.
+    """
+    cfg    = load_config(username)
+    offset = cfg.get("utc_offset_hours", 0)
+    now_utc  = datetime.utcnow()
+    user_now = now_utc + timedelta(hours=offset)
+    slots    = sorted(
+        _parse_raw_slots(cfg.get("time_slots", [{"h": TARGET_HOUR, "m": 0}])),
+        key=lambda x: x[0] * 60 + x[1]
+    )
+
+    # Collect pending/generating items sorted by their current slot order
+    active_items = sorted(
+        [i for i in queue if i["status"] in ("pending", "generating")],
+        key=lambda x: x.get("auto_publish_at", "")
+    )
+
+    if not active_items:
+        return
+
+    # Walk slots forward and assign sequentially
+    assigned = []
+    user_today = user_now.date()
+    for day_offset in range(90):
+        check_date = user_today + timedelta(days=day_offset)
+        for (sh, sm) in slots:
+            slot_local = datetime(check_date.year, check_date.month, check_date.day, sh, sm, 0)
+            slot_utc   = slot_local - timedelta(hours=offset)
+            if slot_utc <= now_utc:
+                continue
+            assigned.append(slot_utc.isoformat() + "Z")
+            if len(assigned) >= len(active_items):
+                break
+        if len(assigned) >= len(active_items):
+            break
+
+    # Apply new slot times
+    for idx, item in enumerate(active_items):
+        if idx < len(assigned):
+            item["auto_publish_at"] = assigned[idx]
+
+
 def to_unicode_bold(text):
     normal  = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
     b_chars = "𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭𝗮𝗯𝗰𝗱𝗲𝗳𝗴𝗵𝗶𝗷𝗸𝗹𝗺𝗻𝗼𝗽𝗾𝗿𝘀𝘁𝘂𝘃𝘄𝘅𝘆𝘇𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵"
@@ -349,7 +371,6 @@ def validate_image_url(url, timeout=8):
     except Exception:
         return False
 
-# ─── AI FUNCTIONS ─────────────────────────────────────────────────────────────
 def generate_post(username, subject):
     cfg      = load_config(username)
     groq_key = cfg.get("groq_api_key", "")
@@ -400,9 +421,6 @@ def get_image_url(username, subject):
         add_log(username, f"SerpAPI Error: {e}", "error")
         return None
 
-# ════════════════════════════════════════════════════════════════════════════════
-#  PUBLISHING — LinkedIn, Facebook, Instagram
-# ════════════════════════════════════════════════════════════════════════════════
 def publish_to_linkedin_slot(username, slot, text, image_url=None):
     cfg   = load_config(username)
     token = cfg.get(f"linkedin_{slot}_access_token", "")
@@ -531,10 +549,8 @@ def publish_to_channels(username, text, image_url=None, target_channels=None):
     success = 0
 
     def channel_allowed(key):
-        # If specific channels were selected for this post, only use those
         if target_channels is not None and len(target_channels) > 0:
             return key in target_channels
-        # Otherwise post to ALL connected channels
         return True
 
     for slot in [1, 2, 3]:
@@ -567,18 +583,9 @@ def publish_to_channels(username, text, image_url=None, target_channels=None):
 
     return success
 
-# ─── IMMEDIATE GENERATION + REVIEW QUEUE ──────────────────────────────────────
 def generate_and_update_queue(username, subject, review_id, mode, uploaded_url, target_channels):
-    """
-    Background thread: generate post text (and image if needed),
-    then update the placeholder item in the review queue from
-    'generating' → 'pending'. If the assigned slot has already
-    passed by the time generation finishes, publish immediately.
-    """
     add_log(username, f"Generating: {subject[:50]}", "info")
-
     post_text = generate_post(username, subject)
-
     if not post_text:
         with get_review_lock(username):
             queue = load_review_queue(username)
@@ -590,16 +597,12 @@ def generate_and_update_queue(username, subject, review_id, mode, uploaded_url, 
             save_review_queue(username, queue)
         add_log(username, f"Generation failed: {subject[:40]}", "error")
         return
-
-    # Get image if needed
     image_url = uploaded_url
     if mode == "auto_image" and not image_url:
         image_url = get_image_url(username, subject)
         if image_url:
             add_log(username, "Image fetched ✓", "ok")
-
     add_log(username, f"Post ready for review: {subject[:40]}", "ok")
-
     with get_review_lock(username):
         queue = load_review_queue(username)
         for item in queue:
@@ -608,8 +611,6 @@ def generate_and_update_queue(username, subject, review_id, mode, uploaded_url, 
                 item["status"]    = "pending"
                 item["post_text"] = post_text
                 item["image_url"] = image_url
-
-                # Check if the assigned slot already passed while we were generating
                 try:
                     auto_at = datetime.fromisoformat(auto_at_str.rstrip("Z"))
                     if datetime.utcnow() >= auto_at:
@@ -626,12 +627,7 @@ def generate_and_update_queue(username, subject, review_id, mode, uploaded_url, 
                 break
         save_review_queue(username, queue)
 
-
 def auto_publish_reviewer():
-    """
-    Background loop — checks every 30s for pending review items
-    whose assigned slot time has arrived, then publishes them.
-    """
     print("[REVIEWER] Auto-publish reviewer started")
     while True:
         try:
@@ -667,11 +663,12 @@ def auto_publish_reviewer():
                             state["total_run"]   = state.get("total_run", 0) + sent
                             add_log(uname, f"Auto-published to {sent} channel(s) ✓", "ok")
                     if changed:
+                        # Repack after auto-publish too
+                        repack_pending_slots(uname, queue)
                         save_review_queue(uname, queue)
         except Exception as e:
             print(f"[REVIEWER] Error: {e}")
         time.sleep(30)
-
 
 def keep_alive_loop():
     time.sleep(30)
@@ -686,9 +683,6 @@ def keep_alive_loop():
             pass
         time.sleep(600)
 
-# ════════════════════════════════════════════════════════════════════════════════
-#  PAGE ROUTES
-# ════════════════════════════════════════════════════════════════════════════════
 @app.route("/")
 def page_login():     return load_html("index.html")
 @app.route("/setup")
@@ -720,9 +714,6 @@ def ping():
     return jsonify({"status": "alive", "utc_time": utc_now.strftime("%H:%M:%S"),
                     "utc_iso": utc_now.isoformat() + "Z"})
 
-# ════════════════════════════════════════════════════════════════════════════════
-#  AUTH ROUTES
-# ════════════════════════════════════════════════════════════════════════════════
 @app.route("/api/auth/google")
 def google_auth():
     if not GOOGLE_CLIENT_ID:
@@ -800,9 +791,7 @@ def google_callback():
         session.clear()
         session["username"] = username
         session.permanent   = True
-        cfg = load_config(username)
-        redirect_to = "/dashboard"
-        return _google_result_page(True, "Signed in with Google!", redirect_to=redirect_to)
+        return _google_result_page(True, "Signed in with Google!", redirect_to="/dashboard")
     except Exception as e:
         return _google_result_page(False, f"Google sign-in error: {e}")
 
@@ -896,9 +885,6 @@ def me():
         "auth_provider": u.get("auth_provider", "local")
     })
 
-# ════════════════════════════════════════════════════════════════════════════════
-#  PROFILE / ACCOUNT MANAGEMENT
-# ════════════════════════════════════════════════════════════════════════════════
 @app.route("/api/profile/update_email", methods=["POST"])
 @require_auth
 def update_email(username):
@@ -969,9 +955,6 @@ def delete_account(username):
     session.clear()
     return jsonify({"ok": True, "message": "Account deleted."})
 
-# ════════════════════════════════════════════════════════════════════════════════
-#  CONFIG
-# ════════════════════════════════════════════════════════════════════════════════
 @app.route("/api/config", methods=["GET"])
 @require_auth
 def get_config(username):
@@ -1022,9 +1005,6 @@ def save_config_route(username):
     add_log(username, "Config updated ✓", "ok")
     return jsonify({"ok": True, "message": "Configuration saved!"})
 
-# ════════════════════════════════════════════════════════════════════════════════
-#  CHANNELS
-# ════════════════════════════════════════════════════════════════════════════════
 @app.route("/api/channels")
 def get_channels():
     username = session.get("username")
@@ -1066,9 +1046,21 @@ def get_channels():
     }}
     return jsonify({"ok": True, "linkedin": linkedin, "facebook": facebook, "instagram": instagram})
 
-# ════════════════════════════════════════════════════════════════════════════════
-#  STATUS
-# ════════════════════════════════════════════════════════════════════════════════
+@app.route("/api/channel/toggle", methods=["POST"])
+@require_auth
+def toggle_channel(username):
+    data     = request.get_json()
+    platform = data.get("platform", "")
+    slot     = int(data.get("slot", 1))
+    enabled  = bool(data.get("enabled", True))
+    cfg = load_config(username)
+    ch_enabled = cfg.get("channel_enabled", {})
+    key = f"{platform}_{slot}"
+    ch_enabled[key] = enabled
+    cfg["channel_enabled"] = ch_enabled
+    save_config(username, cfg)
+    return jsonify({"ok": True})
+
 @app.route("/api/status")
 @require_auth
 def get_status(username):
@@ -1078,6 +1070,13 @@ def get_status(username):
     cfg          = load_config(username)
     offset       = cfg.get("utc_offset_hours", None)
     ch_enabled   = cfg.get("channel_enabled", {})
+
+    # Daily reset: zero out today_count when the user's local date changes
+    user_today = (datetime.utcnow() + timedelta(hours=offset or 0)).strftime("%Y-%m-%d")
+    if state.get("last_reset_date") != user_today:
+        state["today_count"]     = 0
+        state["last_reset_date"] = user_today
+        save_state(username, state)
 
     channels_info = []
     for slot in [1, 2, 3]:
@@ -1135,9 +1134,6 @@ def get_status(username):
         }
     })
 
-# ════════════════════════════════════════════════════════════════════════════════
-#  SUBJECTS → IMMEDIATE GENERATION
-# ════════════════════════════════════════════════════════════════════════════════
 @app.route("/api/subjects", methods=["POST"])
 @require_auth
 def add_subjects(username):
@@ -1151,7 +1147,6 @@ def add_subjects(username):
     if not new_subjects:
         return jsonify({"ok": False, "message": "No subjects provided"}), 400
 
-    # Upload shared image first (for manual_image mode)
     uploaded_url = None
     if mode == "manual_image" and image_b64:
         try:
@@ -1172,7 +1167,6 @@ def add_subjects(username):
         except Exception as e:
             add_log(username, f"Image upload error: {e}", "error")
 
-    # Pre-assign slots for all subjects (sequential, no race condition)
     reserved_slots = []
     placeholders   = []
 
@@ -1181,7 +1175,7 @@ def add_subjects(username):
             subject = subject.strip()
             if not subject:
                 continue
-            review_id      = secrets.token_hex(8)
+            review_id       = secrets.token_hex(8)
             auto_publish_at = get_next_available_slot(username, additional_reserved=reserved_slots)
             reserved_slots.append(auto_publish_at)
 
@@ -1197,12 +1191,10 @@ def add_subjects(username):
             }
             placeholders.append(placeholder)
 
-        # Save all placeholders atomically
         queue = load_review_queue(username)
         queue.extend(placeholders)
         save_review_queue(username, queue)
 
-    # Start background generation for each
     for ph in placeholders:
         threading.Thread(
             target=generate_and_update_queue,
@@ -1258,15 +1250,22 @@ def publish_review_item(username, review_id):
         if "post_text"       in data: item["post_text"]       = data["post_text"]
         if "image_url"       in data: item["image_url"]       = data["image_url"] or None
         if "target_channels" in data: item["target_channels"] = data["target_channels"]
+
         sent = publish_to_channels(username, item["post_text"], item.get("image_url"), item.get("target_channels"))
         item["status"]             = "published"
         item["published_at"]       = datetime.utcnow().isoformat() + "Z"
         item["published_channels"] = sent
+
         state = get_state(username)
         state["today_count"] = state.get("today_count", 0) + 1
         state["total_run"]   = state.get("total_run", 0) + sent
+
+        # ── REPACK: shift all remaining pending posts into earliest available slots ──
+        repack_pending_slots(username, queue)
+
         save_review_queue(username, queue)
-    add_log(username, f"Manually published {review_id} to {sent} channel(s) ✓", "ok")
+
+    add_log(username, f"Manually published {review_id} to {sent} channel(s) ✓ — slots repacked", "ok")
     return jsonify({"ok": True, "sent": sent})
 
 @app.route("/api/review/<review_id>/discard", methods=["POST"])
@@ -1278,8 +1277,12 @@ def discard_review_item(username, review_id):
         if not item:
             return jsonify({"ok": False, "message": "Not found"}), 404
         item["status"] = "discarded"
+
+        # ── REPACK: shift remaining posts up to fill the freed slot ──
+        repack_pending_slots(username, queue)
+
         save_review_queue(username, queue)
-    add_log(username, f"Review post {review_id} discarded", "warn")
+    add_log(username, f"Review post {review_id} discarded — slots repacked", "warn")
     return jsonify({"ok": True})
 
 @app.route("/api/review/<review_id>/update_image", methods=["POST"])
@@ -1312,9 +1315,6 @@ def update_review_image(username, review_id):
     except Exception as e:
         return jsonify({"ok": False, "message": str(e)}), 500
 
-# ════════════════════════════════════════════════════════════════════════════════
-#  ALL OAUTH ROUTES (LinkedIn, Facebook, Instagram) — unchanged
-# ════════════════════════════════════════════════════════════════════════════════
 def _callback_page(success, message="", msg_key="", platform="linkedin", slot=1):
     if success:
         event = msg_key or f"channel_connected:{platform}:{slot}"
@@ -1453,28 +1453,6 @@ def linkedin_callback():
         li_id   = profile.get("sub", "")
         li_name = (profile.get("name") or f"{profile.get('given_name','')} {profile.get('family_name','')}".strip() or "LinkedIn User")
         orgs = []
-        try:
-            acl_res = requests.get("https://api.linkedin.com/v2/organizationAcls",
-                headers={"Authorization": f"Bearer {access_token}", "X-Restli-Protocol-Version": "2.0.0"},
-                params={"q": "roleAssignee", "count": 50}, timeout=12).json()
-            org_ids = []
-            seen_ids = set()
-            for elem in acl_res.get("elements", []):
-                target = str(elem.get("organizationalTarget", ""))
-                if "organization:" in target:
-                    org_id = target.split("organization:")[-1].strip()
-                    if org_id and org_id not in seen_ids:
-                        seen_ids.add(org_id); org_ids.append(org_id)
-            for org_id in org_ids[:15]:
-                try:
-                    org_info = requests.get(f"https://api.linkedin.com/v2/organizations/{org_id}",
-                        headers={"Authorization": f"Bearer {access_token}", "X-Restli-Protocol-Version": "2.0.0"}, timeout=8).json()
-                    org_name = (org_info.get("localizedName") or next(iter((org_info.get("name") or {}).get("localized", {}).values()), None) or f"Company Page {org_id}")
-                    orgs.append({"id": org_id, "name": org_name})
-                except Exception:
-                    orgs.append({"id": org_id, "name": f"Company Page {org_id}"})
-        except Exception as acl_err:
-            add_log(username, f"LinkedIn ACL fetch failed: {acl_err}", "warn")
         token_key = f"li_pending_{username}_{slot}"
         session[token_key] = {"access_token": access_token, "expires_in": expires_in, "personal_id": li_id, "personal_name": li_name}
         session.modified = True
@@ -1712,15 +1690,12 @@ def instagram_webhook2():
         return "Forbidden", 403
     return "OK", 200
 
-# ─── STARTUP ──────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     threading.Thread(target=keep_alive_loop,       daemon=True).start()
     threading.Thread(target=auto_publish_reviewer, daemon=True).start()
     port = int(os.environ.get("PORT", 5000))
     print(f"[STARTUP] LinkedIn Agent on port {port}")
-    print(f"[STARTUP] Data:      {USER_DATA_DIR}/")
-    print(f"[STARTUP] LinkedIn:  {'✓' if LI_CLIENT_ID else '✗ LINKEDIN_CLIENT_ID not set'}")
-    print(f"[STARTUP] Facebook:  {'✓' if FB_APP_ID else '✗ FACEBOOK_APP_ID not set'}")
-    print(f"[STARTUP] Instagram: {'✓' if IG_APP_ID else '✗ INSTAGRAM_APP_ID not set'}")
-    print(f"[STARTUP] Google:    {'✓' if GOOGLE_CLIENT_ID else '✗ GOOGLE_CLIENT_ID not set'}")
+    print(f"[STARTUP] LinkedIn:  {'✓' if LI_CLIENT_ID else '✗'}")
+    print(f"[STARTUP] Facebook:  {'✓' if FB_APP_ID else '✗'}")
+    print(f"[STARTUP] Google:    {'✓' if GOOGLE_CLIENT_ID else '✗'}")
     app.run(host="0.0.0.0", port=port, debug=False)
